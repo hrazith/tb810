@@ -8,7 +8,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
+  --font-sans: var(--font-sans);
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
@@ -30,4 +30,8 @@ kbd,
 pre,
 samp {
   font-family: var(--font-mono);
+}
+
+.test {
+  border: 2px dotted red;
 }
