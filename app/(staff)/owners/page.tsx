@@ -25,38 +25,43 @@ export default async function OwnersPage({ searchParams }: PageProps) {
             Owners
           </h1>
         </div>
-
-        <Link
-          href="/owners/new"
-          className="inline-flex h-11 items-center justify-center rounded-full bg-zinc-950 px-8 text-md font-semibold text-white transition hover:bg-zinc-800"
-        >
-          Add Owner
-        </Link>
-      </div>
-
-      <form
+        <div className=" flex items-center ">
+          <form
         method="get"
-        className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:grid-cols-[1fr_auto_auto]"
+        className="grid gap-3 rounded-2xl    p-4  sm:grid-cols-[1fr_auto_auto]"
       >
         <input
           name="q"
           defaultValue={params.q ?? ""}
           placeholder="Search owners"
-          className="h-11 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
+          className="h-11 rounded-full border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
         />
         <select
           name="status"
           defaultValue={params.status ?? "active"}
-          className="h-11 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
+          className="h-11 rounded-full border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
         >
           <option value="active">Active</option>
           <option value="archived">Archived</option>
           <option value="all">All</option>
         </select>
-        <button className="h-11 rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950">
+        <button className="h-11 rounded-full border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950">
           Filter
         </button>
       </form>
+      <Link
+          href="/owners/new"
+          className="inline-flex h-11 items-center justify-center rounded-full bg-zinc-950 px-8 text-md font-semibold text-white transition hover:bg-zinc-800"
+        >
+          Add Owner
+        </Link>
+          </div>
+        
+
+        
+      </div>
+
+      
 
       {result.error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
