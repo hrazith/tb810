@@ -1014,10 +1014,7 @@ export type Database = {
       tb810_owners: {
         Row: {
           active: boolean
-          code: string | null
           created_at: string
-          document_number: string | null
-          document_type: string | null
           email: string | null
           full_name: string
           id: string
@@ -1026,14 +1023,12 @@ export type Database = {
           legacy_table: string | null
           notes: string | null
           phone_number: string | null
+          owner_reference: string
           updated_at: string
         }
         Insert: {
           active?: boolean
-          code?: string | null
           created_at?: string
-          document_number?: string | null
-          document_type?: string | null
           email?: string | null
           full_name: string
           id?: string
@@ -1042,14 +1037,12 @@ export type Database = {
           legacy_table?: string | null
           notes?: string | null
           phone_number?: string | null
+          owner_reference?: string
           updated_at?: string
         }
         Update: {
           active?: boolean
-          code?: string | null
           created_at?: string
-          document_number?: string | null
-          document_type?: string | null
           email?: string | null
           full_name?: string
           id?: string
@@ -1058,6 +1051,7 @@ export type Database = {
           legacy_table?: string | null
           notes?: string | null
           phone_number?: string | null
+          owner_reference?: string
           updated_at?: string
         }
         Relationships: []

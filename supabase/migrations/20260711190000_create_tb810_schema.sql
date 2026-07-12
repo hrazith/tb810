@@ -65,11 +65,9 @@ create table public.tb810_unit_types (
 create table public.tb810_owners (
   id uuid primary key default gen_random_uuid(),
   full_name text not null,
-  document_type text,
-  document_number text,
   email text,
   phone_number text,
-  code text,
+  owner_reference text not null unique,
   notes text,
   active boolean not null default true,
   legacy_table text,
@@ -78,6 +76,39 @@ create table public.tb810_owners (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create sequence public.tb810_owner_reference_seq;
+
+create or replace function public.tb810_generate_owner_reference()
+returns text
+language sql
+as $$
+  select 'OWN-' || lpad(nextval('public.tb810_owner_reference_seq')::text, 6, '0');
+$$;
+
+create or replace function public.tb810_protect_owner_reference()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.owner_reference is null then
+      new.owner_reference := public.tb810_generate_owner_reference();
+    end if;
+    return new;
+  end if;
+
+  if new.owner_reference is distinct from old.owner_reference then
+    raise exception 'owner_reference is immutable';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger tb810_owners_protect_owner_reference
+before insert or update on public.tb810_owners
+for each row execute function public.tb810_protect_owner_reference();
 
 create table public.tb810_units (
   id uuid primary key default gen_random_uuid(),
