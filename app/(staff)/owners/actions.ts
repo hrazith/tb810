@@ -2,11 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import {
-  archiveOwner,
-  createOwner,
-  updateOwner,
-} from "@/server/owners";
+import { archiveOwner, createOwner, updateOwner } from "@/server/owners";
 import type { OwnerFormState } from "@/server/owners/types";
 import { ownerInputSchema } from "@/server/owners/validation";
 
@@ -19,7 +15,9 @@ function toOwnerInput(formData: FormData) {
   };
 }
 
-function mapFieldErrors(issues: Array<{ path: ReadonlyArray<PropertyKey>; message: string }>) {
+function mapFieldErrors(
+  issues: Array<{ path: ReadonlyArray<PropertyKey>; message: string }>,
+) {
   const fieldErrors: Record<string, string> = {};
   for (const issue of issues) {
     const key = issue.path[0];
@@ -30,7 +28,10 @@ function mapFieldErrors(issues: Array<{ path: ReadonlyArray<PropertyKey>; messag
   return fieldErrors;
 }
 
-function toFormStateError(message: string, values: ReturnType<typeof toOwnerInput>): OwnerFormState {
+function toFormStateError(
+  message: string,
+  values: ReturnType<typeof toOwnerInput>,
+): OwnerFormState {
   return { error: message, values };
 }
 

@@ -31,7 +31,13 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 py-12 text-zinc-900">
       <section className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-16 shadow-sm">
         <div className="mb-32">
-          <Image src="/TB810.svg" alt="TB810" width={105} height={27} priority />
+          <Image
+            src="/TB810.svg"
+            alt="TB810"
+            width={105}
+            height={27}
+            priority
+          />
         </div>
 
         <form action={formAction} className="space-y-6">

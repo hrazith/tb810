@@ -89,7 +89,10 @@ export async function listOwners(
     }
 
     for (const ownership of ownerships ?? []) {
-      unitCounts.set(ownership.owner_id, (unitCounts.get(ownership.owner_id) ?? 0) + 1);
+      unitCounts.set(
+        ownership.owner_id,
+        (unitCounts.get(ownership.owner_id) ?? 0) + 1,
+      );
     }
   }
 
@@ -102,7 +105,9 @@ export async function listOwners(
   };
 }
 
-export async function getOwnerById(ownerId: string): Promise<QueryResult<OwnerSummary | null>> {
+export async function getOwnerById(
+  ownerId: string,
+): Promise<QueryResult<OwnerSummary | null>> {
   const supabase = await createClient();
 
   const { data: owner, error } = await supabase
@@ -137,7 +142,9 @@ export async function getOwnerById(ownerId: string): Promise<QueryResult<OwnerSu
   };
 }
 
-export async function createOwner(input: OwnerInput): Promise<QueryResult<OwnerRecord>> {
+export async function createOwner(
+  input: OwnerInput,
+): Promise<QueryResult<OwnerRecord>> {
   const supabase = await createClient();
   const parsed = ownerInputSchema.safeParse(input);
 
@@ -201,7 +208,9 @@ export async function updateOwner(
   return { data, error: null };
 }
 
-export async function archiveOwner(ownerId: string): Promise<QueryResult<OwnerRecord>> {
+export async function archiveOwner(
+  ownerId: string,
+): Promise<QueryResult<OwnerRecord>> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -218,7 +227,9 @@ export async function archiveOwner(ownerId: string): Promise<QueryResult<OwnerRe
   return { data, error: null };
 }
 
-export async function getOwnerFormDefaults(ownerId?: string): Promise<OwnerInput | null> {
+export async function getOwnerFormDefaults(
+  ownerId?: string,
+): Promise<OwnerInput | null> {
   if (!ownerId) {
     return null;
   }

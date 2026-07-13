@@ -52,7 +52,9 @@ export default async function OwnerDetailPage({ params }: PageProps) {
             >
               Edit
             </Link>
-            <ArchiveOwnerForm action={archiveOwnerAction.bind(null, owner.id)} />
+            <ArchiveOwnerForm
+              action={archiveOwnerAction.bind(null, owner.id)}
+            />
           </div>
         </div>
       </div>
@@ -60,23 +62,33 @@ export default async function OwnerDetailPage({ params }: PageProps) {
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-zinc-950">Notes</h2>
-          <p className="mt-3 text-sm text-zinc-600">{owner.notes ?? "No notes added."}</p>
+          <p className="mt-3 text-sm text-zinc-600">
+            {owner.notes ?? "No notes added."}
+          </p>
         </section>
 
         <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-zinc-950">Ownership summary</h2>
-          <p className="mt-3 text-sm text-zinc-600">Placeholder for ownership summary.</p>
+          <h2 className="text-lg font-semibold text-zinc-950">
+            Ownership summary
+          </h2>
+          <p className="mt-3 text-sm text-zinc-600">
+            Placeholder for ownership summary.
+          </p>
         </section>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-zinc-950">Unit accounts</h2>
-          <p className="mt-3 text-sm text-zinc-600">Placeholder for unit account summary.</p>
+          <p className="mt-3 text-sm text-zinc-600">
+            Placeholder for unit account summary.
+          </p>
         </section>
 
         <section className="rounded-2xl border border-dashed border-zinc-300 bg-white p-6">
-          <h2 className="text-lg font-semibold text-zinc-950">Future sections</h2>
+          <h2 className="text-lg font-semibold text-zinc-950">
+            Future sections
+          </h2>
           <ul className="mt-3 space-y-2 text-sm text-zinc-600">
             <li>Invoices</li>
             <li>Payments</li>

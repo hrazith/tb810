@@ -17,86 +17,144 @@ export default async function OwnersPage({ searchParams }: PageProps) {
   });
 
   return (
-    <section className="space-y-6">
-      <div className="flex flex-col gap-4     sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          
-          <h1 className="text-3xl font-semibold text-zinc-900">
-            Owners
-          </h1>
+    <section className="">
+      <div className="sm:flex sm:items-center">
+        <div className="sm:flex-auto">
+          <h1 className="text-base font-semibold text-zinc-900">Owners</h1>
+          <p className="mt-2 text-sm text-zinc-700">
+            A list of all owners in TB810 including their reference, contact details, status, and unit count.
+          </p>
         </div>
-        <div className=" flex items-center ">
-          <form
+        <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+          <Link
+            href="/owners/new"
+            className="block rounded-md bg-zinc-950 px-3 py-2 text-center text-sm font-semibold text-white shadow-xs transition hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950"
+          >
+            Add owner
+          </Link>
+        </div>
+      </div>
+
+      <form
         method="get"
-        className="grid gap-3 rounded-2xl    p-4  sm:grid-cols-[1fr_auto_auto]"
+        className="mt-6 grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto]"
       >
         <input
           name="q"
           defaultValue={params.q ?? ""}
           placeholder="Search owners"
-          className="h-11 rounded-full border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
+          className="h-11 rounded-md border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950"
         />
         <select
           name="status"
           defaultValue={params.status ?? "active"}
-          className="h-11 rounded-full border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
+          className="h-11 rounded-md border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition focus:border-zinc-950"
         >
           <option value="active">Active</option>
           <option value="archived">Archived</option>
           <option value="all">All</option>
         </select>
-        <button className="h-11 rounded-full border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950">
+        <button className="h-11 rounded-md border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-xs transition hover:border-zinc-950 hover:text-zinc-950">
           Filter
         </button>
       </form>
-      <Link
-          href="/owners/new"
-          className="inline-flex h-11 items-center justify-center rounded-full bg-zinc-950 px-8 text-md font-semibold text-white transition hover:bg-zinc-800"
-        >
-          Add Owner
-        </Link>
-          </div>
-        
-
-        
-      </div>
-
-      
 
       {result.error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        <div className="mt-6 rounded-md border border-red-200 bg-red-50 p-6 text-sm text-red-700">
           {result.error}
         </div>
       ) : result.data.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center text-sm text-zinc-600">
+        <div className="mt-6 rounded-md border border-dashed border-zinc-300 bg-white p-10 text-center text-sm text-zinc-600">
           No owners found.
         </div>
       ) : (
-        <div className="grid gap-4">
-          {result.data.map((owner) => (
-            <Link
-              key={owner.id}
-              href={`/owners/${owner.id}`}
-              className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-400"
-            >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
-                  <h2 className="text-lg font-semibold text-zinc-950">{owner.full_name}</h2>
-                  <p className="text-sm text-zinc-600">
-                    {owner.email ?? "No email"} · {owner.phone_number ?? "No phone"}
-                  </p>
-                  <p className="text-sm text-zinc-500">
-                    Reference: {owner.owner_reference}
-                  </p>
-                </div>
-                <div className="space-y-1 text-sm text-zinc-600 sm:text-right">
-                  <p>Status: {owner.active ? "Active" : "Archived"}</p>
-                  <p>Units owned: {owner.unit_count}</p>
-                  <p>Updated: {new Date(owner.updated_at).toLocaleDateString()}</p>
-                </div>
-              </div>
-            </Link>
-          ))}
+        <div className="mt-8 flow-root">
+          <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+            <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+              <table className="relative min-w-full divide-y divide-zinc-300">
+                <thead>
+                  <tr>
+                    <th
+                      scope="col"
+                      className="py-3.5 pr-3 pl-4 text-left text-sm font-semibold text-zinc-900 sm:pl-0"
+                    >
+                      Name
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900"
+                    >
+                      Reference
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900"
+                    >
+                      Contact
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900"
+                    >
+                      Status
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900"
+                    >
+                      Units
+                    </th>
+                    <th
+                      scope="col"
+                      className="py-3.5 pr-4 pl-3 sm:pr-0"
+                    >
+                      <span className="sr-only">View</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 bg-white">
+                  {result.data.map((owner) => (
+                    <tr key={owner.id} className="hover:bg-zinc-50 hover:cursor-pointer test -mx-2">
+                      <td className="py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap text-zinc-900 sm:pl-0">
+                        {owner.full_name}
+                      </td>
+                      <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
+                        {owner.owner_reference}
+                      </td>
+                      <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
+                        <div className="space-y-1">
+                          <p>{owner.email ?? "No email"}</p>
+                          <p>{owner.phone_number ?? "No phone"}</p>
+                        </div>
+                      </td>
+                      <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            owner.active
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-zinc-100 text-zinc-700"
+                          }`}
+                        >
+                          {owner.active ? "Active" : "Archived"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
+                        {owner.unit_count}
+                      </td>
+                      <td className="py-4 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-0">
+                        <Link
+                          href={`/owners/${owner.id}`}
+                          className="text-zinc-950 transition hover:text-zinc-600"
+                        >
+                          View<span className="sr-only">, {owner.full_name}</span>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </section>

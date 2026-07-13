@@ -1,9 +1,9 @@
-import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
 
 import type { Database } from "@/lib/supabase/database.types";
 
-function createMiddlewareSupabase(request: NextRequest, response: NextResponse) {
+function createProxySupabase(request: NextRequest, response: NextResponse) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
@@ -25,7 +25,7 @@ function createMiddlewareSupabase(request: NextRequest, response: NextResponse) 
   });
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
@@ -45,7 +45,7 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  const supabase = createMiddlewareSupabase(request, response);
+  const supabase = createProxySupabase(request, response);
   const { data } = await supabase.auth.getUser();
   const user = data.user;
 

@@ -6,7 +6,9 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
 
   if (!code) {
-    return NextResponse.redirect(new URL("/login?error=missing_code", request.url));
+    return NextResponse.redirect(
+      new URL("/login?error=missing_code", request.url),
+    );
   }
 
   const supabase = await createClient();

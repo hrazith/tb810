@@ -7,7 +7,10 @@ import type { OwnerFormState, OwnerInput } from "@/server/owners/types";
 
 type Props = {
   initialValues?: Partial<OwnerInput> | null;
-  action: (prevState: OwnerFormState, formData: FormData) => Promise<OwnerFormState>;
+  action: (
+    prevState: OwnerFormState,
+    formData: FormData,
+  ) => Promise<OwnerFormState>;
   submitLabel: string;
   cancelHref: string;
 };
@@ -15,7 +18,9 @@ type Props = {
 const initialState: OwnerFormState = {};
 
 function fieldError(field: string, state: OwnerFormState) {
-  return state.fieldErrors?.[field as keyof NonNullable<OwnerFormState["fieldErrors"]>];
+  return state.fieldErrors?.[
+    field as keyof NonNullable<OwnerFormState["fieldErrors"]>
+  ];
 }
 
 export function OwnerForm({
@@ -28,10 +33,15 @@ export function OwnerForm({
   const values = state.values ?? initialValues ?? {};
 
   return (
-    <form action={formAction} className="space-y-6 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
+    <form
+      action={formAction}
+      className="space-y-6 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm"
+    >
       <div className="grid gap-6 md:grid-cols-2">
         <label className="space-y-2">
-          <span className="block text-lg font-medium text-gray-900">Full name</span>
+          <span className="block text-lg font-medium text-gray-900">
+            Full name
+          </span>
           <input
             name="full_name"
             defaultValue={values.full_name ?? ""}
@@ -39,7 +49,9 @@ export function OwnerForm({
             required
           />
           {fieldError("full_name", state) ? (
-            <p className="text-sm text-red-600">{fieldError("full_name", state)}</p>
+            <p className="text-sm text-red-600">
+              {fieldError("full_name", state)}
+            </p>
           ) : null}
         </label>
 
@@ -57,7 +69,9 @@ export function OwnerForm({
         </label>
 
         <label className="space-y-2">
-          <span className="block text-lg font-medium text-gray-900">Telephone</span>
+          <span className="block text-lg font-medium text-gray-900">
+            Telephone
+          </span>
           <input
             name="phone_number"
             defaultValue={values.phone_number ?? ""}
