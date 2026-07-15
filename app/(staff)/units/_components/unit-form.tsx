@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
+import { Surface } from "@/components/ui/surface";
 import type {
   UnitFormDefaults,
   UnitFormState,
   UnitInput,
+  UnitTypeRecord,
 } from "@/server/units/types";
 
 type Props = {
@@ -31,17 +33,45 @@ function yesNoValue(value?: boolean) {
   return value ? "yes" : "no";
 }
 
+function typeLabel(unitType: UnitTypeRecord) {
+  switch (unitType.code) {
+    case "condo":
+      return "Apartment";
+    case "parking":
+      return "Parking";
+    case "storage":
+      return "Storage";
+  }
+}
+
+function meterAllowed(unitTypeId: string | undefined, unitTypes: UnitTypeRecord[]) {
+  const unitType = unitTypes.find((item) => item.id === unitTypeId);
+  return unitType?.code === "condo";
+}
+
 export function UnitForm({ defaults, action, submitLabel, cancelHref }: Props) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const values = { ...defaults.values, ...(state.values ?? {}) } as Partial<UnitInput> & {
     active?: boolean;
   };
+  const [selectedTypeId, setSelectedTypeId] = useState(
+    values.unit_type_id ?? defaults.unitTypes[0]?.id ?? "",
+  );
+  const [meterValue, setMeterValue] = useState(
+    values.has_meter ? "yes" : "no",
+  );
+
+  useEffect(() => {
+    const nextTypeId = values.unit_type_id ?? defaults.unitTypes[0]?.id ?? "";
+    setSelectedTypeId(nextTypeId);
+    setMeterValue(values.has_meter ? "yes" : "no");
+  }, [defaults.unitTypes, values.has_meter, values.unit_type_id]);
+
+  const meterIsAllowed = meterAllowed(selectedTypeId, defaults.unitTypes);
+  const effectiveMeterValue = meterIsAllowed ? meterValue : "no";
 
   return (
-    <form
-      action={formAction}
-      className="space-y-6 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm"
-    >
+    <Surface as="form" action={formAction} className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2">
         {defaults.showBuildingSelector ? (
           <label className="space-y-2 md:col-span-2">
@@ -73,26 +103,48 @@ export function UnitForm({ defaults, action, submitLabel, cancelHref }: Props) {
           />
         )}
 
-        <label className="space-y-2">
-          <span className="block text-lg font-medium text-zinc-900">Type</span>
-          <select
-            name="unit_type_id"
-            defaultValue={values.unit_type_id ?? ""}
-            className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
+        <fieldset className="space-y-3 md:col-span-2">
+          <legend className="block text-lg font-medium text-zinc-900">Type</legend>
+          <div
+            role="radiogroup"
+            aria-label="Type"
+            className="grid gap-2 sm:grid-cols-3"
           >
-            <option value="">Select type</option>
-            {defaults.unitTypes.map((unitType) => (
-              <option key={unitType.id} value={unitType.id}>
-                {unitType.name}
-              </option>
-            ))}
-          </select>
+            {defaults.unitTypes.map((unitType) => {
+              const checked = unitType.id === selectedTypeId;
+              return (
+                <label
+                  key={unitType.id}
+                  className={`flex min-h-16 cursor-pointer items-center justify-between rounded-xl border px-4 py-3 text-sm transition focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-offset-white ${
+                    checked
+                      ? "border-zinc-950 bg-zinc-950 text-white"
+                      : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-950 hover:text-zinc-950"
+                  }`}
+                  >
+                    <span className="font-medium">{typeLabel(unitType)}</span>
+                    <input
+                      type="radio"
+                      name="unit_type_id"
+                      value={unitType.id}
+                      checked={checked}
+                      onChange={() => {
+                        setSelectedTypeId(unitType.id);
+                        if (unitType.code !== "condo") {
+                          setMeterValue("no");
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                  </label>
+              );
+            })}
+          </div>
           {fieldError("unit_type_id", state) ? (
             <p className="text-sm text-red-600">
               {fieldError("unit_type_id", state)}
             </p>
           ) : null}
-        </label>
+        </fieldset>
 
         <label className="space-y-2">
           <span className="block text-lg font-medium text-zinc-900">
@@ -161,24 +213,52 @@ export function UnitForm({ defaults, action, submitLabel, cancelHref }: Props) {
           ) : null}
         </label>
 
-        <label className="space-y-2">
-          <span className="block text-lg font-medium text-zinc-900">
+        <fieldset className="space-y-3">
+          <legend className="block text-lg font-medium text-zinc-900">
             Has individual meter
-          </span>
-          <select
-            name="has_meter"
-            defaultValue={yesNoValue(values.has_meter)}
-            className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
+          </legend>
+          {!meterIsAllowed ? (
+            <p className="text-sm text-zinc-500">
+              Parking and storage units do not use an individual meter.
+            </p>
+          ) : null}
+          <div
+            role="radiogroup"
+            aria-label="Has individual meter"
+            className="grid gap-2 sm:grid-cols-2"
           >
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
+            {["no", "yes"].map((option) => {
+              const checked = effectiveMeterValue === option;
+              const disabled = option === "yes" && !meterIsAllowed;
+              return (
+                <label
+                  key={option}
+                  className={`flex min-h-14 cursor-pointer items-center justify-center rounded-xl border px-4 py-3 text-sm font-medium transition focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-offset-white ${
+                    checked
+                      ? "border-zinc-950 bg-zinc-950 text-white"
+                      : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-950 hover:text-zinc-950"
+                  } ${disabled ? "cursor-not-allowed opacity-50 hover:border-zinc-300 hover:text-zinc-700" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="has_meter"
+                    value={option}
+                    checked={checked}
+                    onChange={() => setMeterValue(option)}
+                    disabled={disabled}
+                    className="sr-only"
+                  />
+                  {option === "yes" ? "Yes" : "No"}
+                </label>
+              );
+            })}
+          </div>
           {fieldError("has_meter", state) ? (
             <p className="text-sm text-red-600">
               {fieldError("has_meter", state)}
             </p>
           ) : null}
-        </label>
+        </fieldset>
       </div>
 
       <label className="block space-y-2">
@@ -212,6 +292,6 @@ export function UnitForm({ defaults, action, submitLabel, cancelHref }: Props) {
           Cancel
         </Link>
       </div>
-    </form>
+    </Surface>
   );
 }

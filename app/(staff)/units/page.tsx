@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Surface } from "@/components/ui/surface";
 import { listUnitTypes, listUnits } from "@/server/units";
 
 type PageProps = {
@@ -48,10 +49,7 @@ export default async function UnitsPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      <form
-        method="get"
-        className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_12rem_12rem_auto]"
-      >
+      <Surface as="form" method="get" padding="compact" className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_12rem_auto]">
         <input
           name="q"
           defaultValue={params.q ?? ""}
@@ -82,58 +80,77 @@ export default async function UnitsPage({ searchParams }: PageProps) {
         <button className="h-11 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-xs transition hover:border-zinc-950 hover:text-zinc-950">
           Filter
         </button>
-      </form>
+      </Surface>
 
       {unitsResult.error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        <Surface className="border-red-200 bg-red-50 text-sm text-red-700">
           {unitsResult.error}
-        </div>
+        </Surface>
       ) : unitsResult.data.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center text-sm text-zinc-600">
+        <Surface padding="spacious" className="border-dashed border-zinc-300 text-center text-sm text-zinc-600">
           No units found.
-        </div>
+        </Surface>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-zinc-900">Unit number</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-zinc-900">Type</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-zinc-900">Floor</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-zinc-900">Registered area</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-zinc-900">Participation</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-zinc-900">Meter</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-zinc-900">Status</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-zinc-900">Last updated</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {unitsResult.data.map((unit) => (
-                  <tr key={unit.id} className="hover:bg-zinc-50">
-                    <td className="px-6 py-4 text-sm font-medium text-zinc-950">
-                      <Link href={`/units/${unit.id}`} className="hover:underline">
-                        {unit.unit_number}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-zinc-600">{unit.unit_type_name}</td>
-                    <td className="px-6 py-4 text-sm text-zinc-600">{unit.floor ?? "—"}</td>
-                    <td className="px-6 py-4 text-sm text-zinc-600">{formatArea(unit.registered_area_m2)}</td>
-                    <td className="px-6 py-4 text-sm text-zinc-600">{formatParticipation(unit.participation_percentage)}</td>
-                    <td className="px-6 py-4 text-sm text-zinc-600">{unit.has_meter ? "Yes" : "No"}</td>
-                    <td className="px-6 py-4 text-sm text-zinc-600">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${unit.active ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-700"}`}>
-                        {unit.active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-zinc-600">
+        <div className="grid gap-3">
+          {unitsResult.data.map((unit) => (
+            <Link
+              key={unit.id}
+              href={`/units/${unit.id}`}
+              className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:-translate-y-px hover:border-zinc-950 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
+            >
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                      Unit number
+                    </p>
+                    <span className="text-lg font-semibold text-zinc-950 underline decoration-transparent transition group-hover:decoration-zinc-950">
+                      {unit.unit_number}
+                    </span>
+                  </div>
+                  <div className="grid gap-2 text-sm text-zinc-600 sm:grid-cols-2 lg:grid-cols-4">
+                    <p>
+                      <span className="font-medium text-zinc-900">Type:</span>{" "}
+                      {unit.unit_type_name}
+                    </p>
+                    <p>
+                      <span className="font-medium text-zinc-900">Floor:</span>{" "}
+                      {unit.floor ?? "—"}
+                    </p>
+                    <p>
+                      <span className="font-medium text-zinc-900">Registered area:</span>{" "}
+                      {formatArea(unit.registered_area_m2)}
+                    </p>
+                    <p>
+                      <span className="font-medium text-zinc-900">Participation:</span>{" "}
+                      {formatParticipation(unit.participation_percentage)}
+                    </p>
+                    <p>
+                      <span className="font-medium text-zinc-900">Meter:</span>{" "}
+                      {unit.has_meter ? "Yes" : "No"}
+                    </p>
+                    <p>
+                      <span className="font-medium text-zinc-900">Status:</span>{" "}
+                      {unit.active ? "Active" : "Inactive"}
+                    </p>
+                    <p className="sm:col-span-2 lg:col-span-2">
+                      <span className="font-medium text-zinc-900">Last updated:</span>{" "}
                       {new Date(unit.updated_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    unit.active
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-zinc-100 text-zinc-700"
+                  }`}
+                >
+                  {unit.active ? "Active" : "Inactive"}
+                </span>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
     </section>

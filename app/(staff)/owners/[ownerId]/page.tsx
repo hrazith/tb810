@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { Surface } from "@/components/ui/surface";
 import { archiveOwnerAction } from "../actions";
 import { ArchiveOwnerForm } from "../_components/archive-owner-form";
 import { getOwnerById } from "@/server/owners";
@@ -27,7 +28,7 @@ export default async function OwnerDetailPage({ params }: PageProps) {
 
   return (
     <section className="space-y-6">
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <Surface as="div">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
@@ -57,35 +58,35 @@ export default async function OwnerDetailPage({ params }: PageProps) {
             />
           </div>
         </div>
-      </div>
+      </Surface>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <Surface as="section">
           <h2 className="text-lg font-semibold text-zinc-950">Notes</h2>
           <p className="mt-3 text-sm text-zinc-600">
             {owner.notes ?? "No notes added."}
           </p>
-        </section>
+        </Surface>
 
-        <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <Surface as="section">
           <h2 className="text-lg font-semibold text-zinc-950">
             Ownership summary
           </h2>
           <p className="mt-3 text-sm text-zinc-600">
             Placeholder for ownership summary.
           </p>
-        </section>
+        </Surface>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <Surface as="section">
           <h2 className="text-lg font-semibold text-zinc-950">Unit accounts</h2>
           <p className="mt-3 text-sm text-zinc-600">
             Placeholder for unit account summary.
           </p>
-        </section>
+        </Surface>
 
-        <section className="rounded-2xl border border-dashed border-zinc-300 bg-white p-6">
+        <Surface as="section" className="border-dashed border-zinc-300">
           <h2 className="text-lg font-semibold text-zinc-950">
             Future sections
           </h2>
@@ -96,7 +97,7 @@ export default async function OwnerDetailPage({ params }: PageProps) {
             <li>Documents</li>
             <li>Activity</li>
           </ul>
-        </section>
+        </Surface>
       </div>
     </section>
   );

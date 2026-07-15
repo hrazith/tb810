@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
+import { Surface } from "@/components/ui/surface";
 import type { OwnerFormState, OwnerInput } from "@/server/owners/types";
 
 type Props = {
@@ -33,10 +34,7 @@ export function OwnerForm({
   const values = state.values ?? initialValues ?? {};
 
   return (
-    <form
-      action={formAction}
-      className="space-y-6 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm"
-    >
+    <Surface as="form" action={formAction} className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2">
         <label className="space-y-2">
           <span className="block text-lg font-medium text-gray-900">
@@ -111,6 +109,6 @@ export function OwnerForm({
           Cancel
         </Link>
       </div>
-    </form>
+    </Surface>
   );
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Surface } from "@/components/ui/surface";
 import { listOwners } from "@/server/owners";
 
 type PageProps = {
@@ -60,13 +61,13 @@ export default async function OwnersPage({ searchParams }: PageProps) {
       </form>
 
       {result.error ? (
-        <div className="mt-6 rounded-md border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        <Surface className="mt-6 border-red-200 bg-red-50 text-sm text-red-700">
           {result.error}
-        </div>
+        </Surface>
       ) : result.data.length === 0 ? (
-        <div className="mt-6 rounded-md border border-dashed border-zinc-300 bg-white p-10 text-center text-sm text-zinc-600">
+        <Surface className="mt-6 border-dashed border-zinc-300 text-center text-sm text-zinc-600">
           No owners found.
-        </div>
+        </Surface>
       ) : (
         <div className="mt-8 flow-root">
           <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">

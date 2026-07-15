@@ -86,9 +86,6 @@ export async function listUnits(
     request = request.eq("active", false);
   }
 
-  if (query) {
-  }
-
   const { data, error } = await request;
   if (error) return { data: [], error: error.message };
 
