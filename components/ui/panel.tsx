@@ -1,15 +1,15 @@
 import type { ComponentPropsWithoutRef, ElementType, ReactNode } from "react";
 
-type SurfacePadding = "compact" | "default" | "spacious";
+type PanelPadding = "compact" | "default" | "spacious";
 
-type SurfaceProps<T extends ElementType = "div"> = {
+type PanelProps<T extends ElementType = "div"> = {
   as?: T;
-  padding?: SurfacePadding;
+  padding?: PanelPadding;
   className?: string;
   children?: ReactNode;
 } & Omit<ComponentPropsWithoutRef<T>, "as" | "className" | "children">;
 
-const paddingClasses: Record<SurfacePadding, string> = {
+const paddingClasses: Record<PanelPadding, string> = {
   compact: "p-4 md:p-5",
   default: "p-6 md:p-8",
   spacious: "p-8 md:p-12 lg:p-16",
@@ -19,13 +19,13 @@ function joinClasses(...classes: Array<string | undefined | false>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function Surface<T extends ElementType = "div">({
+export function Panel<T extends ElementType = "div">({
   as,
   padding = "default",
   className,
   children,
   ...props
-}: SurfaceProps<T>) {
+}: PanelProps<T>) {
   const Component = as ?? "div";
 
   return (

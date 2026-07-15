@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { Surface } from "@/components/ui/surface";
+import { Button } from "@/components/ui/button";
+import { Panel } from "@/components/ui/panel";
 import { listOwners } from "@/server/owners";
 
 type PageProps = {
@@ -27,12 +28,9 @@ export default async function OwnersPage({ searchParams }: PageProps) {
           </p>
         </div>
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-          <Link
-            href="/owners/new"
-            className="block rounded-md bg-zinc-950 px-3 py-2 text-center text-sm font-semibold text-white shadow-xs transition hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950"
-          >
-            Add owner
-          </Link>
+          <Button asChild variant="primary" shape="pill">
+  <Link href="/owners/new">Add Owner</Link>
+</Button>
         </div>
       </div>
 
@@ -61,13 +59,13 @@ export default async function OwnersPage({ searchParams }: PageProps) {
       </form>
 
       {result.error ? (
-        <Surface className="mt-6 border-red-200 bg-red-50 text-sm text-red-700">
+        <Panel className="mt-6 border-red-200 bg-red-50 text-sm text-red-700">
           {result.error}
-        </Surface>
+        </Panel>
       ) : result.data.length === 0 ? (
-        <Surface className="mt-6 border-dashed border-zinc-300 text-center text-sm text-zinc-600">
+        <Panel className="mt-6 border-dashed border-zinc-300 text-center text-sm text-zinc-600">
           No owners found.
-        </Surface>
+        </Panel>
       ) : (
         <div className="mt-8 flow-root">
           <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">

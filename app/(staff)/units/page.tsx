@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { Surface } from "@/components/ui/surface";
+import { Button } from "@/components/ui/button";
+import { Panel } from "@/components/ui/panel";
 import { listUnitTypes, listUnits } from "@/server/units";
 
 type PageProps = {
@@ -40,16 +41,14 @@ export default async function UnitsPage({ searchParams }: PageProps) {
           </p>
         </div>
         <div className="mt-4 sm:mt-0">
-          <Link
-            href="/units/new"
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800"
-          >
-            Add Unit
-          </Link>
+          
+          <Button asChild variant="primary" shape="pill">
+  <Link href="/units/new">Add Unit</Link>
+</Button>
         </div>
       </div>
 
-      <Surface as="form" method="get" padding="compact" className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_12rem_auto]">
+      <Panel as="form" method="get" padding="compact" className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_12rem_auto]">
         <input
           name="q"
           defaultValue={params.q ?? ""}
@@ -80,16 +79,16 @@ export default async function UnitsPage({ searchParams }: PageProps) {
         <button className="h-11 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-xs transition hover:border-zinc-950 hover:text-zinc-950">
           Filter
         </button>
-      </Surface>
+      </Panel>
 
       {unitsResult.error ? (
-        <Surface className="border-red-200 bg-red-50 text-sm text-red-700">
+        <Panel className="border-red-200 bg-red-50 text-sm text-red-700">
           {unitsResult.error}
-        </Surface>
+        </Panel>
       ) : unitsResult.data.length === 0 ? (
-        <Surface padding="spacious" className="border-dashed border-zinc-300 text-center text-sm text-zinc-600">
+        <Panel padding="spacious" className="border-dashed border-zinc-300 text-center text-sm text-zinc-600">
           No units found.
-        </Surface>
+        </Panel>
       ) : (
         <div className="grid gap-3">
           {unitsResult.data.map((unit) => (
