@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+
+import { brandConfig, gothamSans } from "@/brand";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TB810",
-  description: "Standalone TB810 application",
+  title: brandConfig.shortName,
+  description: `${brandConfig.productName} ${brandConfig.descriptor}`,
 };
 
 export default function RootLayout({
@@ -12,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang={brandConfig.defaultLocale} className={`${gothamSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

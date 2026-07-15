@@ -1,10 +1,11 @@
 @import "tailwindcss";
+@import "../brand/tokens.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --font-sans: Arial, Helvetica, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --background: var(--brand-background);
+  --foreground: var(--brand-text);
+  --font-sans: var(--brand-font-sans);
+  --font-mono: var(--brand-font-mono);
 }
 
 @theme inline {
@@ -12,13 +13,11 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-zinc-950: var(--brand-primary);
+  --color-zinc-900: var(--brand-text);
+  --color-zinc-700: var(--brand-text-muted);
+  --color-zinc-200: var(--brand-border);
+  --color-zinc-300: color-mix(in srgb, var(--brand-border) 60%, white);
 }
 
 body {
