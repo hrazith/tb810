@@ -1620,7 +1620,7 @@ export type Database = {
       }
       tb810_unit_accounts: {
         Row: {
-          account_number: string | null
+          account_number: string
           building_id: string
           created_at: string
           credit_balance: number
@@ -1631,14 +1631,12 @@ export type Database = {
           legacy_table: string | null
           notes: string | null
           opening_balance: number
-          owner_id: string | null
-          ownership_id: string | null
           status: string
           unit_id: string
           updated_at: string
         }
         Insert: {
-          account_number?: string | null
+          account_number?: string
           building_id: string
           created_at?: string
           credit_balance?: number
@@ -1649,14 +1647,12 @@ export type Database = {
           legacy_table?: string | null
           notes?: string | null
           opening_balance?: number
-          owner_id?: string | null
-          ownership_id?: string | null
           status?: string
           unit_id: string
           updated_at?: string
         }
         Update: {
-          account_number?: string | null
+          account_number?: string
           building_id?: string
           created_at?: string
           credit_balance?: number
@@ -1667,8 +1663,6 @@ export type Database = {
           legacy_table?: string | null
           notes?: string | null
           opening_balance?: number
-          owner_id?: string | null
-          ownership_id?: string | null
           status?: string
           unit_id?: string
           updated_at?: string
@@ -1682,23 +1676,9 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "tb810_unit_accounts_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "tb810_owners"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tb810_unit_accounts_ownership_id_fkey"
-            columns: ["ownership_id"]
-            isOneToOne: false
-            referencedRelation: "tb810_ownerships"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "tb810_unit_accounts_unit_id_fkey"
             columns: ["unit_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "tb810_units"
             referencedColumns: ["id"]
           },
@@ -1951,7 +1931,12 @@ export type Database = {
       }
       has_tb810_role: { Args: { role_key: string }; Returns: boolean }
       is_tb810_staff: { Args: never; Returns: boolean }
+      tb810_ensure_unit_account_for_unit: {
+        Args: { target_unit_id: string }
+        Returns: string
+      }
       tb810_generate_owner_reference: { Args: never; Returns: string }
+      tb810_generate_unit_account_number: { Args: never; Returns: string }
       tb810_rebuild_unit_account_balance: {
         Args: { target_unit_account_id: string }
         Returns: undefined

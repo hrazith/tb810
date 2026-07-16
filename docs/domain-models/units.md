@@ -12,6 +12,8 @@ Unit types currently include:
 
 The Unit is the durable asset record. It describes the thing that exists in the building, not who owns it at a given moment.
 
+Each Unit has one permanent financial account. The account is part of the Unit model conceptually, even though it is implemented through separate account tables.
+
 ## Responsibilities
 
 The Unit aggregate is responsible for:
@@ -110,14 +112,6 @@ Freeform operational notes about the Unit.
 - Why it exists: legacy records and day-to-day operations often need reminders or clarifications
 - Business meaning: flexible notes, not transactional state
 
-### `active`
-
-Lifecycle flag indicating whether the Unit is currently active.
-
-- Purpose: control operational visibility
-- Why it exists: units should not be hard deleted once referenced
-- Business meaning: active units are in use; inactive units remain for history and traceability
-
 ### `legacy_table`
 
 Name of the legacy source table used during migration.
@@ -193,14 +187,15 @@ Those relationships should be modeled through their own aggregates or transactio
 ## Business Rules
 
 - A Unit may exist without an owner
-- A Unit should not be hard deleted once referenced
-- Units can be inactive
 - ownership may change without changing the Unit
 - participation percentage does not change merely because ownership changes
 - registered area and participation percentage are separate stored facts
 - participation is not automatically recalculated yet
 - condo, parking, and storage are all first-class asset types
 - debt follows the asset account across ownership changes
+- there is no co-ownership support
+- a Unit has at most one current owner
+- Units are a fixed inventory and are not created or archived as a normal workflow
 
 ## Modernization Notes
 

@@ -54,22 +54,26 @@ Complete:
 - participation percentage clarified and renamed
 - billing adjustment removed from Unit
 - Units domain documentation
+- fixed inventory decision
+- no co-ownership decision
+- one permanent Unit Account per Unit decision
 
 ## Core Rules That Shape the Roadmap
 
-- TB810 currently manages one building, so no Buildings CRUD is planned for v1
+- TB810 currently manages one building, so no Buildings CRUD is planned for the user-facing application
 - the Building remains a first-class database entity and root aggregate
 - Owners and Units are separate
 - Ownerships connect Owners to Units over time
 - registered area belongs to the Unit
 - participation percentage is a persisted legal coefficient on the Unit
 - participation percentage is not automatically recalculated yet
-- ownership share is separate from participation percentage
+- there is no co-ownership support
+- ownership share is not a required TB810 concept
 - debts belong to the asset account, not the owner
 - ownership changes do not erase or reset debt
 - the incoming owner becomes responsible for the existing asset balance
 - condo, parking, and storage are all first-class assets
-- Units and Owners are archived or inactivated, not hard deleted
+- Units are a fixed inventory and are not created or archived as a normal workflow
 - billing, invoicing, payments, and reconciliation are workflows, not generic CRUD modules
 
 ## Domain Sequence
@@ -79,14 +83,14 @@ Complete:
 - Purpose: define the physical/legal asset root for the rest of the model.
 - Why here: Ownerships, Unit Accounts, billing, and all asset-linked workflows depend on a stable Unit aggregate first.
 - Key dependency: unit type, registered area, participation percentage, and lifecycle rules.
-- Definition of done: `/units` CRUD and archive flow, with the asset model finalized enough for Ownerships and Unit Accounts to attach to it cleanly.
+- Definition of done: `/units`, `/units/[unitId]`, and `/units/[unitId]/edit` with list/search/type filtering and metadata editing, with the asset model finalized enough for Ownerships and Unit Accounts to attach to it cleanly.
 
 ### 2. Ownerships
 
 - Purpose: model who owns which Unit over time.
 - Why here: ownership must sit on top of a stable Unit definition and before any account lifecycle tied to ownership changes.
 - Key dependency: Units and Owners.
-- Definition of done: ownership history, ownership share, effective dates, and archive semantics without mixing in debt or billing logic.
+- Definition of done: ownership history, effective dates, and transfer semantics without mixing in debt or billing logic.
 
 ### 3. Unit Accounts
 
@@ -200,11 +204,10 @@ Units is the next milestone because it establishes the physical/legal asset root
 ### Definition of Done
 
 - `/units`
-- `/units/new`
 - `/units/[unitId]`
 - `/units/[unitId]/edit`
-- list/search/filter
-- create/edit/archive
+- list/search/type filtering
+- edit
 - unit type
 - unit number
 - floor
@@ -212,12 +215,13 @@ Units is the next milestone because it establishes the physical/legal asset root
 - participation percentage
 - meter capability
 - notes
-- active/inactive lifecycle
 - responsive UI
 - RLS-backed access
 - QA checklist
 - no ownership assignment yet
 - no billing or balance editing on Unit
+- no Unit creation workflow
+- no Unit archival workflow
 
 ### Why Units Comes Next
 

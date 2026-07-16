@@ -10,7 +10,7 @@ This document is intended to function as the constitution of TB810: a permanent 
 
 ## Principle 1 - Building is the root aggregate
 
-TB810 currently manages a single condominium, so Building CRUD is intentionally deferred. Even so, the Building remains the root business entity of the system.
+TB810 currently manages a single condominium, so Building CRUD is intentionally omitted from the user-facing application. Even so, the Building remains the root business entity of the system.
 
 Every Unit belongs to exactly one Building. That relationship is foundational, not optional.
 
@@ -22,7 +22,7 @@ A Unit represents a real asset, not a person and not a financial record.
 
 Examples of Units include:
 
-- condominium
+- apartment / condo
 - parking
 - storage
 
@@ -38,6 +38,8 @@ A Unit contains only characteristics that belong to the asset itself, such as:
 - meter capability
 
 A Unit does not own financial balances or ownership history.
+
+Each Unit has exactly one permanent Unit Account that carries debt, credits, invoices, payments, and ledger history across ownership changes.
 
 ## Principle 3 - Owners are people or legal entities
 
@@ -56,6 +58,8 @@ Ownership connects Owners and Units.
 Ownership changes over time, so ownership is historical by nature. It should never overwrite previous ownership history.
 
 Ownership exists independently from billing. It is a relationship, not a balance, and not the asset itself.
+
+TB810 does not support co-ownership. At any time, a Unit has at most one current owner.
 
 ## Principle 5 - Asset accounts own financial history
 
@@ -128,13 +132,15 @@ The basic boundaries are:
 - Invoices own presentation
 - Payments own settlement
 
+One Unit maps to one permanent Unit Account. Account identity does not come from ownership identity.
+
 This separation keeps the model understandable and prevents future confusion about where the source of truth lives.
 
 ## Principle 11 - Preserve history
 
 Historical information should be preserved.
 
-Prefer archive or inactive states over deletion when records participate in financial or ownership history. Changes should remain traceable.
+Prefer history-preserving states over deletion when records participate in financial or ownership history. Changes should remain traceable.
 
 The goal is not to erase earlier truth. The goal is to represent later truth without losing what came before.
 
