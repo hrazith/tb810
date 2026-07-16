@@ -2,11 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import {
-  archiveUnit,
-  createUnit,
-  updateUnit,
-} from "@/server/units";
+import { updateUnit } from "@/server/units";
 import type { UnitFormState } from "@/server/units/types";
 import { unitInputSchema } from "@/server/units/validation";
 
@@ -53,26 +49,6 @@ function toFormStateError(
   return { error: message, values };
 }
 
-export async function createUnitAction(
-  _prev: UnitFormState,
-  formData: FormData,
-): Promise<UnitFormState> {
-  const values = toUnitInput(formData);
-  const validation = unitInputSchema.safeParse(values);
-  if (!validation.success) {
-    return {
-      error: "Please fix the highlighted fields.",
-      fieldErrors: mapFieldErrors(validation.error.issues),
-      values,
-    };
-  }
-
-  const result = await createUnit(validation.data);
-  if (result.error) return toFormStateError(result.error, values);
-
-  redirect(`/units/${result.data.id}`);
-}
-
 export async function updateUnitAction(
   unitId: string,
   _prev: UnitFormState,
@@ -90,15 +66,6 @@ export async function updateUnitAction(
 
   const result = await updateUnit(unitId, validation.data);
   if (result.error) return toFormStateError(result.error, values);
-
-  redirect(`/units/${unitId}`);
-}
-
-export async function archiveUnitAction(unitId: string): Promise<void> {
-  const result = await archiveUnit(unitId);
-  if (result.error) {
-    throw new Error(result.error);
-  }
 
   redirect(`/units/${unitId}`);
 }

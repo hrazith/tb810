@@ -41,7 +41,3 @@ export const unitInputSchema = z.object({
 });
 
 export type UnitInputSchema = z.infer<typeof unitInputSchema>;
-
-export const unitArchiveSchema = z.object({
-  active: z.boolean(),
-});

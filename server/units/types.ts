@@ -1,11 +1,8 @@
 export type UnitTypeCode = "condo" | "parking" | "storage";
 
-export type UnitStatusFilter = "active" | "inactive" | "all";
-
 export type UnitFilters = {
   query?: string;
   unitTypeId?: string;
-  status?: UnitStatusFilter;
 };
 
 export type UnitRecord = {
@@ -26,6 +23,9 @@ export type UnitRecord = {
 export type UnitListItem = UnitRecord & {
   unit_type_name: string;
   unit_type_code: UnitTypeCode;
+  current_owner_id: string | null;
+  current_owner_name: string | null;
+  current_owner_reference: string | null;
 };
 
 export type UnitDetail = UnitRecord & {
@@ -69,5 +69,4 @@ export type UnitFormDefaults = {
   building: BuildingRecord | null;
   buildings: BuildingRecord[];
   unitTypes: UnitTypeRecord[];
-  showBuildingSelector: boolean;
 };

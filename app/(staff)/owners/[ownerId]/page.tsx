@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { Surface } from "@/components/ui/surface";
+import { Panel } from "@/components/ui/panel";
 import { archiveOwnerAction } from "../actions";
 import { ArchiveOwnerForm } from "../_components/archive-owner-form";
 import { getOwnerById } from "@/server/owners";
+import { getOwnerUnitsSnapshot } from "@/server/ownerships";
 
 type PageProps = {
   params: Promise<{
@@ -25,10 +26,17 @@ export default async function OwnerDetailPage({ params }: PageProps) {
   }
 
   const owner = result.data;
+  const ownershipResult = await getOwnerUnitsSnapshot(ownerId);
+
+  if (ownershipResult.error) {
+    throw new Error(ownershipResult.error);
+  }
+
+  const ownerships = ownershipResult.data;
 
   return (
     <section className="space-y-6">
-      <Surface as="div">
+      <Panel as="div">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
@@ -58,46 +66,102 @@ export default async function OwnerDetailPage({ params }: PageProps) {
             />
           </div>
         </div>
-      </Surface>
+      </Panel>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Surface as="section">
+        <Panel as="section">
           <h2 className="text-lg font-semibold text-zinc-950">Notes</h2>
           <p className="mt-3 text-sm text-zinc-600">
             {owner.notes ?? "No notes added."}
           </p>
-        </Surface>
+        </Panel>
 
-        <Surface as="section">
+        <Panel as="section">
           <h2 className="text-lg font-semibold text-zinc-950">
             Ownership summary
           </h2>
           <p className="mt-3 text-sm text-zinc-600">
-            Placeholder for ownership summary.
+            {ownerships.currentUnits.length + ownerships.pastUnits.length} total
+            ownership records.
           </p>
-        </Surface>
+        </Panel>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Surface as="section">
-          <h2 className="text-lg font-semibold text-zinc-950">Unit accounts</h2>
-          <p className="mt-3 text-sm text-zinc-600">
-            Placeholder for unit account summary.
-          </p>
-        </Surface>
-
-        <Surface as="section" className="border-dashed border-zinc-300">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel as="section">
           <h2 className="text-lg font-semibold text-zinc-950">
-            Future sections
+            Currently owned Units
           </h2>
-          <ul className="mt-3 space-y-2 text-sm text-zinc-600">
-            <li>Invoices</li>
-            <li>Payments</li>
-            <li>Receipts</li>
-            <li>Documents</li>
-            <li>Activity</li>
-          </ul>
-        </Surface>
+          {ownerships.currentUnits.length ? (
+            <div className="mt-3 space-y-3">
+              {ownerships.currentUnits.map((item) => (
+                <div
+                  key={item.unit_id}
+                  className="rounded-xl border border-zinc-200 p-4"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <p className="font-medium text-zinc-950">
+                        {item.unit_number}
+                      </p>
+                      <p className="text-sm text-zinc-600">
+                        {item.unit_type_name}
+                      </p>
+                      <p className="text-sm text-zinc-600">
+                        Starts: {item.ownership_start_date}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/units/${item.unit_id}`}
+                      className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
+                    >
+                      View unit
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-zinc-600">No current units.</p>
+          )}
+        </Panel>
+
+        <Panel as="section">
+          <h2 className="text-lg font-semibold text-zinc-950">Past Units</h2>
+          {ownerships.pastUnits.length ? (
+            <div className="mt-3 space-y-3">
+              {ownerships.pastUnits.map((item) => (
+                <div
+                  key={`${item.unit_id}-${item.ownership_start_date}-${item.ownership_end_date}`}
+                  className="rounded-xl border border-zinc-200 p-4"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <p className="font-medium text-zinc-950">
+                        {item.unit_number}
+                      </p>
+                      <p className="text-sm text-zinc-600">
+                        {item.unit_type_name}
+                      </p>
+                      <p className="text-sm text-zinc-600">
+                        {item.ownership_start_date} to{" "}
+                        {item.ownership_end_date ?? "Current"}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/units/${item.unit_id}`}
+                      className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
+                    >
+                      View unit
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-zinc-600">No past units.</p>
+          )}
+        </Panel>
       </div>
     </section>
   );

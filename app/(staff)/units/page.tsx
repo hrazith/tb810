@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { listUnitTypes, listUnits } from "@/server/units";
 
@@ -8,7 +7,6 @@ type PageProps = {
   searchParams?: Promise<{
     q?: string;
     unitTypeId?: string;
-    status?: "active" | "inactive" | "all";
   }>;
 };
 
@@ -26,7 +24,6 @@ export default async function UnitsPage({ searchParams }: PageProps) {
     listUnits({
       query: params.q,
       unitTypeId: params.unitTypeId,
-      status: params.status,
     }),
     listUnitTypes(),
   ]);
@@ -40,15 +37,9 @@ export default async function UnitsPage({ searchParams }: PageProps) {
             A staff view of asset records in TB810 with type, location, meter capability, lifecycle, and last update details.
           </p>
         </div>
-        <div className="mt-4 sm:mt-0">
-          
-          <Button asChild variant="primary" shape="pill">
-  <Link href="/units/new">Add Unit</Link>
-</Button>
-        </div>
       </div>
 
-      <Panel as="form" method="get" padding="compact" className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_12rem_auto]">
+      <Panel as="form" method="get" padding="compact" className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto]">
         <input
           name="q"
           defaultValue={params.q ?? ""}
@@ -66,15 +57,6 @@ export default async function UnitsPage({ searchParams }: PageProps) {
               {unitType.name}
             </option>
           ))}
-        </select>
-        <select
-          name="status"
-          defaultValue={params.status ?? "active"}
-          className="h-11 rounded-xl border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition focus:border-zinc-950"
-        >
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="all">All</option>
         </select>
         <button className="h-11 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-xs transition hover:border-zinc-950 hover:text-zinc-950">
           Filter
@@ -109,6 +91,10 @@ export default async function UnitsPage({ searchParams }: PageProps) {
                   </div>
                   <div className="grid gap-2 text-sm text-zinc-600 sm:grid-cols-2 lg:grid-cols-4">
                     <p>
+                      <span className="font-medium text-zinc-900">Owner:</span>{" "}
+                      {unit.current_owner_name ?? "Unassigned"}
+                    </p>
+                    <p>
                       <span className="font-medium text-zinc-900">Type:</span>{" "}
                       {unit.unit_type_name}
                     </p>
@@ -128,25 +114,12 @@ export default async function UnitsPage({ searchParams }: PageProps) {
                       <span className="font-medium text-zinc-900">Meter:</span>{" "}
                       {unit.has_meter ? "Yes" : "No"}
                     </p>
-                    <p>
-                      <span className="font-medium text-zinc-900">Status:</span>{" "}
-                      {unit.active ? "Active" : "Inactive"}
-                    </p>
                     <p className="sm:col-span-2 lg:col-span-2">
                       <span className="font-medium text-zinc-900">Last updated:</span>{" "}
                       {new Date(unit.updated_at).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
-                <span
-                  className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${
-                    unit.active
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-zinc-100 text-zinc-700"
-                  }`}
-                >
-                  {unit.active ? "Active" : "Inactive"}
-                </span>
               </div>
             </Link>
           ))}

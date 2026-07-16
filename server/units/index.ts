@@ -10,7 +10,6 @@ import type {
   UnitRecord,
   UnitTypeRecord,
 } from "./types";
-import { unitInputSchema } from "./validation";
 
 type QueryResult<T> = {
   data: T;
@@ -80,12 +79,6 @@ export async function listUnits(
     request = request.eq("unit_type_id", filters.unitTypeId);
   }
 
-  if (filters.status === "active") {
-    request = request.eq("active", true);
-  } else if (filters.status === "inactive") {
-    request = request.eq("active", false);
-  }
-
   const { data, error } = await request;
   if (error) return { data: [], error: error.message };
 
@@ -107,6 +100,54 @@ export async function listUnits(
     ]),
   );
 
+  const unitIds = (data ?? []).map((row) => row.id);
+  const currentOwnerByUnitId = new Map<
+    string,
+    { id: string; full_name: string; owner_reference: string }
+  >();
+
+  if (unitIds.length > 0) {
+    const { data: ownerships, error: ownershipError } = await supabase
+      .from("tb810_ownerships")
+      .select("unit_id, owner_id")
+      .in("unit_id", unitIds)
+      .is("end_date", null);
+
+    if (ownershipError) {
+      return { data: [], error: ownershipError.message };
+    }
+
+    const ownerIds = [...new Set((ownerships ?? []).map((row) => row.owner_id))];
+    if (ownerIds.length > 0) {
+      const { data: owners, error: ownerError } = await supabase
+        .from("tb810_owners")
+        .select("id, full_name, owner_reference")
+        .in("id", ownerIds);
+
+      if (ownerError) {
+        return { data: [], error: ownerError.message };
+      }
+
+      const ownerById = new Map(
+        (owners ?? []).map((owner) => [
+          owner.id,
+          {
+            id: owner.id,
+            full_name: owner.full_name,
+            owner_reference: owner.owner_reference,
+          },
+        ]),
+      );
+
+      for (const ownership of ownerships ?? []) {
+        const owner = ownerById.get(ownership.owner_id);
+        if (owner) {
+          currentOwnerByUnitId.set(ownership.unit_id, owner);
+        }
+      }
+    }
+  }
+
   return {
     data: (data ?? [])
       .map((row) => {
@@ -125,10 +166,14 @@ export async function listUnits(
         ) {
           return null;
         }
+        const currentOwner = currentOwnerByUnitId.get(row.id) ?? null;
         return {
           ...row,
           unit_type_name: unitType.name,
           unit_type_code: unitType.code,
+          current_owner_id: currentOwner?.id ?? null,
+          current_owner_name: currentOwner?.full_name ?? null,
+          current_owner_reference: currentOwner?.owner_reference ?? null,
         };
       })
       .filter(Boolean) as UnitListItem[],
@@ -175,47 +220,12 @@ export async function getUnitById(unitId: string): Promise<QueryResult<UnitDetai
   };
 }
 
-export async function createUnit(
-  input: UnitInput,
-): Promise<QueryResult<UnitRecord>> {
-  const supabase = await createClient();
-  const parsed = unitInputSchema.safeParse(input);
-  if (!parsed.success) {
-    return { data: null as never, error: parsed.error.issues[0]?.message ?? "Invalid unit input" };
-  }
-
-  const payload = parsed.data;
-  const { data, error } = await supabase
-    .from("tb810_units")
-    .insert({
-      building_id: payload.building_id,
-      unit_type_id: payload.unit_type_id,
-      unit_number: payload.unit_number,
-      floor: payload.floor,
-      registered_area_m2: payload.registered_area_m2,
-      participation_percentage: payload.participation_percentage,
-      has_meter: payload.has_meter,
-      notes: payload.notes,
-      active: true,
-    })
-    .select(UNIT_SELECT)
-    .single();
-
-  if (error) return { data: null as never, error: error.message };
-  return { data, error: null };
-}
-
 export async function updateUnit(
   unitId: string,
   input: UnitInput,
 ): Promise<QueryResult<UnitRecord>> {
   const supabase = await createClient();
-  const parsed = unitInputSchema.safeParse(input);
-  if (!parsed.success) {
-    return { data: null as never, error: parsed.error.issues[0]?.message ?? "Invalid unit input" };
-  }
-
-  const payload = parsed.data;
+  const payload = input;
   const { data, error } = await supabase
     .from("tb810_units")
     .update({
@@ -236,32 +246,17 @@ export async function updateUnit(
   return { data, error: null };
 }
 
-export async function archiveUnit(
-  unitId: string,
-): Promise<QueryResult<UnitRecord>> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("tb810_units")
-    .update({ active: false })
-    .eq("id", unitId)
-    .select(UNIT_SELECT)
-    .single();
-
-  if (error) return { data: null as never, error: error.message };
-  return { data, error: null };
-}
-
 export async function getUnitFormDefaults(
   unitId?: string,
 ): Promise<QueryResult<UnitFormDefaults>> {
-  const [buildingsResult, unitTypesResult, unitResult] = await Promise.all([
-    listBuildings(),
+  const [buildingResult, unitTypesResult, unitResult] = await Promise.all([
+    getCurrentBuilding(),
     listUnitTypes(),
     unitId ? getUnitById(unitId) : Promise.resolve({ data: null, error: null }),
   ]);
 
-  if (buildingsResult.error) {
-    return { data: null as never, error: buildingsResult.error };
+  if (buildingResult.error) {
+    return { data: null as never, error: buildingResult.error };
   }
 
   if (unitTypesResult.error) {
@@ -272,7 +267,7 @@ export async function getUnitFormDefaults(
     return { data: null as never, error: unitResult.error };
   }
 
-  const building = buildingsResult.data[0] ?? null;
+  const building = buildingResult.data;
   const values = unitResult.data
     ? {
         building_id: unitResult.data.building_id,
@@ -310,9 +305,8 @@ export async function getUnitFormDefaults(
     data: {
       values,
       building,
-      buildings: buildingsResult.data,
+      buildings: building ? [building] : [],
       unitTypes: unitTypesResult.data,
-      showBuildingSelector: buildingsResult.data.length > 1,
     },
     error: null,
   };

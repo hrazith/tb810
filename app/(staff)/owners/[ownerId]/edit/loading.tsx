@@ -1,7 +1,7 @@
-import { Surface } from "@/components/ui/surface";
+import { Panel } from "@/components/ui/panel";
 
 export default function EditOwnerLoading() {
   return (
-    <Surface className="h-96 animate-pulse" />
+    <Panel className="h-96 animate-pulse" />
   );
 }

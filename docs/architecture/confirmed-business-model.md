@@ -48,7 +48,7 @@ The Building remains a first-class database entity and root aggregate, but the u
 
 ## Ownership
 
-Ownership connects one Owner to one Unit for a defined period.
+Ownership is the historical relationship that records which Owner is responsible for a Unit during a defined period.
 
 Ownership changes preserve history:
 
@@ -71,6 +71,14 @@ Ownership changes must not:
 - erase financial history
 
 The incoming Owner becomes responsible for the existing Unit Account.
+
+## Ownership Transfer
+
+Ownership transfer is a business workflow, not generic CRUD.
+
+The transfer closes one Ownership and creates the next without changing the Unit Account or rewriting historical invoices, payments, or receipts.
+
+Billing responsibility is resolved at the billing-cycle boundary from the Ownership active on that period start date.
 
 ## Monthly Invoices
 
@@ -103,6 +111,16 @@ Invoice lines should be modeled as charge types rather than hardcoded invoice co
 The legacy `Presupuesto` concept is the approved Annual Association Budget.
 
 It is the source for the participation-based monthly assessment.
+
+The monthly assessment is calculated from the approved annual budget and the Unit's persisted participation percentage.
+
+## Billing Period
+
+The Billing Period is the monthly operational clock for TB810.
+
+It collects approved charge inputs, determines the responsible Owner for each Unit Account, generates one invoice per Unit Account, and records the completion state of the monthly billing run.
+
+The Billing Period references the Annual Budget, ownership responsibility, meter inputs, utility inputs, and additional charges. It does not own permanent balances or ownership history.
 
 ## Participation
 

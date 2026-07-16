@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 import { createClient } from "@/lib/supabase/client";
-import { Surface } from "@/components/ui/surface";
+import { Panel } from "@/components/ui/panel";
 
 import { signIn, type LoginState } from "./actions";
 
@@ -30,7 +30,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 py-12 text-zinc-900">
-      <Surface as="section" padding="spacious" className="w-full max-w-md">
+      <Panel as="section" padding="spacious" className="w-full max-w-md">
         <div className="mb-32">
           <Image
             src="/TB810.svg"
@@ -78,7 +78,7 @@ export default function LoginPage() {
             {pending ? "Signing in..." : "Sign in"}
           </button>
         </form>
-      </Surface>
+      </Panel>
     </main>
   );
 }

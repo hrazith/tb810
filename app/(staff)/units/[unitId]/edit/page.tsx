@@ -37,7 +37,6 @@ export default async function EditUnitPage({ params }: PageProps) {
         defaults={defaults.data}
         action={updateUnitAction.bind(null, unitId)}
         submitLabel="Save changes"
-        cancelHref={`/units/${unitId}`}
       />
     </section>
   );

@@ -61,6 +61,8 @@ Ownership exists independently from billing. It is a relationship, not a balance
 
 TB810 does not support co-ownership. At any time, a Unit has at most one current owner.
 
+Ownership responsibility is determined at the billing-cycle boundary, so the active Ownership on the first day of the Billing Period is the source of truth for that period's addressee.
+
 ## Principle 5 - Asset accounts own financial history
 
 Financial history belongs to the asset account.
@@ -116,6 +118,8 @@ These workflows consume data from the domain model, but they do not define the m
 
 If a workflow needs a concept that does not belong in the core domain, that concept should be modeled carefully rather than hidden inside a transactional shortcut.
 
+Billing Period is the monthly workflow aggregate that coordinates invoice generation, but it does not own the permanent asset balance or the ownership history that feed it.
+
 ## Principle 10 - Domain boundaries matter
 
 Each domain must have one clear responsibility.
@@ -135,6 +139,19 @@ The basic boundaries are:
 One Unit maps to one permanent Unit Account. Account identity does not come from ownership identity.
 
 This separation keeps the model understandable and prevents future confusion about where the source of truth lives.
+
+The Billing Period is separate from the Unit Account:
+
+- Billing Period owns the monthly run state
+- Unit Account owns the asset's financial history
+- Ownership owns who is responsible during the cycle
+
+The Ownership transfer workflow must close one Ownership and create the next atomically without changing the Unit Account.
+
+Annual Budget is separate from Billing Period:
+
+- Annual Budget defines the yearly charge basis
+- Billing Period consumes the approved budget to produce monthly charges
 
 ## Principle 11 - Preserve history
 

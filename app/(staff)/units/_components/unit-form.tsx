@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 
-import { Surface } from "@/components/ui/surface";
+import { Panel } from "@/components/ui/panel";
 import type {
   UnitFormDefaults,
   UnitFormState,
@@ -18,7 +17,6 @@ type Props = {
     formData: FormData,
   ) => Promise<UnitFormState>;
   submitLabel: string;
-  cancelHref: string;
 };
 
 const initialState: UnitFormState = {};
@@ -49,7 +47,7 @@ function meterAllowed(unitTypeId: string | undefined, unitTypes: UnitTypeRecord[
   return unitType?.code === "condo";
 }
 
-export function UnitForm({ defaults, action, submitLabel, cancelHref }: Props) {
+export function UnitForm({ defaults, action, submitLabel }: Props) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const values = { ...defaults.values, ...(state.values ?? {}) } as Partial<UnitInput> & {
     active?: boolean;
@@ -71,38 +69,14 @@ export function UnitForm({ defaults, action, submitLabel, cancelHref }: Props) {
   const effectiveMeterValue = meterIsAllowed ? meterValue : "no";
 
   return (
-    <Surface as="form" action={formAction} className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-2">
-        {defaults.showBuildingSelector ? (
-          <label className="space-y-2 md:col-span-2">
-            <span className="block text-lg font-medium text-zinc-900">
-              Building
-            </span>
-            <select
-              name="building_id"
-              defaultValue={values.building_id ?? defaults.building?.id ?? ""}
-              className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
-            >
-              {defaults.buildings.map((building) => (
-                <option key={building.id} value={building.id}>
-                  {building.name}
-                </option>
-              ))}
-            </select>
-            {fieldError("building_id", state) ? (
-              <p className="text-sm text-red-600">
-                {fieldError("building_id", state)}
-              </p>
-            ) : null}
-          </label>
-        ) : (
-          <input
-            type="hidden"
-            name="building_id"
-            value={values.building_id ?? defaults.building?.id ?? ""}
-          />
-        )}
+    <Panel as="form" action={formAction} className="space-y-6">
+      <input
+        type="hidden"
+        name="building_id"
+        value={values.building_id ?? defaults.building?.id ?? ""}
+      />
 
+      <div className="grid gap-6 md:grid-cols-2">
         <fieldset className="space-y-3 md:col-span-2">
           <legend className="block text-lg font-medium text-zinc-900">Type</legend>
           <div
@@ -120,22 +94,22 @@ export function UnitForm({ defaults, action, submitLabel, cancelHref }: Props) {
                       ? "border-zinc-950 bg-zinc-950 text-white"
                       : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-950 hover:text-zinc-950"
                   }`}
-                  >
-                    <span className="font-medium">{typeLabel(unitType)}</span>
-                    <input
-                      type="radio"
-                      name="unit_type_id"
-                      value={unitType.id}
-                      checked={checked}
-                      onChange={() => {
-                        setSelectedTypeId(unitType.id);
-                        if (unitType.code !== "condo") {
-                          setMeterValue("no");
-                        }
-                      }}
-                      className="sr-only"
-                    />
-                  </label>
+                >
+                  <span className="font-medium">{typeLabel(unitType)}</span>
+                  <input
+                    type="radio"
+                    name="unit_type_id"
+                    value={unitType.id}
+                    checked={checked}
+                    onChange={() => {
+                      setSelectedTypeId(unitType.id);
+                      if (unitType.code !== "condo") {
+                        setMeterValue("no");
+                      }
+                    }}
+                    className="sr-only"
+                  />
+                </label>
               );
             })}
           </div>
@@ -285,13 +259,7 @@ export function UnitForm({ defaults, action, submitLabel, cancelHref }: Props) {
         >
           {submitLabel}
         </button>
-        <Link
-          href={cancelHref}
-          className="inline-flex h-12 items-center justify-center rounded-xl border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950"
-        >
-          Cancel
-        </Link>
       </div>
-    </Surface>
+    </Panel>
   );
 }

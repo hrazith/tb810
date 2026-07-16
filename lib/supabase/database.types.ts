@@ -1058,7 +1058,6 @@ export type Database = {
       }
       tb810_ownerships: {
         Row: {
-          billing_enabled: boolean
           created_at: string
           end_date: string | null
           id: string
@@ -1067,13 +1066,11 @@ export type Database = {
           legacy_table: string | null
           notes: string | null
           owner_id: string
-          ownership_share: number | null
           start_date: string
           unit_id: string
           updated_at: string
         }
         Insert: {
-          billing_enabled?: boolean
           created_at?: string
           end_date?: string | null
           id?: string
@@ -1082,13 +1079,11 @@ export type Database = {
           legacy_table?: string | null
           notes?: string | null
           owner_id: string
-          ownership_share?: number | null
           start_date?: string
           unit_id: string
           updated_at?: string
         }
         Update: {
-          billing_enabled?: boolean
           created_at?: string
           end_date?: string | null
           id?: string
@@ -1097,7 +1092,6 @@ export type Database = {
           legacy_table?: string | null
           notes?: string | null
           owner_id?: string
-          ownership_share?: number | null
           start_date?: string
           unit_id?: string
           updated_at?: string
@@ -1940,6 +1934,33 @@ export type Database = {
       tb810_rebuild_unit_account_balance: {
         Args: { target_unit_account_id: string }
         Returns: undefined
+      }
+      tb810_transfer_ownership: {
+        Args: {
+          p_notes?: string
+          p_owner_id: string
+          p_start_date: string
+          p_unit_id: string
+        }
+        Returns: {
+          created_at: string
+          end_date: string | null
+          id: string
+          legacy_id: string | null
+          legacy_metadata: Json
+          legacy_table: string | null
+          notes: string | null
+          owner_id: string
+          start_date: string
+          unit_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tb810_ownerships"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {

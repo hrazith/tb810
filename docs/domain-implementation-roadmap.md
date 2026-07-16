@@ -90,7 +90,7 @@ Complete:
 - Purpose: model who owns which Unit over time.
 - Why here: ownership must sit on top of a stable Unit definition and before any account lifecycle tied to ownership changes.
 - Key dependency: Units and Owners.
-- Definition of done: ownership history, effective dates, and transfer semantics without mixing in debt or billing logic.
+- Definition of done: ownership history, effective dates, boundary-based billing responsibility, transfer semantics, and a guided ownership transfer workflow without mixing in debt or billing logic.
 
 ### 3. Unit Accounts
 
@@ -99,98 +99,112 @@ Complete:
 - Key dependency: Units and Ownerships.
 - Definition of done: asset-account lifecycle, opening/current balance, ownership handoff behavior, and debt continuity across ownership changes.
 
-### 4. Meter Readings
+### 4. Ownership Transfer Workflow
+
+- Purpose: operationalize the handoff between outgoing and incoming Owners without changing the Unit Account.
+- Why here: the workflow sits on top of the Ownership domain and must be understood before billing periods consume it.
+- Key dependency: Ownerships, Unit Accounts, and NOC policy.
+- Definition of done: atomic close-and-create ownership transfer, billing-cycle boundary handling, and audit metadata.
+
+### 5. Annual Budgets
+
+- Purpose: define the approved annual association budget that monthly assessments draw from.
+- Why here: Billing Periods and monthly invoice calculations need a stable yearly source of truth before monthly orchestration is finalized.
+- Key dependency: Building and core financial policy decisions.
+- Definition of done: approved annual budget model, yearly record lifecycle, and the participation-based assessment formula.
+
+### 6. Billing Periods
+
+- Purpose: define the monthly billing cycle boundary and workflow state for a period.
+- Why here: invoicing and allocation need a period container before bill generation begins.
+- Key dependency: Building, Units, Unit Accounts, Ownerships, and Annual Budgets.
+- Definition of done: billing period lifecycle, approval states, invoice-generation controls, and idempotent monthly run behavior.
+
+### 7. Meter Readings
 
 - Purpose: capture usage inputs that feed utility allocation and invoice calculations.
 - Why here: meter data is an input to billing but depends on Units and account context.
 - Key dependency: Units and metering capability.
 - Definition of done: reading capture, validation, history, and linkage to billing periods or utility bills.
 
-### 5. Billing Periods
-
-- Purpose: define the billing cycle boundary and workflow state for a period.
-- Why here: invoicing and allocation need a period container before bill generation begins.
-- Key dependency: Building, Units, and account structure.
-- Definition of done: billing period lifecycle, approval states, and period-level controls.
-
-### 6. Utility Bills
+### 8. Utility Bills
 
 - Purpose: model supplier-side utility charges that will later be allocated across units.
 - Why here: utility bills are upstream inputs to billing and allocations.
 - Key dependency: Billing Periods and Suppliers.
 - Definition of done: bill capture, attachment, categorization, and period association.
 
-### 7. Invoice Preview and Generation
+### 9. Invoice Preview and Generation
 
 - Purpose: assemble a draft statement for a Unit/Owner before final posting.
 - Why here: invoice logic depends on unit accounts, billing periods, readings, and bill inputs.
 - Key dependency: Unit Accounts, Billing Periods, Meter Readings, and Utility Bills.
 - Definition of done: preview, generation, and validation of invoice totals before approval or send.
 
-### 8. Payments
+### 10. Payments
 
 - Purpose: record money received against invoices and accounts.
 - Why here: payment posting should follow invoice generation and account structure.
 - Key dependency: Invoices and Unit Accounts.
 - Definition of done: payment capture, posting, allocation, and lifecycle status.
 
-### 9. Reconciliation and Allocations
+### 11. Reconciliation and Allocations
 
 - Purpose: apply payments and other receipts to invoices, balances, and related charges.
 - Why here: reconciliation depends on recorded invoices and payments, not the other way around.
 - Key dependency: Payments, Invoices, and Unit Accounts.
 - Definition of done: allocation rules, reconciliation states, and auditability of how money was applied.
 
-### 10. Receipts
+### 12. Receipts
 
 - Purpose: issue the operational receipt record for payments or reconciled collections.
 - Why here: receipts are downstream of payment capture and reconciliation.
 - Key dependency: Payments and Reconciliation.
 - Definition of done: receipt generation, numbering, and traceable linkage to posted collections.
 
-### 11. Credits and Credit Transfers
+### 13. Credits and Credit Transfers
 
 - Purpose: manage overpayments, credits, and movement of credit between asset accounts.
 - Why here: credits rely on the balance and reconciliation model already existing.
 - Key dependency: Unit Accounts, Payments, and Reconciliation.
 - Definition of done: credit lifecycle, transfer rules, and balance continuity across unit accounts.
 
-### 12. Reports
+### 14. Reports
 
 - Purpose: summarize operational, billing, and collections data for staff.
 - Why here: reporting is most useful after the core workflows exist and can be trusted.
 - Key dependency: all prior transactional domains.
 - Definition of done: stable staff-facing reports with clear source-of-truth queries.
 
-### 13. Suppliers and Expenses
+### 15. Suppliers and Expenses
 
 - Purpose: manage external vendors and expense records that feed utility and maintenance workflows.
 - Why here: suppliers support utility bills and expense tracking, which are easier to define after billing primitives exist.
 - Key dependency: Utility Bills and Billing Periods.
 - Definition of done: supplier records, expense capture, and links to paid or payable operational costs.
 
-### 14. Documents
+### 16. Documents
 
 - Purpose: attach files to owners, units, invoices, payments, bills, and other records.
 - Why here: document storage should attach to mature aggregates rather than define them.
 - Key dependency: the core business aggregates already being present.
 - Definition of done: upload, metadata, association, access control, and lifecycle states.
 
-### 15. Communications
+### 17. Communications
 
 - Purpose: record notices, messages, and operational outreach.
 - Why here: communications depend on existing owner, unit, invoice, and payment records as targets.
 - Key dependency: Owners, Units, Invoices, and Payments.
 - Definition of done: message records, delivery states, and linkage to business events.
 
-### 16. Staff and Permissions Administration
+### 18. Staff and Permissions Administration
 
 - Purpose: manage operational access and permission assignment within TB810.
 - Why here: staff management should follow the core business model, not define it.
 - Key dependency: existing auth, roles, and permission primitives.
 - Definition of done: staff lifecycle, role assignment, and permission administration UI/workflows.
 
-### 17. Audit Log and Administrative Controls
+### 19. Audit Log and Administrative Controls
 
 - Purpose: preserve traceability and administrative oversight across all domains.
 - Why here: audit and control surfaces are most valuable once the main workflows exist.
@@ -222,6 +236,10 @@ Units is the next milestone because it establishes the physical/legal asset root
 - no billing or balance editing on Unit
 - no Unit creation workflow
 - no Unit archival workflow
+
+## Next Milestone After Units and Ownerships
+
+Ownerships and the Ownership Transfer workflow are the immediate next milestone. Billing Periods are documented now as a canonical domain model, but implementation should wait until Ownership responsibility and Annual Budget behavior are finalized.
 
 ### Why Units Comes Next
 
