@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { listOwners } from "@/server/owners";
 
+import { OwnersTable } from "./_components/owners-table";
+
 type PageProps = {
   searchParams?: Promise<{
     q?: string;
@@ -70,88 +72,7 @@ export default async function OwnersPage({ searchParams }: PageProps) {
         <div className="mt-8 flow-root">
           <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
             <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-              <table className="relative min-w-full divide-y divide-zinc-300">
-                <thead>
-                  <tr>
-                    <th
-                      scope="col"
-                      className="py-3.5 pr-3 pl-4 text-left text-sm font-semibold text-zinc-900 sm:pl-0"
-                    >
-                      Name
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900"
-                    >
-                      Reference
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900"
-                    >
-                      Contact
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900"
-                    >
-                      Status
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900"
-                    >
-                      Units
-                    </th>
-                    <th
-                      scope="col"
-                      className="py-3.5 pr-4 pl-3 sm:pr-0"
-                    >
-                      <span className="sr-only">View</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 bg-white">
-                  {result.data.map((owner) => (
-                    <tr key={owner.id} className="hover:bg-zinc-50 hover:cursor-pointer test -mx-2">
-                      <td className="py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap text-zinc-900 sm:pl-0">
-                        {owner.full_name}
-                      </td>
-                      <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
-                        {owner.owner_reference}
-                      </td>
-                      <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
-                        <div className="space-y-1">
-                          <p>{owner.email ?? "No email"}</p>
-                          <p>{owner.phone_number ?? "No phone"}</p>
-                        </div>
-                      </td>
-                      <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            owner.active
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-zinc-100 text-zinc-700"
-                          }`}
-                        >
-                          {owner.active ? "Active" : "Archived"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
-                        {owner.unit_count}
-                      </td>
-                      <td className="py-4 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-0">
-                        <Link
-                          href={`/owners/${owner.id}`}
-                          className="text-zinc-950 transition hover:text-zinc-600"
-                        >
-                          View<span className="sr-only">, {owner.full_name}</span>
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <OwnersTable owners={result.data} />
             </div>
           </div>
         </div>
