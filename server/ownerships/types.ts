@@ -1,5 +1,8 @@
 import type { UnitTypeCode } from "@/server/units/types";
-export type { OwnershipTransferInput } from "./validation";
+export type {
+  OwnershipTransferFormInput,
+  OwnershipTransferInput,
+} from "./validation";
 
 export type OwnershipRecord = {
   id: string;
@@ -25,6 +28,7 @@ export type OwnershipWithRelations = OwnershipRecord & {
   unit_number: string;
   unit_type_code: UnitTypeCode;
   unit_type_name: string;
+  ownership_status: "current" | "scheduled" | "past";
 };
 
 export type UnitAccountSummary = {
@@ -37,6 +41,7 @@ export type UnitAccountSummary = {
 
 export type UnitOwnershipSnapshot = {
   currentOwnership: OwnershipWithRelations | null;
+  scheduledOwnerships: OwnershipWithRelations[];
   ownershipHistory: OwnershipWithRelations[];
   unitAccount: UnitAccountSummary | null;
 };
@@ -48,11 +53,12 @@ export type OwnerUnitSummary = {
   unit_type_name: string;
   ownership_start_date: string;
   ownership_end_date: string | null;
-  ownership_status: "current" | "past";
+  ownership_status: "current" | "scheduled" | "past";
 };
 
 export type OwnerUnitsSnapshot = {
   currentUnits: OwnerUnitSummary[];
+  scheduledUnits: OwnerUnitSummary[];
   pastUnits: OwnerUnitSummary[];
 };
 
@@ -71,5 +77,6 @@ export type OwnershipTransferDefaults = {
     owner_reference: string;
     active: boolean;
   }>;
-  suggestedStartDate: string;
+  suggestedEffectiveMonth: string;
+  minimumEffectiveMonth: string;
 };

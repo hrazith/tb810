@@ -11,8 +11,7 @@ It exists because ownership changes affect billing responsibility, but they do n
 - Unit
 - current Owner
 - incoming Owner
-- legal transfer date
-- billing responsibility effective period
+- Billing-effective month
 - notes
 - NOC or clearance status, if available
 - supporting documents later
@@ -23,8 +22,8 @@ Before a transfer can complete:
 
 - the Unit must exist
 - the incoming Owner must exist or be created first
-- there must be no overlapping active Ownership for the Unit
-- the billing-effective period must be known
+- there must be no overlapping Ownership periods for the Unit
+- the billing-effective month must be known
 - the Unit Account must remain unchanged
 - NOC may be required by policy, but enforcement details are deferred
 
@@ -36,8 +35,8 @@ Recommended sequence:
 2. Review current Owner.
 3. Review Unit Account balance and NOC status.
 4. Select or create incoming Owner.
-5. Choose legal transfer date.
-6. Determine billing-cycle effective date.
+5. Choose Billing-effective month.
+6. Normalize the selected month to the first day of that month for storage.
 7. Close the current Ownership.
 8. Create the new Ownership.
 9. Preserve the same Unit Account.
@@ -62,8 +61,12 @@ TB810 should resolve responsibility from the Ownership active on the billing-cyc
 Recommended rule:
 
 - use the Owner active on the first day of the Billing Period
-- if a transfer closes during July, August becomes the first period billed to the incoming Owner
+- if a Billing-effective month is August 2026, the new Ownership starts on 2026-08-01
+- the previous Ownership ends on 2026-07-31
 - the July invoice remains with the outgoing Owner if the July period had already begun
+- the incoming Owner inherits all outstanding Unit Account debt
+- historical invoices remain unchanged
+- no prorating occurs
 
 This is the simplest model that fully expresses the confirmed business rule.
 
@@ -74,14 +77,14 @@ If a Unit has no current Owner, the same workflow is used to assign the first Ow
 In that case:
 
 - there is no prior Ownership to close
-- the new Ownership begins on the chosen first-of-month effective date
+- the new Ownership begins on the chosen billing-effective month boundary
 - the Unit Account remains unchanged
 
 ## Owner Reporting
 
 Owner-level balances are derived by aggregating invoices and Unit Account balances for Units currently assigned to that Owner.
 
-Debt does not move onto the Owner as a personal balance. It remains on the Unit Account.
+Debt does not move onto the Owner as a personal balance. It remains on the Unit Account, but the incoming Owner becomes responsible for all outstanding Unit Account debt.
 
 Example:
 

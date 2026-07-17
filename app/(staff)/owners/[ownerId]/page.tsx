@@ -81,13 +81,15 @@ export default async function OwnerDetailPage({ params }: PageProps) {
             Ownership summary
           </h2>
           <p className="mt-3 text-sm text-zinc-600">
-            {ownerships.currentUnits.length + ownerships.pastUnits.length} total
+            {ownerships.currentUnits.length +
+              ownerships.scheduledUnits.length +
+              ownerships.pastUnits.length} total
             ownership records.
           </p>
         </Panel>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Panel as="section">
           <h2 className="text-lg font-semibold text-zinc-950">
             Currently owned Units
@@ -123,6 +125,44 @@ export default async function OwnerDetailPage({ params }: PageProps) {
             </div>
           ) : (
             <p className="mt-3 text-sm text-zinc-600">No current units.</p>
+          )}
+        </Panel>
+
+        <Panel as="section">
+          <h2 className="text-lg font-semibold text-zinc-950">
+            Scheduled Units
+          </h2>
+          {ownerships.scheduledUnits.length ? (
+            <div className="mt-3 space-y-3">
+              {ownerships.scheduledUnits.map((item) => (
+                <div
+                  key={item.unit_id}
+                  className="rounded-xl border border-zinc-200 p-4"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <p className="font-medium text-zinc-950">
+                        {item.unit_number}
+                      </p>
+                      <p className="text-sm text-zinc-600">
+                        {item.unit_type_name}
+                      </p>
+                      <p className="text-sm text-zinc-600">
+                        Starts: {item.ownership_start_date}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/units/${item.unit_id}`}
+                      className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
+                    >
+                      View unit
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-zinc-600">No scheduled units.</p>
           )}
         </Panel>
 

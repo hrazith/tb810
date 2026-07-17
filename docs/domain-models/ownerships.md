@@ -6,6 +6,8 @@ Ownership is the historical relationship that records which Owner is responsible
 
 It is a relationship, not a balance, not a financial account, and not the asset itself.
 
+TB810 uses billing-month responsibility, not a legal transfer date. Users select a Billing-effective month, and the system normalizes it to the first day of that month for storage.
+
 ## Responsibilities
 
 The Ownership aggregate is responsible for:
@@ -39,10 +41,11 @@ Beginning of the Ownership period.
 
 Recommended meaning:
 
-- this is the billing-responsibility start date for the relationship
-- it should be the date from which TB810 considers the Owner responsible for the Unit in the relevant billing cycle
+- this is the billing-month boundary for the relationship
+- it should be the first day of the billing month from which TB810 considers the Owner responsible for the Unit
+- it is not a legal transfer date
 
-This meaning is simpler than treating it as a separate legal-transfer date, and it matches the monthly billing boundary rule.
+The exact legal transfer date is not captured.
 
 ### `end_date`
 
@@ -52,6 +55,12 @@ Recommended rule:
 
 - active ownership is the row where `start_date <= billing_period.starts_on`
 - and `end_date is null or end_date >= billing_period.starts_on`
+
+Ownership lifecycle states are distinct:
+
+- Current Ownership starts on or before the current billing month and has no earlier end date
+- Scheduled Ownership starts after the current billing month
+- Past Ownership ends before the current billing month
 
 This keeps the billing boundary deterministic and easy to query.
 
@@ -145,6 +154,9 @@ That means:
 - the Owner active on the first day of the Billing Period is the responsible Owner for that period
 - a sale during the month affects the next billing period, not the current one
 - existing invoices do not move to the incoming Owner after the invoice is issued
+- the incoming Owner inherits all outstanding Unit Account debt
+- historical invoices remain unchanged
+- no prorating occurs
 
 This model is deterministic and matches the confirmed business rule that the association does not prorate mid-cycle transfers.
 
@@ -181,7 +193,7 @@ The current schema already supports the basic relationship shape, but it also in
 
 ### Fields to clarify
 
-- `start_date` as billing-responsibility start date
+- `start_date` as billing-month boundary
 - `end_date` as inclusive end date for the relationship
 
 ### Missing constraints
@@ -212,7 +224,5 @@ Because ownership transfer is financially relevant, the safest path is to enforc
 
 Only a few decisions remain unresolved:
 
-- whether a separate legal transfer date needs to be preserved in addition to `start_date`
 - whether `end_date` should be inclusive or whether a half-open interval should be used everywhere
 - whether overlap prevention should be enforced purely by database constraint or by transactional application logic plus validation
-

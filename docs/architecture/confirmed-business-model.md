@@ -52,8 +52,12 @@ Ownership is the historical relationship that records which Owner is responsible
 
 Ownership changes preserve history:
 
-- the previous ownership receives an end date
-- the new ownership begins on the relevant billing-cycle boundary
+- users select a Billing-effective month
+- the server normalizes that month to the first day of the month for storage
+- the previous Ownership receives an end date on the final day of the prior month
+- the new Ownership begins on the billing-month boundary
+- exact legal transfer dates are not captured
+- scheduled Ownership is distinct from Current Ownership
 
 Ownership transfer is a business workflow, not generic CRUD.
 
@@ -79,6 +83,7 @@ Ownership transfer is a business workflow, not generic CRUD.
 The transfer closes one Ownership and creates the next without changing the Unit Account or rewriting historical invoices, payments, or receipts.
 
 Billing responsibility is resolved at the billing-cycle boundary from the Ownership active on that period start date.
+The incoming Owner becomes responsible for all outstanding Unit Account debt, while historical invoices remain unchanged and no prorating occurs.
 
 ## Monthly Invoices
 

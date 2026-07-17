@@ -21,6 +21,12 @@ function formatParticipation(value: number) {
   return `${value.toFixed(4).replace(/\.?0+$/, "")}%`;
 }
 
+function statusLabel(status: string) {
+  if (status === "current") return "Current";
+  if (status === "scheduled") return "Scheduled";
+  return "Past";
+}
+
 export default async function UnitDetailPage({ params }: PageProps) {
   const { unitId } = await params;
   const result = await getUnitById(unitId);
@@ -133,6 +139,23 @@ export default async function UnitDetailPage({ params }: PageProps) {
             ) : (
               <p className="text-sm text-zinc-600">No current owner.</p>
             )}
+            {ownershipSnapshot?.scheduledOwnerships.length ? (
+              <div className="space-y-2 pt-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Scheduled owner
+                </h4>
+                {ownershipSnapshot.scheduledOwnerships.map((item) => (
+                  <div key={item.id} className="space-y-1">
+                    <p className="text-sm font-medium text-zinc-950">
+                      {item.owner.full_name}
+                    </p>
+                    <p className="text-xs text-zinc-600">
+                      Starts: {item.start_date}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-3">
@@ -171,7 +194,7 @@ export default async function UnitDetailPage({ params }: PageProps) {
                           {item.end_date ?? "Current"}
                         </td>
                         <td className="px-4 py-3 text-zinc-600">
-                          {item.end_date === null ? "Current" : "Past"}
+                          {statusLabel(item.ownership_status)}
                         </td>
                       </tr>
                     ))}

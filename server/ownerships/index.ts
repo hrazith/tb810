@@ -3,7 +3,7 @@ import { getUnitById } from "@/server/units";
 import type { UnitTypeCode } from "@/server/units/types";
 
 import {
-  firstDayOfNextMonth,
+  getCurrentBillingMonth,
   ownershipTransferSchema,
 } from "./validation";
 import type {
@@ -27,6 +27,25 @@ const OWNERSHIP_SELECT =
 
 function mapOwnershipRow(row: OwnershipRecord): OwnershipRecord {
   return row;
+}
+
+function toBillingMonth(dateString: string) {
+  return dateString.slice(0, 7);
+}
+
+function classifyOwnershipRow(
+  row: OwnershipRecord,
+  currentBillingMonth: string,
+): OwnershipWithRelations["ownership_status"] {
+  const startMonth = toBillingMonth(row.start_date);
+  const endMonth = row.end_date ? toBillingMonth(row.end_date) : null;
+
+  if (startMonth > currentBillingMonth) return "scheduled";
+  if (endMonth !== null && endMonth < currentBillingMonth) return "past";
+  if (startMonth <= currentBillingMonth && (endMonth === null || endMonth >= currentBillingMonth)) {
+    return "current";
+  }
+  return "past";
 }
 
 async function getUnitLookup(
@@ -160,6 +179,7 @@ function mapOwnershipWithRelations(
   row: OwnershipRecord,
   owner: OwnershipWithRelations["owner"],
   unit: { unit_number: string; unit_type_code: UnitTypeCode; unit_type_name: string },
+  ownership_status: OwnershipWithRelations["ownership_status"],
 ): OwnershipWithRelations {
   return {
     ...mapOwnershipRow(row),
@@ -167,48 +187,13 @@ function mapOwnershipWithRelations(
     unit_number: unit.unit_number,
     unit_type_code: unit.unit_type_code,
     unit_type_name: unit.unit_type_name,
+    ownership_status,
   };
 }
 
-export async function getCurrentOwnershipForUnit(
+async function getOwnershipRowsForUnit(
   unitId: string,
-): Promise<QueryResult<OwnershipWithRelations | null>> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("tb810_ownerships")
-    .select(OWNERSHIP_SELECT)
-    .eq("unit_id", unitId)
-    .is("end_date", null)
-    .order("start_date", { ascending: false })
-    .maybeSingle();
-
-  if (error) return { data: null, error: error.message };
-  if (!data) return { data: null, error: null };
-
-  const [{ data: ownerMap, error: ownerError }, { data: unitMap, error: unitError }] =
-    await Promise.all([
-      getOwnerMap(supabase, [data.owner_id]),
-      getUnitMap(supabase, [data.unit_id]),
-    ]);
-
-  if (ownerError) return { data: null, error: ownerError };
-  if (unitError) return { data: null, error: unitError };
-
-  if (!ownerMap || !unitMap) {
-    return { data: null, error: null };
-  }
-
-  const owner = ownerMap.get(data.owner_id);
-  const unit = unitMap.get(data.unit_id);
-
-  if (!owner || !unit) return { data: null, error: null };
-
-  return { data: mapOwnershipWithRelations(data, owner, unit), error: null };
-}
-
-export async function getOwnershipHistoryForUnit(
-  unitId: string,
-): Promise<QueryResult<OwnershipWithRelations[]>> {
+): Promise<QueryResult<OwnershipRecord[]>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tb810_ownerships")
@@ -218,8 +203,21 @@ export async function getOwnershipHistoryForUnit(
     .order("created_at", { ascending: false });
 
   if (error) return { data: [], error: error.message };
+  return { data: (data ?? []) as OwnershipRecord[], error: null };
+}
 
-  const ownerIds = [...new Set((data ?? []).map((row) => row.owner_id))];
+export async function getOwnershipHistoryForUnit(
+  unitId: string,
+): Promise<QueryResult<OwnershipWithRelations[]>> {
+  const supabase = await createClient();
+  const [rowsResult, currentMonthResult] = await Promise.all([
+    getOwnershipRowsForUnit(unitId),
+    Promise.resolve(getCurrentBillingMonth()),
+  ]);
+
+  if (rowsResult.error) return { data: [], error: rowsResult.error };
+
+  const ownerIds = [...new Set((rowsResult.data ?? []).map((row) => row.owner_id))];
   const { data: ownerMap, error: ownerError } = await getOwnerMap(supabase, ownerIds);
   if (ownerError) return { data: [], error: ownerError };
 
@@ -233,10 +231,17 @@ export async function getOwnershipHistoryForUnit(
   if (!unit) return { data: [], error: null };
 
   return {
-    data: (data ?? [])
+    data: (rowsResult.data ?? [])
       .map((row) => {
         const owner = ownerMap.get(row.owner_id);
-        return owner ? mapOwnershipWithRelations(row, owner, unit) : null;
+        return owner
+          ? mapOwnershipWithRelations(
+              row,
+              owner,
+              unit,
+              classifyOwnershipRow(row, currentMonthResult),
+            )
+          : null;
       })
       .filter(Boolean) as OwnershipWithRelations[],
     error: null,
@@ -247,20 +252,53 @@ export async function getUnitOwnershipSnapshot(
   unitId: string,
 ): Promise<QueryResult<UnitOwnershipSnapshot | null>> {
   const supabase = await createClient();
-  const [currentResult, historyResult, accountResult] = await Promise.all([
-    getCurrentOwnershipForUnit(unitId),
-    getOwnershipHistoryForUnit(unitId),
+  const [rowsResult, accountResult] = await Promise.all([
+    getOwnershipRowsForUnit(unitId),
     getUnitAccountSummary(supabase, unitId),
   ]);
 
-  if (currentResult.error) return { data: null, error: currentResult.error };
-  if (historyResult.error) return { data: null, error: historyResult.error };
+  if (rowsResult.error) return { data: null, error: rowsResult.error };
   if (accountResult.error) return { data: null, error: accountResult.error };
+
+  const currentMonth = getCurrentBillingMonth();
+  const { data: ownerMap, error: ownerError } = await getOwnerMap(
+    supabase,
+    [...new Set((rowsResult.data ?? []).map((row) => row.owner_id))],
+  );
+  if (ownerError) return { data: null, error: ownerError };
+
+  const { data: unitMap, error: unitError } = await getUnitMap(supabase, [unitId]);
+  if (unitError) return { data: null, error: unitError };
+  if (!unitMap || !ownerMap) return { data: null, error: null };
+
+  const unit = unitMap.get(unitId);
+  if (!unit) return { data: null, error: null };
+
+  const ownershipHistory = (rowsResult.data ?? [])
+    .map((row) => {
+      const owner = ownerMap.get(row.owner_id);
+      return owner
+        ? mapOwnershipWithRelations(
+            row,
+            owner,
+            unit,
+            classifyOwnershipRow(row, currentMonth),
+          )
+        : null;
+    })
+    .filter(Boolean) as OwnershipWithRelations[];
+
+  const currentOwnership =
+    ownershipHistory.find((row) => row.ownership_status === "current") ?? null;
+  const scheduledOwnerships = ownershipHistory.filter(
+    (row) => row.ownership_status === "scheduled",
+  );
 
   return {
     data: {
-      currentOwnership: currentResult.data,
-      ownershipHistory: historyResult.data,
+      currentOwnership,
+      scheduledOwnerships,
+      ownershipHistory,
       unitAccount: accountResult.data,
     },
     error: null,
@@ -275,18 +313,21 @@ export async function getCurrentUnitsForOwner(
     .from("tb810_ownerships")
     .select(OWNERSHIP_SELECT)
     .eq("owner_id", ownerId)
-    .is("end_date", null)
-    .order("start_date", { ascending: false });
+    .order("start_date", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) return { data: [], error: error.message };
 
-  const unitIds = [...new Set((data ?? []).map((row) => row.unit_id))];
+  const currentMonth = getCurrentBillingMonth();
+  const rows = (data ?? []) as OwnershipRecord[];
+  const currentRows = rows.filter((row) => classifyOwnershipRow(row, currentMonth) === "current");
+  const unitIds = [...new Set(currentRows.map((row) => row.unit_id))];
   const { data: unitMap, error: unitError } = await getUnitMap(supabase, unitIds);
   if (unitError) return { data: [], error: unitError };
   if (!unitMap) return { data: [], error: null };
 
   return {
-    data: (data ?? [])
+    data: currentRows
       .map((row) => {
         const unit = unitMap.get(row.unit_id);
         if (!unit) return null;
@@ -305,6 +346,47 @@ export async function getCurrentUnitsForOwner(
   };
 }
 
+export async function getScheduledUnitsForOwner(
+  ownerId: string,
+): Promise<QueryResult<OwnerUnitSummary[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tb810_ownerships")
+    .select(OWNERSHIP_SELECT)
+    .eq("owner_id", ownerId)
+    .order("start_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) return { data: [], error: error.message };
+
+  const currentMonth = getCurrentBillingMonth();
+  const rows = (data ?? []) as OwnershipRecord[];
+  const scheduledRows = rows.filter((row) => classifyOwnershipRow(row, currentMonth) === "scheduled");
+  const unitIds = [...new Set(scheduledRows.map((row) => row.unit_id))];
+  const { data: unitMap, error: unitError } = await getUnitMap(supabase, unitIds);
+  if (unitError) return { data: [], error: unitError };
+  if (!unitMap) return { data: [], error: null };
+
+  return {
+    data: scheduledRows
+      .map((row) => {
+        const unit = unitMap.get(row.unit_id);
+        if (!unit) return null;
+        return {
+          unit_id: row.unit_id,
+          unit_number: unit.unit_number,
+          unit_type_code: unit.unit_type_code,
+          unit_type_name: unit.unit_type_name,
+          ownership_start_date: row.start_date,
+          ownership_end_date: row.end_date,
+          ownership_status: "scheduled" as const,
+        };
+      })
+      .filter(Boolean) as OwnerUnitSummary[],
+    error: null,
+  };
+}
+
 export async function getPastUnitsForOwner(
   ownerId: string,
 ): Promise<QueryResult<OwnerUnitSummary[]>> {
@@ -313,18 +395,21 @@ export async function getPastUnitsForOwner(
     .from("tb810_ownerships")
     .select(OWNERSHIP_SELECT)
     .eq("owner_id", ownerId)
-    .not("end_date", "is", null)
-    .order("end_date", { ascending: false });
+    .order("start_date", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) return { data: [], error: error.message };
 
-  const unitIds = [...new Set((data ?? []).map((row) => row.unit_id))];
+  const currentMonth = getCurrentBillingMonth();
+  const rows = (data ?? []) as OwnershipRecord[];
+  const pastRows = rows.filter((row) => classifyOwnershipRow(row, currentMonth) === "past");
+  const unitIds = [...new Set(pastRows.map((row) => row.unit_id))];
   const { data: unitMap, error: unitError } = await getUnitMap(supabase, unitIds);
   if (unitError) return { data: [], error: unitError };
   if (!unitMap) return { data: [], error: null };
 
   return {
-    data: (data ?? [])
+    data: pastRows
       .map((row) => {
         const unit = unitMap.get(row.unit_id);
         if (!unit) return null;
@@ -346,17 +431,20 @@ export async function getPastUnitsForOwner(
 export async function getOwnerUnitsSnapshot(
   ownerId: string,
 ): Promise<QueryResult<OwnerUnitsSnapshot>> {
-  const [currentUnits, pastUnits] = await Promise.all([
+  const [currentUnits, scheduledUnits, pastUnits] = await Promise.all([
     getCurrentUnitsForOwner(ownerId),
+    getScheduledUnitsForOwner(ownerId),
     getPastUnitsForOwner(ownerId),
   ]);
 
   if (currentUnits.error) return { data: null as never, error: currentUnits.error };
+  if (scheduledUnits.error) return { data: null as never, error: scheduledUnits.error };
   if (pastUnits.error) return { data: null as never, error: pastUnits.error };
 
   return {
     data: {
       currentUnits: currentUnits.data,
+      scheduledUnits: scheduledUnits.data,
       pastUnits: pastUnits.data,
     },
     error: null,
@@ -382,13 +470,28 @@ export async function getTransferDefaults(
   if (ownersResult.error) return { data: null, error: ownersResult.error.message };
   if (!unitLookup.data) return { data: null, error: null };
 
+  const currentMonth = getCurrentBillingMonth();
+  let minimumEffectiveMonth = currentMonth;
+  const currentOwnershipMonth = snapshot.data?.currentOwnership
+    ? toBillingMonth(snapshot.data.currentOwnership.start_date)
+    : null;
+
+  if (currentOwnershipMonth) {
+    const [year, month] = currentOwnershipMonth.split("-").map(Number);
+    const nextMonth = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7);
+    if (nextMonth > minimumEffectiveMonth) {
+      minimumEffectiveMonth = nextMonth;
+    }
+  }
+
   return {
     data: {
       unit: unitLookup.data,
       unitAccount: snapshot.data?.unitAccount ?? null,
       currentOwnership: snapshot.data?.currentOwnership ?? null,
       owners: ownersResult.data ?? [],
-      suggestedStartDate: firstDayOfNextMonth(),
+      suggestedEffectiveMonth: minimumEffectiveMonth,
+      minimumEffectiveMonth,
     },
     error: null,
   };

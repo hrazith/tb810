@@ -3,20 +3,25 @@
 import { redirect } from "next/navigation";
 
 import { transferOwnership } from "@/server/ownerships";
-import type { OwnershipTransferInput } from "@/server/ownerships/types";
+import type {
+  OwnershipTransferFormInput,
+  OwnershipTransferInput,
+} from "@/server/ownerships/validation";
 import { ownershipTransferSchema } from "@/server/ownerships/validation";
+
+type TransferFormValues = OwnershipTransferFormInput;
 
 type TransferFormState = {
   error?: string;
   fieldErrors?: Partial<Record<keyof OwnershipTransferInput, string>>;
-  values?: OwnershipTransferInput;
+  values?: TransferFormValues;
 };
 
-function toInput(unitId: string, formData: FormData): OwnershipTransferInput {
+function toInput(unitId: string, formData: FormData): TransferFormValues {
   return {
     unit_id: unitId,
     owner_id: String(formData.get("owner_id") ?? ""),
-    effective_date: String(formData.get("effective_date") ?? ""),
+    effective_month: String(formData.get("effective_month") ?? ""),
     notes: String(formData.get("notes") ?? ""),
   };
 }

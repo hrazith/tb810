@@ -7,15 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import type {
   OwnershipTransferDefaults,
+  OwnershipTransferFormInput,
   OwnershipTransferInput,
 } from "@/server/ownerships/types";
 
 import { OwnerPicker } from "./owner-picker";
 
+type TransferFormValues = OwnershipTransferFormInput;
+
 type TransferFormState = {
   error?: string;
   fieldErrors?: Partial<Record<keyof OwnershipTransferInput, string>>;
-  values?: OwnershipTransferInput;
+  values?: TransferFormValues;
 };
 
 const initialState: TransferFormState = {};
@@ -36,10 +39,10 @@ type Props = {
   cancelHref: string;
 };
 
-function previousDay(dateString: string) {
-  if (!dateString) return "Select an effective date";
-  const date = new Date(`${dateString}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() - 1);
+function previousMonthEnd(month: string) {
+  if (!month) return "Select a billing month";
+  const [year, monthNumber] = month.split("-").map(Number);
+  const date = new Date(Date.UTC(year, monthNumber - 1, 0));
   return date.toISOString().slice(0, 10);
 }
 
@@ -53,24 +56,28 @@ export function TransferOwnershipForm({
   const values = state.values ?? {
     unit_id: defaults.unit.id,
     owner_id: "",
-    effective_date: defaults.suggestedStartDate,
+    effective_month: defaults.suggestedEffectiveMonth,
     notes: "",
   };
-  const [ownerId, setOwnerId] = useState(values.owner_id);
-  const [effectiveDate, setEffectiveDate] = useState(values.effective_date);
-  const effectiveDateError = fieldError("effective_date", state);
+  const initialOwnerId = String(values.owner_id ?? "");
+  const initialEffectiveMonth = String(values.effective_month ?? "");
+  const [ownerId, setOwnerId] = useState(initialOwnerId);
+  const [effectiveMonth, setEffectiveMonth] = useState<string>(
+    initialEffectiveMonth,
+  );
+  const effectiveMonthError = fieldError("effective_month", state);
   const ownerError = fieldError("owner_id", state);
   const notesError = fieldError("notes", state);
 
   useEffect(() => {
-    setOwnerId(values.owner_id);
-    setEffectiveDate(values.effective_date);
-  }, [values.owner_id, values.effective_date]);
+    setOwnerId(String(values.owner_id ?? ""));
+    setEffectiveMonth(String(values.effective_month ?? ""));
+  }, [values.owner_id, values.effective_month]);
 
   const isAssign = !defaults.currentOwnership;
   const currentOwnerThrough = useMemo(
-    () => previousDay(effectiveDate),
-    [effectiveDate],
+    () => previousMonthEnd(effectiveMonth),
+    [effectiveMonth],
   );
 
   return (
@@ -126,8 +133,8 @@ export function TransferOwnershipForm({
               Billing changes at the monthly cycle boundary.
             </p>
             <p className="mt-1">
-              Use the first day of a month. No prorating. Historical invoices
-              stay with the owner recorded when they were issued.
+              Select the billing-effective month. No prorating. Historical
+              invoices stay with the owner recorded when they were issued.
             </p>
           </div>
         </div>
@@ -135,20 +142,21 @@ export function TransferOwnershipForm({
         <div className="space-y-4">
           <label className="block space-y-2">
             <span className="block text-sm font-medium text-zinc-900">
-              Effective billing date
+              Billing-effective month
             </span>
             <input
-              type="date"
-              name="effective_date"
-              value={effectiveDate}
-              onChange={(event) => setEffectiveDate(event.target.value)}
-              aria-invalid={effectiveDateError ? "true" : undefined}
-              aria-describedby={effectiveDateError ? "effective-date-error" : undefined}
+              type="month"
+              name="effective_month"
+              value={effectiveMonth}
+              min={defaults.minimumEffectiveMonth}
+              onChange={(event) => setEffectiveMonth(event.target.value)}
+              aria-invalid={effectiveMonthError ? "true" : undefined}
+              aria-describedby={effectiveMonthError ? "effective-month-error" : undefined}
               className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none transition focus:border-zinc-950 aria-[invalid=true]:border-red-500"
             />
-            {effectiveDateError ? (
-              <p id="effective-date-error" className="text-sm text-red-600">
-                {effectiveDateError}
+            {effectiveMonthError ? (
+              <p id="effective-month-error" className="text-sm text-red-600">
+                {effectiveMonthError}
               </p>
             ) : null}
           </label>
@@ -156,8 +164,8 @@ export function TransferOwnershipForm({
           <div className="rounded-2xl border border-zinc-200 p-4">
             <p className="text-sm font-medium text-zinc-900">Incoming owner</p>
             <p className="mt-1 text-sm text-zinc-600">
-              Search and select the owner who becomes responsible on the
-              effective date.
+              Search and select the owner who becomes responsible starting with
+              the selected billing month.
             </p>
             <div className="mt-3">
               <Link
@@ -190,7 +198,7 @@ export function TransferOwnershipForm({
         <textarea
           name="notes"
           rows={4}
-          defaultValue={state.values?.notes ?? ""}
+          defaultValue={(state.values?.notes ?? "") as string}
           aria-invalid={notesError ? "true" : undefined}
           aria-describedby={notesError ? "notes-error" : undefined}
           className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none transition focus:border-zinc-950 aria-[invalid=true]:border-red-500"
@@ -211,10 +219,17 @@ export function TransferOwnershipForm({
             Current owner responsible through:{" "}
             {defaults.currentOwnership ? currentOwnerThrough : "No current owner"}
           </p>
-          <p>Incoming owner responsible from: {effectiveDate || "Select a date"}</p>
+          <p>
+            Incoming owner responsible from:{" "}
+            {effectiveMonth ? `${effectiveMonth}-01` : "Select a billing month"}
+          </p>
           <p>Unit Account remains unchanged.</p>
-          <p>Outstanding debt remains with the Unit.</p>
+          <p>
+            The incoming Owner becomes responsible for all outstanding debt on
+            this Unit Account, including unpaid charges from earlier months.
+          </p>
           <p>Existing invoices remain unchanged.</p>
+          <p>Future invoices use the incoming Owner starting with the selected billing month.</p>
         </div>
       </div>
 
