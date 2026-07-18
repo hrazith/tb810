@@ -1,5 +1,7 @@
 # Persistence Review
 
+The finance architecture referenced here is frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md). This review is retained as a persistence companion to that authoritative architecture.
+
 This review compares the current TB810 persistence model against the finalized domain model for:
 
 - Organization

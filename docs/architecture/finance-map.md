@@ -1,5 +1,7 @@
 # Finance Map
 
+Finance architecture is frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md). This page is retained as a compact conceptual map for reference.
+
 This document captures the conceptual dependency map for the TB810 finance subsystem.
 
 It is not a workflow.

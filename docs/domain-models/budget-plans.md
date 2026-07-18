@@ -1,5 +1,7 @@
 # Budget Plans Domain
 
+The authoritative finance architecture is frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md). This document remains the domain-model companion for Budget Plans.
+
 ## Purpose
 
 A Budget Plan is the year-scoped configuration record that establishes the Monthly Assessment Pool for TB810.

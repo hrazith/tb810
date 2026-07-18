@@ -1,5 +1,7 @@
 # TB810 Domain Principles
 
+Finance decisions are frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md). This document remains the broader architectural constitution, but finance-specific authority now lives in the freeze document.
+
 ## Introduction
 
 These principles are intentionally stable.
@@ -118,7 +120,7 @@ These workflows consume data from the domain model, but they do not define the m
 
 If a workflow needs a concept that does not belong in the core domain, that concept should be modeled carefully rather than hidden inside a transactional shortcut.
 
-Billing Period is the monthly workflow aggregate that coordinates invoice generation, but it does not own the permanent asset balance or the ownership history that feed it.
+Billing Period is the monthly operational context that coordinates invoice generation, but it does not own the permanent asset balance or the ownership history that feed it.
 
 ## Principle 10 - Domain boundaries matter
 
@@ -142,7 +144,7 @@ This separation keeps the model understandable and prevents future confusion abo
 
 The Billing Period is separate from the Unit Account:
 
-- Billing Period owns the monthly run state
+- Billing Period owns the monthly operational context
 - Unit Account owns the asset's financial history
 - Ownership owns who is responsible during the cycle
 

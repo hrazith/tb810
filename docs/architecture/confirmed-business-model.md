@@ -1,5 +1,7 @@
 # Confirmed Business Model
 
+This document now serves as a business-model companion. The authoritative finance architecture is frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md).
+
 ## Unit
 
 A Unit is a permanent physical and legal asset.

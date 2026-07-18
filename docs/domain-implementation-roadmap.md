@@ -1,5 +1,7 @@
 # TB810 Domain Implementation Roadmap
 
+Finance architecture is frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md). This roadmap continues to describe sequencing, but finance-specific architectural decisions should now follow the freeze document.
+
 ## Overview
 
 TB810 will be built domain by domain, with each domain moving through the same sequence:
@@ -108,7 +110,7 @@ Complete:
 
 ### 5. Budget Plans
 
-- Status: Architecturally Frozen (Pending Carlos Discussion Items)
+- Status: Frozen in `docs/architecture/finance-architecture-freeze-v1.md`
 - Purpose: define the approved Monthly Assessment Pool that monthly assessments draw from.
 - Why here: Billing Periods and monthly invoice calculations need a stable year-scoped configuration record before monthly orchestration is finalized.
 - Key dependency: Building and core financial policy decisions.
@@ -116,9 +118,9 @@ Complete:
 
 ### 6. Billing Periods
 
-- Status: Architecturally Frozen - downstream activity details remain in their respective domains
+- Status: Frozen in `docs/architecture/finance-architecture-freeze-v1.md`
 
-- Purpose: define the monthly billing cycle boundary and workflow state for a period.
+- Purpose: define the monthly operational context for a calendar month.
 - Why here: invoicing and allocation need a monthly operational context before bill generation begins.
 - Key dependency: Building, Units, Unit Accounts, Ownerships, and Budget Plans.
 - Definition of done: operational workspace, monthly activity surfacing, invoice-generation controls, and clear downstream domain boundaries.
@@ -225,12 +227,12 @@ Billing Periods is the next milestone because it establishes the operational mon
 - blockers, exceptions, overdue items and missing information are surfaced
 - billing preparation, invoice activity, collections, payment entry and reconciliation are represented as downstream work
 - monthly cadence is preserved without requiring Carlos to manually create the month
-- no Draft/Open/Ready/Active/Closed/Archived Billing Period lifecycle states
+- no Draft/Open/Ready/Active/Closed/Archived Billing Period lifecycle states are modeled as the domain definition
 - invoice generation, payments, allocation and reconciliation remain in their respective downstream domains
 
 ## Next Milestone After Billing Periods
 
-The next architecture domain is likely Unit Ledger, because the Billing Period model now provides the monthly operational context and the remaining finance work needs a stable account-history boundary.
+The next architecture domain after the frozen finance foundation is Unit Ledger, because the Billing Period model now provides the monthly operational context and the remaining finance work needs a stable account-history boundary.
 
 ### Why Unit Ledger Comes Next
 

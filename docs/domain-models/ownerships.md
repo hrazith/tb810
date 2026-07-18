@@ -1,5 +1,7 @@
 # Ownerships Domain
 
+The authoritative finance architecture is frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md). This document remains the domain-model companion for Ownerships.
+
 ## Purpose
 
 Ownership is the historical relationship that records which Owner is responsible for a Unit during a defined period.

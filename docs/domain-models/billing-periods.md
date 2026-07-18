@@ -1,5 +1,7 @@
 # Billing Periods Domain
 
+The authoritative finance architecture is frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md). This document remains the domain-model companion for Billing Periods.
+
 The Billing Period domain is architecturally frozen. Downstream activity details remain in their respective domains.
 
 ## Purpose
