@@ -102,10 +102,6 @@ Document this observation but do not introduce a solution.
 - Budget lifecycle intentionally omitted.
 - Budget Plan intentionally remains a small aggregate.
 
-## Open Questions for Carlos
+See also:
 
-1. What information should the Budget Preview contain to help validate the Monthly Assessment Pool?
-2. Are Unit-level Fixed Assessment Adjustments still a real business requirement or merely legacy workarounds?
-3. Should the Budget Plan become read-only once invoice generation has begun?
-4. Does Carlos ever revise the Monthly Assessment Pool after the budget meeting for reasons other than correcting a data-entry mistake?
-5. Would category-level operating budget planning be useful in the future, even though it does not exist in the legacy system?
+- [`docs/research/questions-for-carlos.md`](/Users/roon/dev/tb810/docs/research/questions-for-carlos.md)

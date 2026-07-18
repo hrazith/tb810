@@ -116,10 +116,12 @@ Complete:
 
 ### 6. Billing Periods
 
+- Status: Architecturally Frozen - downstream activity details remain in their respective domains
+
 - Purpose: define the monthly billing cycle boundary and workflow state for a period.
-- Why here: invoicing and allocation need a period container before bill generation begins.
+- Why here: invoicing and allocation need a monthly operational context before bill generation begins.
 - Key dependency: Building, Units, Unit Accounts, Ownerships, and Budget Plans.
-- Definition of done: billing period lifecycle, approval states, invoice-generation controls, and idempotent monthly run behavior.
+- Definition of done: operational workspace, monthly activity surfacing, invoice-generation controls, and clear downstream domain boundaries.
 
 ### 7. Meter Readings
 
@@ -212,43 +214,30 @@ Complete:
 - Key dependency: the rest of the domain model and its transactional events.
 - Definition of done: durable audit history, admin review surfaces, and controls for sensitive operations.
 
-## Next Milestone: Units
+## Next Milestone: Billing Periods
 
-Units is the next milestone because it establishes the physical/legal asset root that Ownerships, Unit Accounts, and all billing workflows depend on.
+Billing Periods is the next milestone because it establishes the operational monthly context that downstream billing, payments, allocation, and reconciliation workflows depend on.
 
 ### Definition of Done
 
-- `/units`
-- `/units/[unitId]`
-- `/units/[unitId]/edit`
-- list/search/type filtering
-- edit
-- unit type
-- unit number
-- floor
-- registered area
-- participation percentage
-- meter capability
-- notes
-- responsive UI
-- RLS-backed access
-- QA checklist
-- no ownership assignment yet
-- no billing or balance editing on Unit
-- no Unit creation workflow
-- no Unit archival workflow
+- monthly operational context exists by calendar month
+- operational health is visible
+- blockers, exceptions, overdue items and missing information are surfaced
+- billing preparation, invoice activity, collections, payment entry and reconciliation are represented as downstream work
+- monthly cadence is preserved without requiring Carlos to manually create the month
+- no Draft/Open/Ready/Active/Closed/Archived Billing Period lifecycle states
+- invoice generation, payments, allocation and reconciliation remain in their respective downstream domains
 
-## Next Milestone After Units and Ownerships
+## Next Milestone After Billing Periods
 
-Ownerships and the Ownership Transfer workflow are the immediate next milestone. Billing Periods are documented now as a canonical domain model, but implementation should wait until Ownership responsibility and Budget Plan behavior are finalized.
+The next architecture domain is likely Unit Ledger, because the Billing Period model now provides the monthly operational context and the remaining finance work needs a stable account-history boundary.
 
-### Why Units Comes Next
+### Why Unit Ledger Comes Next
 
-- It is the first unresolved domain that anchors the asset model.
-- Ownerships need it.
-- Unit Accounts need it.
-- Billing depends on it.
-- The schema already reflects the modernized Unit boundary, so the remaining work is implementation rather than model invention.
+- It sits directly beneath monthly billing and ownership responsibility.
+- It keeps permanent asset-side financial history separate from presentation and workflow concerns.
+- It gives the finance model a clean place for ledger-oriented behavior before payments and reconciliation expand.
+- Payments are still not the next implementation target.
 
 ## Guardrails
 

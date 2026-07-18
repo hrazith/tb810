@@ -1,10 +1,23 @@
 # Billing Periods Domain
 
+The Billing Period domain is architecturally frozen. Downstream activity details remain in their respective domains.
+
 ## Purpose
 
-A Billing Period is the monthly operational clock for TB810.
+A Billing Period is the operational context for one calendar month.
 
-It is the orchestration record that:
+Examples:
+
+- January 2027
+- February 2027
+
+It exists because the calendar exists.
+
+It is not manually created or opened by Carlos.
+
+It is the container and operational context for the month's work.
+
+It is the orchestration context that:
 
 - collects approved charge inputs
 - determines the responsible Owner for each Unit Account
@@ -17,12 +30,10 @@ The Billing Period does not own permanent balances, ownership history, payment h
 
 The Billing Period aggregate is responsible for:
 
-- monthly cycle state
 - period date boundaries
-- invoice-generation readiness
-- approval workflow metadata
-- completion tracking
-- traceability of the billing run
+- operational awareness
+- traceability of the monthly run
+- surfacing blockers, overdue items, exceptions and missing information
 
 ## Existing Schema Fields
 
@@ -54,7 +65,7 @@ End date for the billing period.
 
 ### `status`
 
-Current lifecycle state.
+Operational status of the monthly context.
 
 Current schema values:
 
@@ -64,6 +75,8 @@ Current schema values:
 - `approved`
 - `invoices_generated`
 - `closed`
+
+These values are current schema fields, but the domain should not be modeled as a workflow state machine.
 
 ### `approved_by`
 
@@ -115,70 +128,21 @@ The mature Billing Period domain is expected to conceptually include:
 - utility-consumption month
 - status
 - budget plan reference
-- review metadata
-- approval metadata
-- invoice-generation metadata
-- close metadata
+- operational health summary
+- blockers
+- overdue items
+- exceptions
 - notes
 
 Some of these are already represented in the current schema, some are likely needed later, and some still require schema review before implementation. This document defines the business shape only.
 
 ## Lifecycle
 
-The Billing Period should use a restrained state model:
+Do not model the Billing Period itself as a traditional workflow state machine.
 
-1. Draft
-2. Collecting inputs
-3. Ready for review
-4. Approved
-5. Invoices generated
-6. Closed
+Do not initially model Draft, Open, Ready, Active, Closed or Archived lifecycle states.
 
-### Draft
-
-- the period exists
-- dates and initial settings may be prepared
-- inputs are incomplete
-- invoices cannot be generated
-
-### Collecting inputs
-
-The association gathers:
-
-- the applicable Budget Plan
-- water readings and calculated charges
-- common-water source amount
-- gas charges where applicable
-- approved additional charges
-- ownership responsibility for the period
-
-### Ready for review
-
-- required charge inputs are present
-- invoice preview can be calculated
-- no invoices have been finalized
-
-### Approved
-
-- an authorized staff member has reviewed the billing inputs
-- calculations are approved
-- the period is ready for invoice generation
-
-### Invoices generated
-
-- one invoice exists for each eligible permanent Unit Account
-- invoice line items preserve their charge source
-- invoice addressee is snapshotted from the Owner responsible for the billing cycle
-- repeated generation must not create duplicates
-
-### Closed
-
-- the billing run is administratively finalized
-- invoices remain payable after the period closes
-- payment collection is not required to finish before closing
-- historical billing inputs and generated invoices should not be silently rewritten
-
-Reopening should only be considered later as an administrative exception, not as a routine workflow.
+The relevant question is what is preventing the month's activities from progressing.
 
 ## Charge Calculation Model
 
@@ -191,6 +155,23 @@ Invoice calculation should be understood conceptually as follows.
 The exact rounding policy remains unresolved before implementation.
 
 The confirmed calculation is direct and uses the monthly assessment pool without a yearly normalization step.
+
+Monthly obligations are immutable financial history.
+
+Once monthly obligations are established they become part of financial history.
+
+The system must preserve:
+
+- monthly assessment amount
+- participation percentage
+- water calculations
+- rates
+- calculation inputs
+- resulting obligation
+
+Future edits to budgets, ownership percentages or rates must never silently rewrite previous months.
+
+Historical months remain historically correct.
 
 ### Private water
 
@@ -218,6 +199,16 @@ The confirmed calculation is direct and uses the monthly assessment pool without
 - assigned to a target billing period
 - include amount, description, reason or source, and status
 - do not alter the Budget Plan or participation percentage
+
+## Invoice Corrections
+
+If an invoice mistake is found after sending it, cancel the wrong invoice and send a new one.
+
+Invoices should never be edited after being issued.
+
+Cancelled invoices remain in history.
+
+Replacement invoices are newly issued.
 
 ## Invoice Generation
 
@@ -255,43 +246,61 @@ The exact cutoff implementation remains part of the Ownership workflow design.
 - payment allocation belongs to the Payments domain
 - closing a Billing Period does not mean every invoice is paid
 
+## Operational Health
+
+The Billing Period should provide operational awareness.
+
+The system should continuously understand:
+
+- what has been completed
+- what remains outstanding
+- what requires attention
+- what is overdue
+- what is blocked
+- what data is missing
+- what changed recently
+- what should be addressed next
+
+The primary question answered by the Billing Period experience is:
+
+What requires attention in this month's operation?
+
+The interface should prioritize exceptions and attention items while still allowing the user to access the underlying records.
+
 ## Budget Plan Workflow
 
-The yearly relationship should be:
+The monthly relationship should be:
 
-1. Budget Plan is created
-2. Budget Plan is reviewed and approved
-3. Monthly Billing Periods reference the approved budget plan
-4. Each period calculates the monthly Unit assessment from that approved budget plan
-5. If the budget plan changes, the effective-period behavior must be explicitly controlled
+1. Budget Plan is established
+2. Monthly Billing Periods reference the approved Budget Plan
+3. Each period calculates the monthly Unit assessment from that approved Budget Plan
+4. If the budget plan changes, the effective-period behavior must be explicitly controlled
 
 Budget revision behavior remains an open design question.
 
 ## Domain Relationships
 
-Building
-→ Budget Plan
-→ Billing Period
-→ Invoices
-→ Invoice Line Items
-→ Permanent Unit Accounts
+Billing Period coordinates monthly work across the core finance domains:
+
+- Building
+- Budget Plan
+- Unit Accounts
+- Ownerships
+- Invoices
+- Invoice Line Items
 
 Supporting inputs:
 
-Units
-→ participation percentage
+- Units
+- Meter Readings / Utility Inputs
+- Common Utility Bills
+- Additional Charges
 
-Ownerships
-→ responsible Owner for the billing cycle
-
-Meter Readings / Utility Inputs
-→ private water and gas charges
-
-Common Utility Bill
-→ common-water allocations
-
-Additional Charges
-→ targeted Unit Account invoice lines
+Monthly assessment relies on the Unit participation percentage.
+Ownerships determine the responsible Owner for the billing cycle.
+Meter readings and utility inputs feed private water and gas charges.
+Common utility bills feed common-water allocations.
+Additional charges become targeted Unit Account invoice lines.
 
 ## Invariants
 
@@ -329,10 +338,5 @@ Unresolved decisions:
 
 - exact rounding policy for monthly participation assessment
 - exact invoice and due dates
-- mandatory inputs before approval
-- whether approval is always required
-- whether a generated period can be reopened
-- how corrections are handled after invoice generation
-  - whether budget plan revisions affect future periods only
 - exact gas input mechanism
 - whether negative additional charges are allowed as direct credits or require a separate adjustment workflow

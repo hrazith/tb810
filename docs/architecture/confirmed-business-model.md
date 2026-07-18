@@ -111,6 +111,85 @@ A Unit invoice may contain charge line items from:
 
 Invoice lines should be modeled as charge types rather than hardcoded invoice columns.
 
+## Billing Period
+
+Billing Period is an operational context representing one accounting month.
+
+Examples:
+
+- January 2027
+- February 2027
+
+The Billing Period exists because the calendar exists.
+
+It is not something Carlos manually creates or opens.
+
+The dashboard should communicate operational health rather than workflow state.
+
+Billing Period is frozen as a domain concept. Downstream activity details remain in their respective domains.
+
+The Billing Period should not be modeled with lifecycle states such as Draft, Ready, Open, Closed or Archived.
+
+The more relevant question is what is preventing the month's activities from progressing.
+
+## Monthly Obligations
+
+Monthly obligations are immutable financial history.
+
+Once monthly obligations are established they become part of financial history.
+
+The system must preserve:
+
+- monthly assessment amount
+- participation percentage
+- water calculations
+- rates
+- calculation inputs
+- resulting obligation
+
+Future edits to budgets, ownership percentages or rates must never silently rewrite previous months.
+
+Historical months remain historically correct.
+
+## Invoice Corrections
+
+If an invoice mistake is found after sending it, the wrong invoice should be canceled and a new one issued.
+
+Invoices should never be edited after being issued.
+
+Cancelled invoices remain in history.
+
+Replacement invoices are newly issued.
+
+## Architectural Language
+
+Maintain three levels of language.
+
+Business Language:
+
+- Invoices
+- Amount Due
+- Payments
+- Owner Statement
+
+Product Language:
+
+- January Invoices
+- Owner Statement
+- Outstanding Balance
+
+Domain Language:
+
+- Billing Period
+- Monthly Financial Obligations
+- Unit Account
+
+These internal concepts should not necessarily appear in the UI.
+
+See also:
+
+- [`docs/architecture/finance-map.md`](/Users/roon/dev/tb810/docs/architecture/finance-map.md)
+
 ## Budget Plan
 
 The legacy `Presupuesto` concept is the Budget Plan, a deliberately small year-scoped configuration record.
@@ -136,6 +215,10 @@ Budget Plans never own participation percentages.
 
 The Budget Plan may be edited, but if invoicing has already begun the legacy system appears to rely on Unit-level adjustments rather than budget versioning. That behavior is documented here as an observation, not a recommended model.
 
+See also:
+
+- [`docs/domain-models/budget-plans.md`](/Users/roon/dev/tb810/docs/domain-models/budget-plans.md)
+
 ## Billing Period
 
 The Billing Period is the monthly operational clock for TB810.
@@ -156,26 +239,9 @@ The preview exists to help Carlos validate the Monthly Assessment Pool before co
 
 The exact contents of the preview remain intentionally open until discussed with Carlos.
 
-## Frozen Decisions
+See also:
 
-- One Budget Plan per calendar year.
-- Monthly Assessment Pool is stored.
-- Fixed Monthly Assessments are always derived.
-- Budget Plans do not store calculated assessments.
-- Budget Preview derives assessments.
-- Invoices store historical billed amounts.
-- Participation Percentages belong to Units.
-- Unit inventory is fixed.
-- Budget lifecycle intentionally omitted.
-- Budget Plan intentionally remains a small aggregate.
-
-## Open Questions for Carlos
-
-1. What information should the Budget Preview contain to help validate the Monthly Assessment Pool?
-2. Are Unit-level Fixed Assessment Adjustments still a real business requirement or merely legacy workarounds?
-3. Should the Budget Plan become read-only once invoice generation has begun?
-4. Does Carlos ever revise the Monthly Assessment Pool after the budget meeting for reasons other than correcting a data-entry mistake?
-5. Would category-level operating budget planning be useful in the future, even though it does not exist in the legacy system?
+- [`docs/research/questions-for-carlos.md`](/Users/roon/dev/tb810/docs/research/questions-for-carlos.md)
 
 ## Participation
 

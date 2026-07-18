@@ -166,7 +166,38 @@ Configuration is not accounting:
 - configuration drives financial operations
 - configuration itself is not the financial ledger
 
-## Principle 11 - Preserve history
+## Principle 11 - The business must outlive the operator
+
+Do not design workflows around Carlos or any individual administrator.
+
+The business continues to exist regardless of who performs the operational work.
+
+Time advances.
+Billing periods exist.
+Financial obligations exist.
+
+Administrators review, communicate, collect and reconcile. They do not create the existence of the business.
+
+## Principle 12 - Time is a first-class business actor
+
+Many business events exist because time advances, not because a human pressed a button.
+
+Examples:
+
+- Billing Period begins because the calendar advances
+- Monthly financial obligations exist because a new month exists
+
+Avoid workflow-driven architecture whenever possible.
+
+## Principle 13 - Immutable financial history
+
+Once financial history has been established it should never silently change.
+
+Corrections should create new financial events rather than rewriting history.
+
+This principle underpins the finance architecture.
+
+## Principle 14 - Preserve history
 
 Historical information should be preserved.
 
@@ -174,7 +205,7 @@ Prefer history-preserving states over deletion when records participate in finan
 
 The goal is not to erase earlier truth. The goal is to represent later truth without losing what came before.
 
-## Principle 12 - Modernization over replication
+## Principle 15 - Modernization over replication
 
 TB810 is not a recreation of the legacy database.
 
