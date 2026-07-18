@@ -106,18 +106,19 @@ Complete:
 - Key dependency: Ownerships, Unit Accounts, and NOC policy.
 - Definition of done: atomic close-and-create ownership transfer, billing-cycle boundary handling, and audit metadata.
 
-### 5. Annual Budgets
+### 5. Budget Plans
 
-- Purpose: define the approved annual association budget that monthly assessments draw from.
-- Why here: Billing Periods and monthly invoice calculations need a stable yearly source of truth before monthly orchestration is finalized.
+- Status: Architecturally Frozen (Pending Carlos Discussion Items)
+- Purpose: define the approved Monthly Assessment Pool that monthly assessments draw from.
+- Why here: Billing Periods and monthly invoice calculations need a stable year-scoped configuration record before monthly orchestration is finalized.
 - Key dependency: Building and core financial policy decisions.
-- Definition of done: approved annual budget model, yearly record lifecycle, and the participation-based assessment formula.
+- Definition of done: Budget Plan model, Monthly Assessment Pool storage, Budget Preview, and the participation-based assessment formula.
 
 ### 6. Billing Periods
 
 - Purpose: define the monthly billing cycle boundary and workflow state for a period.
 - Why here: invoicing and allocation need a period container before bill generation begins.
-- Key dependency: Building, Units, Unit Accounts, Ownerships, and Annual Budgets.
+- Key dependency: Building, Units, Unit Accounts, Ownerships, and Budget Plans.
 - Definition of done: billing period lifecycle, approval states, invoice-generation controls, and idempotent monthly run behavior.
 
 ### 7. Meter Readings
@@ -239,7 +240,7 @@ Units is the next milestone because it establishes the physical/legal asset root
 
 ## Next Milestone After Units and Ownerships
 
-Ownerships and the Ownership Transfer workflow are the immediate next milestone. Billing Periods are documented now as a canonical domain model, but implementation should wait until Ownership responsibility and Annual Budget behavior are finalized.
+Ownerships and the Ownership Transfer workflow are the immediate next milestone. Billing Periods are documented now as a canonical domain model, but implementation should wait until Ownership responsibility and Budget Plan behavior are finalized.
 
 ### Why Units Comes Next
 

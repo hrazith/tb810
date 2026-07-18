@@ -111,13 +111,30 @@ A Unit invoice may contain charge line items from:
 
 Invoice lines should be modeled as charge types rather than hardcoded invoice columns.
 
-## Annual Budget
+## Budget Plan
 
-The legacy `Presupuesto` concept is the approved Annual Association Budget.
+The legacy `Presupuesto` concept is the Budget Plan, a deliberately small year-scoped configuration record.
 
-It is the source for the participation-based monthly assessment.
+It stores exactly one business decision:
 
-The monthly assessment is calculated from the approved annual budget and the Unit's persisted participation percentage.
+- Year
+- Monthly Assessment Pool
+
+The Monthly Assessment Pool represents the total fixed maintenance amount to be collected every month across all Units.
+
+TB810 establishes a Monthly Assessment Pool for a Budget Plan. Each Unit's Fixed Monthly Assessment is calculated by multiplying the Monthly Assessment Pool by the Unit's participation percentage. The amount is not divided by twelve.
+
+Budget Plan is configuration, not accounting.
+
+Fixed Monthly Assessment is always derived.
+
+Invoices persist the calculated amounts that were billed.
+
+Budget Plans do not persist calculated assessments.
+
+Budget Plans never own participation percentages.
+
+The Budget Plan may be edited, but if invoicing has already begun the legacy system appears to rely on Unit-level adjustments rather than budget versioning. That behavior is documented here as an observation, not a recommended model.
 
 ## Billing Period
 
@@ -125,7 +142,40 @@ The Billing Period is the monthly operational clock for TB810.
 
 It collects approved charge inputs, determines the responsible Owner for each Unit Account, generates one invoice per Unit Account, and records the completion state of the monthly billing run.
 
-The Billing Period references the Annual Budget, ownership responsibility, meter inputs, utility inputs, and additional charges. It does not own permanent balances or ownership history.
+The Billing Period references the Budget Plan, ownership responsibility, meter inputs, utility inputs, and additional charges. It does not own permanent balances or ownership history.
+
+## Budget Preview
+
+Creating or editing a Budget Plan should eventually lead to a Budget Preview.
+
+The preview calculates the Fixed Monthly Assessment for every Unit.
+
+The preview does not create invoices.
+
+The preview exists to help Carlos validate the Monthly Assessment Pool before continuing.
+
+The exact contents of the preview remain intentionally open until discussed with Carlos.
+
+## Frozen Decisions
+
+- One Budget Plan per calendar year.
+- Monthly Assessment Pool is stored.
+- Fixed Monthly Assessments are always derived.
+- Budget Plans do not store calculated assessments.
+- Budget Preview derives assessments.
+- Invoices store historical billed amounts.
+- Participation Percentages belong to Units.
+- Unit inventory is fixed.
+- Budget lifecycle intentionally omitted.
+- Budget Plan intentionally remains a small aggregate.
+
+## Open Questions for Carlos
+
+1. What information should the Budget Preview contain to help validate the Monthly Assessment Pool?
+2. Are Unit-level Fixed Assessment Adjustments still a real business requirement or merely legacy workarounds?
+3. Should the Budget Plan become read-only once invoice generation has begun?
+4. Does Carlos ever revise the Monthly Assessment Pool after the budget meeting for reasons other than correcting a data-entry mistake?
+5. Would category-level operating budget planning be useful in the future, even though it does not exist in the legacy system?
 
 ## Participation
 

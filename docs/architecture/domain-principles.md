@@ -148,10 +148,23 @@ The Billing Period is separate from the Unit Account:
 
 The Ownership transfer workflow must close one Ownership and create the next atomically without changing the Unit Account.
 
-Annual Budget is separate from Billing Period:
+Budget Plan is separate from Billing Period:
 
-- Annual Budget defines the yearly charge basis
-- Billing Period consumes the approved budget to produce monthly charges
+- Budget Plan is configuration
+- Billing Period is a monthly operational record
+- Budget Plan defines the Monthly Assessment Pool
+- Billing Period consumes the approved Budget Plan to produce monthly charges
+
+Derived data should remain derived:
+
+- Fixed Monthly Assessment is computed, not stored on the Budget Plan
+- Budget Plans never persist invoice history
+- Invoices persist historical billed amounts
+
+Configuration is not accounting:
+
+- configuration drives financial operations
+- configuration itself is not the financial ledger
 
 ## Principle 11 - Preserve history
 

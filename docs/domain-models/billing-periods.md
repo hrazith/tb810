@@ -11,7 +11,7 @@ It is the orchestration record that:
 - generates one invoice per Unit Account
 - records completion state for the monthly billing run
 
-The Billing Period does not own permanent balances, ownership history, payment history, annual budget definition, meter identity, or Owner identity. It consumes or references those domains.
+The Billing Period does not own permanent balances, ownership history, payment history, budget plan definition, meter identity, or Owner identity. It consumes or references those domains.
 
 ## Responsibilities
 
@@ -114,7 +114,7 @@ The mature Billing Period domain is expected to conceptually include:
 - due date
 - utility-consumption month
 - status
-- annual budget reference
+- budget plan reference
 - review metadata
 - approval metadata
 - invoice-generation metadata
@@ -145,7 +145,7 @@ The Billing Period should use a restrained state model:
 
 The association gathers:
 
-- the applicable Annual Budget
+- the applicable Budget Plan
 - water readings and calculated charges
 - common-water source amount
 - gas charges where applicable
@@ -186,16 +186,11 @@ Invoice calculation should be understood conceptually as follows.
 
 ### Monthly budget assessment
 
-`Annual Budget × Unit participation percentage ÷ 12`
+`Monthly Assessment Pool × Unit participation percentage / 100`
 
 The exact rounding policy remains unresolved before implementation.
 
-Two calculation orders may differ slightly:
-
-- calculate annual Unit share, then divide by 12
-- calculate monthly building budget, then apply participation percentage
-
-The business has not yet chosen between those orders.
+The confirmed calculation is direct and uses the monthly assessment pool without a yearly normalization step.
 
 ### Private water
 
@@ -222,7 +217,7 @@ The business has not yet chosen between those orders.
 - Unit Account-specific
 - assigned to a target billing period
 - include amount, description, reason or source, and status
-- do not alter the Annual Budget or participation percentage
+- do not alter the Budget Plan or participation percentage
 
 ## Invoice Generation
 
@@ -260,22 +255,22 @@ The exact cutoff implementation remains part of the Ownership workflow design.
 - payment allocation belongs to the Payments domain
 - closing a Billing Period does not mean every invoice is paid
 
-## Annual Workflow
+## Budget Plan Workflow
 
 The yearly relationship should be:
 
-1. Annual Budget is created
-2. Annual Budget is reviewed and approved
-3. Monthly Billing Periods reference the approved budget
-4. Each period calculates the monthly Unit assessment from that approved budget
-5. If the annual budget changes, the effective-period behavior must be explicitly controlled
+1. Budget Plan is created
+2. Budget Plan is reviewed and approved
+3. Monthly Billing Periods reference the approved budget plan
+4. Each period calculates the monthly Unit assessment from that approved budget plan
+5. If the budget plan changes, the effective-period behavior must be explicitly controlled
 
 Budget revision behavior remains an open design question.
 
 ## Domain Relationships
 
 Building
-→ Annual Budget
+→ Budget Plan
 → Billing Period
 → Invoices
 → Invoice Line Items
@@ -338,7 +333,6 @@ Unresolved decisions:
 - whether approval is always required
 - whether a generated period can be reopened
 - how corrections are handled after invoice generation
-- whether annual budget revisions affect future periods only
+  - whether budget plan revisions affect future periods only
 - exact gas input mechanism
 - whether negative additional charges are allowed as direct credits or require a separate adjustment workflow
-
