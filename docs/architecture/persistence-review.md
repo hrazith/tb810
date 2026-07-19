@@ -363,10 +363,10 @@ Budget Plan.
 
 ### Decision
 
-- Current model: there is no dedicated Budget Plan table yet.
-- Target model: add a Budget Plan root with optional versioning and line items if the business needs them.
-- Required before UI sprint: `REQUIRED BEFORE UI` only if the finance UI will surface budget creation or preview; otherwise `SAFE TO DEFER` for the deeper versioning structure.
-- Migration/backfill: `REQUIRES CARLOS CLARIFICATION` because the legacy data must be interpreted as either plan rows or plan versions before any backfill is designed.
+- Current model: a dedicated Budget Plan table now exists for the building/year/monthly-operating-budget entry point.
+- Target model: keep the table small and use optional versioning or line items only if the business explicitly needs them later.
+- Required before UI sprint: `REQUIRED BEFORE UI` for the 2027 Budget Plan entry point that has now been implemented; deeper versioning remains `SAFE TO DEFER`.
+- Migration/backfill: `SAFE TO DEFER` for the first implementation slice because this table is now the persistence home for the live plan record.
 
 ### Recommended Persistence Shape
 

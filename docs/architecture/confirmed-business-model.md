@@ -208,6 +208,9 @@ TB810 establishes a Monthly Assessment Pool for a Budget Plan. Each Unit's Fixed
 Budget Plan is configuration, not accounting.
 
 Fixed Monthly Assessment is always derived.
+It is a live planning value, not a historical financial record.
+It is recalculated from the current Budget Plan and Unit participation percentage.
+Historical monthly charges are represented by Monthly Financial Obligations, which snapshot the Fixed Monthly Assessment at the time obligations are generated.
 
 Invoices persist the calculated amounts that were billed.
 

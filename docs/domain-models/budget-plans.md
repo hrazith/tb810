@@ -8,6 +8,18 @@ A Budget Plan is the year-scoped configuration record that establishes the Month
 
 It is intentionally a very small aggregate.
 
+## Current Implementation
+
+TB810 now persists a single Budget Plan entry point for the active building and calendar year.
+
+For the first implemented slice, the Budget Plan stores:
+
+- plan year
+- currency
+- monthly operating budget
+
+This is the entry point for the Finance Foundation v1 UI, not the monthly obligation calculation itself.
+
 ## Confirmed Business Rules
 
 - One Budget Plan per calendar year.
@@ -21,6 +33,9 @@ It is intentionally a very small aggregate.
 ## Derived Financial Rule
 
 The Fixed Monthly Assessment is always derived.
+It is a derived planning value, recalculated from the current Budget Plan and Unit Participation Percentage.
+It is not a historical financial record.
+Historical monthly charges are represented by Monthly Financial Obligations, which snapshot the Fixed Monthly Assessment at the time obligations are generated.
 
 Formula:
 
@@ -103,6 +118,10 @@ Document this observation but do not introduce a solution.
 - Unit inventory is fixed.
 - Budget lifecycle intentionally omitted.
 - Budget Plan intentionally remains a small aggregate.
+
+## Next Step
+
+The next finance step is to use the persisted Monthly Operating Budget to generate Monthly Financial Obligations later in the finance flow.
 
 See also:
 

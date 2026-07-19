@@ -4,6 +4,10 @@ import { UserSwitchIcon } from "@phosphor-icons/react/dist/ssr";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import {
+  getLatestBudgetPlanForCurrentBuilding,
+  getUnitFixedMonthlyAssessment,
+} from "@/server/budget-plans";
 import { getUnitOwnershipSnapshot } from "@/server/ownerships";
 import { getUnitById } from "@/server/units";
 
@@ -19,6 +23,15 @@ function formatArea(value: number | null) {
 
 function formatParticipation(value: number) {
   return `${value.toFixed(4).replace(/\.?0+$/, "")}%`;
+}
+
+function formatCurrency(value: string, currency: string) {
+  return new Intl.NumberFormat("es-PE", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value));
 }
 
 function statusLabel(status: string) {
@@ -40,6 +53,19 @@ export default async function UnitDetailPage({ params }: PageProps) {
   }
 
   const unit = result.data;
+  const budgetPlanResult = await getLatestBudgetPlanForCurrentBuilding();
+
+  if (budgetPlanResult.error) {
+    throw new Error(budgetPlanResult.error);
+  }
+
+  const budgetPlan = budgetPlanResult.data;
+  const planYear = budgetPlan?.plan_year ?? 2027;
+  const assessmentState = await getUnitFixedMonthlyAssessment({
+    unitId,
+    planYear,
+  });
+
   const ownershipResult = await getUnitOwnershipSnapshot(unitId);
 
   if (ownershipResult.error) {
@@ -96,6 +122,72 @@ export default async function UnitDetailPage({ params }: PageProps) {
             </Button>
           </div>
         </div>
+      </Panel>
+
+      <Panel as="section" className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-950">
+            Monthly Assessment
+          </h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Fixed Monthly Assessment for the latest Budget Plan.
+          </p>
+        </div>
+
+        {assessmentState.status === "ready" ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Fixed Monthly Assessment
+              </p>
+              <p className="text-base font-semibold text-zinc-950">
+                {formatCurrency(
+                  assessmentState.data.fixedMonthlyAssessment,
+                  assessmentState.data.currency,
+                )}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Assessment Percentage
+              </p>
+              <p className="text-base font-semibold text-zinc-950">
+                {formatParticipation(assessmentState.data.assessmentPercentage)}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Budget Plan
+              </p>
+              <p className="text-base font-semibold text-zinc-950">
+                {assessmentState.data.planYear}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Monthly Operating Budget
+              </p>
+              <p className="text-base font-semibold text-zinc-950">
+                {formatCurrency(
+                  assessmentState.data.monthlyOperatingBudget,
+                  assessmentState.data.currency,
+                )}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-zinc-600">{assessmentState.message}</p>
+            {assessmentState.reason === "budget-plan-missing" ? (
+              <Link
+                href={`/finance/budget-plans/${assessmentState.planYear ?? planYear}`}
+                className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
+              >
+                Open Budget Plan
+              </Link>
+            ) : null}
+          </div>
+        )}
       </Panel>
 
       <Panel as="section" className="space-y-6">

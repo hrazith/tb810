@@ -239,6 +239,44 @@ export type Database = {
           },
         ]
       }
+      tb810_budget_plans: {
+        Row: {
+          building_id: string
+          created_at: string
+          currency: string
+          id: string
+          monthly_operating_budget: string
+          plan_year: number
+          updated_at: string
+        }
+        Insert: {
+          building_id: string
+          created_at?: string
+          currency?: string
+          id?: string
+          monthly_operating_budget?: string
+          plan_year: number
+          updated_at?: string
+        }
+        Update: {
+          building_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          monthly_operating_budget?: string
+          plan_year?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tb810_budget_plans_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "tb810_buildings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tb810_buildings: {
         Row: {
           address: string | null
