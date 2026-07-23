@@ -1,154 +1,266 @@
 # UI Architecture
 
-This document defines the permanent UI vocabulary for TB810 and future AssetEdge-family products.
+This document defines the canonical UI architecture for TB810 and the shared
+platform surface. It is intentionally small and opinionated so we can keep the
+product consistent without creating a large generic design system too early.
 
-## Purpose
+The goal is not to abstract everything. The goal is to establish a stable
+visual and structural vocabulary that:
 
-The UI layer exists to provide reusable interface primitives that keep feature code consistent, readable, and easy to evolve.
+- keeps TB810 consistent
+- avoids repeated styling decisions
+- helps future domains ship faster
+- can later be reused across Stellar and Asset Edge
+- still allows each client to keep its own brand configuration
 
-It should help a new engineer understand the app without needing to know a design framework or memorize repeated Tailwind class strings.
+## Architecture Layers
 
-## Layer Responsibilities
+```text
+UI Architecture
+├── Brand
+│   ├── Colors
+│   ├── Typography
+│   ├── Icons
+│   ├── Radius
+│   ├── Shadows
+│   └── Motion
+│
+├── Layout
+│   ├── App shell
+│   ├── Header
+│   ├── Sidebar
+│   ├── Page
+│   ├── Page content
+│   ├── Section
+│   ├── Panel placement
+│   └── Grid
+│
+├── Components
+│   ├── Button
+│   ├── Panel
+│   ├── Badge
+│   ├── Field
+│   ├── Input
+│   ├── Table
+│   ├── Empty state
+│   └── Dialog
+│
+└── Domains
+    ├── Owners
+    ├── Units
+    ├── Ownerships
+    ├── Billing
+    ├── Payments
+    └── other business domains
+```
 
-### `brand/`
+## 1. Brand
 
-`brand/` owns the visual identity of a product.
-
-It may define:
-
-- typography
-- colors
-- radius
-- shadows
-- visual tokens
-- product names
-- brand assets
-
-`brand/` does not own routes, business logic, or data access.
-
-### `components/ui/`
-
-`components/ui/` owns reusable UI primitives.
-
-These primitives are shared building blocks such as panels, buttons, badges, headers, and states.
-
-`components/ui/` should express the application’s interface vocabulary, not business rules.
-
-### Feature Components
-
-Feature components live with the domain or route they support.
-
-They solve business problems and compose UI primitives into working screens.
-
-Feature code should never hardcode repeated TB810 visual styles when a shared primitive exists.
-
-## Canonical Vocabulary
-
-These are the initial canonical TB810 UI primitives:
-
-- `Panel`
-- `Button`
-- `PageHeader`
-- `Badge`
-- `EmptyState`
-- `Dialog`
-- `Field`
-
-`Panel` and `Button` are implemented at this stage.
-
-The remaining primitives are documented as future vocabulary and should be introduced only when needed.
-
-## Button
-
-`Button` is the canonical action primitive for TB810.
-
-It is used for user actions, including primary call-to-action links when rendered through `asChild`.
-
-Canonical variants:
-
-- `primary`
-- `secondary`
-- `destructive`
-- `ghost`
-- `link`
-- `icon`
-
-Canonical sizes:
-
-- `sm`
-- `md`
-- `lg`
-
-The default size is `md`.
-
-The primary button treatment should remain brand-driven and visually restrained:
-
-- `px-12 py-3 text-base font-medium shadow-sm`
-- smooth, subtle hover and focus states
-- standard rounded radius
-- no gradients or heavy animation
-
-Feature pages should not recreate button chrome inline when a shared primitive exists.
-
-## Panel
-
-`Panel` is the major grouped content container for TB810.
+The Brand layer defines visual identity.
 
 It owns:
 
-- border
-- radius
-- background
-- shadow
-- padding variants
+- font families
+- font weights
+- semantic colors
+- icon family
+- border-radius scale
+- shadows
+- motion characteristics
+- logos and brand assets
 
-Feature pages should not repeat the canonical panel styling inline.
+Brand must not contain:
 
-Preferred usage:
+- page composition
+- business rules
+- domain-specific terminology
+- data fetching
+- workflow logic
 
-```tsx
-<Panel>
-  ...
-</Panel>
+Brand values should be exposed through semantic tokens and shared configuration
+rather than repeated directly throughout feature code.
 
-<Panel padding="compact">
-  ...
-</Panel>
+Examples of brand tokens:
 
-<Panel padding="spacious">
-  ...
-</Panel>
+- primary action color
+- foreground color
+- muted foreground
+- panel border
+- default radius
+- focus ring
+- default typography
+
+## 2. Layout
+
+The Layout layer defines how pages and regions are composed.
+
+It owns:
+
+- application shell
+- top header
+- side navigation
+- content width
+- page padding
+- vertical rhythm
+- page headers
+- sections
+- grids
+- placement of panels
+- responsive page structure
+
+Layout should answer questions such as:
+
+- Where does page content begin?
+- How wide can content grow?
+- How much vertical space separates the header from the main content?
+- How do sections align?
+- What changes on smaller screens?
+
+Layout must not contain:
+
+- business rules
+- owner-specific behavior
+- unit-specific behavior
+- billing logic
+- domain data access
+
+## 3. Components
+
+The Components layer contains reusable UI primitives.
+
+Examples:
+
+- Button
+- Panel
+- Badge
+- Field
+- Input
+- Table
+- EmptyState
+- Dialog
+
+Components should:
+
+- be reusable across domains
+- consume Brand tokens
+- fit within Layout primitives
+- expose a small and intentional API
+- support accessibility
+- avoid knowing which business domain is rendering them
+
+Components must not:
+
+- fetch domain data
+- contain owner, unit, payment, or billing business rules
+- define page-level composition
+- encode one-off feature behavior unless explicitly implemented as a domain
+  component
+
+## 4. Domains
+
+The Domains layer solves business problems.
+
+Examples:
+
+- Owners
+- Units
+- Ownerships
+- Billing
+- Payments
+
+Domains own:
+
+- business terminology
+- domain validation
+- workflows
+- data access
+- domain-specific forms
+- domain-specific tables
+- route composition
+- orchestration of Layout and Components
+
+Domain code may compose:
+
+- Brand through tokens
+- Layout through page primitives
+- Components through reusable controls
+
+Domain code should not redefine:
+
+- colors
+- spacing conventions
+- button systems
+- panel styles
+- global page structure
+
+## Dependency Direction
+
+```text
+Brand
+  ↓
+Layout and Components
+  ↓
+Domains
 ```
 
-`Panel` should remain usable from server components and support semantic HTML through an `as` prop where practical.
+Domains may consume lower layers, but lower layers must not depend on Domains.
 
-## Brand vs UI vs Feature Code
+## Canonical Vocabulary
+
+The vocabulary should remain intentionally small. New primitives should only be
+added when repeated application needs justify them.
 
 ### Brand
 
-Defines the product’s visual identity.
+- fonts
+- semantic colors
+- icons
+- radius
+- shadows
+- motion
 
-### UI
+### Layout
 
-Defines reusable interface primitives.
+- `AppShell`
+- `Header`
+- `Sidebar`
+- `Page`
+- `PageContent`
+- `Section`
+- `Grid`
 
-### Feature slices
+### Components
 
-Solve business problems and should consume the shared primitives instead of recreating them.
+- `Button`
+- `Panel`
+- `Badge`
+- `Field`
+- `Input`
+- `Table`
+- `EmptyState`
+- `Dialog`
 
-## Cross-Product Direction
+### Domains
 
-This UI layer is intended to become shared across future AssetEdge products.
+- `Owners`
+- `Units`
+- `Ownerships`
+- `Unit Accounts`
+- `Billing`
+- `Invoices`
+- `Payments`
+- `Receipts`
+- `Documents`
 
-TB810 is the first implementation.
+## Practical Guidance
 
-Future products such as Highline, Stellar, and the AssetEdge Platform should implement the same UI contract while supplying their own branding.
+- Brand should be resolved once per request or tenant, not restated inside each
+  component.
+- Layout should provide the stable page frame for all client apps.
+- Components should be shared wherever they genuinely repeat.
+- Domains should own the business vocabulary and orchestration.
+- Feature code should use semantic tokens and layout primitives instead of
+  hard-coded ad hoc styling.
+- The architecture should keep TB810 readable today while leaving room to reuse
+  the same conventions in Stellar and Asset Edge later.
 
-The contract should remain stable even when the brand layer changes.
-
-## Guidance
-
-- Prefer business-readable names over design-framework terminology
-- Keep primitives small and composable
-- Avoid feature-level reimplementation of panel chrome
-- Keep styling decisions centralized so future products can swap branding without rewriting feature pages
