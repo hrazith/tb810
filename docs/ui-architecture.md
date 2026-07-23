@@ -4,14 +4,16 @@ This document defines the canonical UI architecture for TB810 and the shared
 platform surface. It is intentionally small and opinionated so we can keep the
 product consistent without creating a large generic design system too early.
 
-The goal is not to abstract everything. The goal is to establish a stable
-visual and structural vocabulary that:
+The objective is not to create a large generic design system prematurely.
+
+The objective is to establish a small, canonical design language and UI
+architecture that:
 
 - keeps TB810 consistent
 - avoids repeated styling decisions
-- helps future domains ship faster
-- can later be reused across Stellar and Asset Edge
-- still allows each client to keep its own brand configuration
+- allows future domains to be built faster
+- can later be reused across Stellar and AssetEdge
+- still allows each client to retain its own brand configuration
 
 ## Architecture Layers
 
@@ -54,7 +56,7 @@ UI Architecture
     └── other business domains
 ```
 
-## 1. Brand
+## Brand
 
 The Brand layer defines visual identity.
 
@@ -80,7 +82,7 @@ Brand must not contain:
 Brand values should be exposed through semantic tokens and shared configuration
 rather than repeated directly throughout feature code.
 
-Examples of brand tokens:
+Examples:
 
 - primary action color
 - foreground color
@@ -90,7 +92,7 @@ Examples of brand tokens:
 - focus ring
 - default typography
 
-## 2. Layout
+## Layout
 
 The Layout layer defines how pages and regions are composed.
 
@@ -124,7 +126,7 @@ Layout must not contain:
 - billing logic
 - domain data access
 
-## 3. Components
+## Components
 
 The Components layer contains reusable UI primitives.
 
@@ -156,7 +158,7 @@ Components must not:
 - encode one-off feature behavior unless explicitly implemented as a domain
   component
 
-## 4. Domains
+## Domains
 
 The Domains layer solves business problems.
 
@@ -205,10 +207,10 @@ Domains
 
 Domains may consume lower layers, but lower layers must not depend on Domains.
 
-## Canonical Vocabulary
+## Current Canonical Vocabulary
 
-The vocabulary should remain intentionally small. New primitives should only be
-added when repeated application needs justify them.
+The current or planned vocabulary should remain intentionally small. It should
+expand only when repeated application needs justify a new primitive.
 
 ### Brand
 
@@ -252,15 +254,13 @@ added when repeated application needs justify them.
 - `Receipts`
 - `Documents`
 
-## Practical Guidance
+## Boundary Summary
 
-- Brand should be resolved once per request or tenant, not restated inside each
-  component.
-- Layout should provide the stable page frame for all client apps.
-- Components should be shared wherever they genuinely repeat.
-- Domains should own the business vocabulary and orchestration.
-- Feature code should use semantic tokens and layout primitives instead of
-  hard-coded ad hoc styling.
-- The architecture should keep TB810 readable today while leaving room to reuse
-  the same conventions in Stellar and Asset Edge later.
+- Brand provides semantic tokens and shared visual configuration.
+- Layout provides the shell, page framing, and region composition.
+- Components provide reusable UI primitives with small, intentional APIs.
+- Domains provide business terminology, workflows, data access, and route
+  orchestration.
 
+Lower layers define how the UI is structured and styled. Domains define what
+the application does for a specific business area.
