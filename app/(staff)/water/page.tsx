@@ -18,6 +18,13 @@ function formatReading(value: number) {
   return value.toFixed(3).replace(/\.?0+$/, "");
 }
 
+function formatPeriod(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    year: "numeric",
+  }).format(new Date(`${value}T00:00:00`));
+}
+
 export default async function WaterPage() {
   const [buildingResult, billsResult] = await Promise.all([
     getCurrentBuilding(),
@@ -79,16 +86,20 @@ export default async function WaterPage() {
             >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                    Bill date
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 ">
+                    {bill.description ?? "Sedapal Invoice"}
                   </p>
                   <h2 className="text-lg font-semibold text-zinc-950">
-                    {bill.bill_date}
+                    {formatPeriod(bill.bill_date)}
                   </h2>
-                  <p className="text-sm text-zinc-600">
-                    {bill.description ?? "Sedapal common water invoice"}
-                  </p>
-                  <div className="grid gap-2 text-sm text-zinc-600 sm:grid-cols-2 lg:grid-cols-4">
+                  
+                  <div className="flex gap-6 text-sm text-zinc-600  ">
+                    <p>
+                      <span className="font-medium text-zinc-900">
+                        Reading date:
+                      </span>{" "}
+                      {bill.bill_date}
+                    </p>
                     <p>
                       <span className="font-medium text-zinc-900">
                         Previous:
