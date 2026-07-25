@@ -84,6 +84,66 @@ Use these names consistently:
 
 Do not use "Billed Month".
 
+## Time Semantics
+
+### Consumption Period
+
+The supplier-provided date range covered by the Sedapal invoice.
+
+It may span two calendar months.
+
+This is printed on the invoice as the consumption period and is not the direct MVP1 input for Service Month.
+
+### Reading Date
+
+The end date of the supplier Consumption Period and the date of the current master-meter reading.
+
+In the current data model this may still be stored in `bill_date`, but its business meaning in this workflow is Reading Date.
+
+### Billed Month
+
+Sedapal’s invoice-month label.
+
+It is a supplier label and is not the same as Service Month.
+
+### Service Month
+
+TB810’s accounting attribution month.
+
+MVP1 rule:
+
+`Service Month = start of month(Reading Date) - 1 calendar month`
+
+This means Service Month is the calendar month immediately preceding the Reading Date’s month.
+
+### Charge Month
+
+TB810’s downstream owner-billing month.
+
+MVP1 rule:
+
+`Charge Month = Service Month + 1 calendar month`
+
+For the current workflow this normally matches the Reading Date month and Sedapal Billed Month, but those terms are not interchangeable.
+
+### Canonical Example
+
+- Consumption Period: 05 Jun 2026 – 06 Jul 2026
+- Reading Date: 06 Jul 2026
+- Billed Month: Jul 2026
+- Service Month: Jun 2026
+- Charge Month: Jul 2026
+
+### MVP1 Constraint
+
+MVP1 assumes the Sedapal monthly meter-reading cadence remains consistent, so the previous-calendar-month rule is the canonical Service Month derivation.
+
+This is a deliberate operational rule, not a universal utility billing formula.
+
+### MVP2 Note
+
+MVP2 may store Consumption Period Start, Consumption Period End, Invoice Issue Date, and Supplier Billed Month separately so future OCR can derive Service Month from the actual supplier period instead of the simplified previous-month rule.
+
 ## Record Lifecycle
 
 Current Service Month

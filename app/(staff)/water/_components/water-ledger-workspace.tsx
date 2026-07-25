@@ -1,9 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  FunnelSimple,
+  PlusCircleIcon,
+  SortAscending,
+} from "@phosphor-icons/react/dist/ssr";
 
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Panel } from "@/components/ui/panel";
+import { SelectMenu, type SelectMenuItem } from "@/components/ui/select-menu";
+import {
+  formatMonthYear,
+  formatPeruvianDate,
+  getServiceMonthFromReadingDate,
+} from "@/lib/water-dates";
 import type { WaterBillSummary } from "@/server/water";
 
 import { createCommonWaterBillAction } from "../actions";
@@ -11,6 +24,7 @@ import { CommonWaterBillForm } from "./common-water-bill-form";
 
 type Props = {
   bills: WaterBillSummary[];
+  previousReading: string;
 };
 
 function formatMoney(value: number) {
@@ -25,11 +39,19 @@ function formatReading(value: number) {
 }
 
 function formatServiceMonth(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    year: "numeric",
-  }).format(new Date(`${value}T00:00:00`));
+  return formatMonthYear(getServiceMonthFromReadingDate(value));
 }
+
+const filterItems: SelectMenuItem[] = [
+  { id: "all", label: "All" },
+  { id: "open", label: "Open" },
+  { id: "locked", label: "Locked" },
+];
+
+const sortItems: SelectMenuItem[] = [
+  { id: "newest", label: "Newest first" },
+  { id: "oldest", label: "Oldest first" },
+];
 
 function WaterLedgerTable({ bills }: { bills: WaterBillSummary[] }) {
   return (
@@ -51,7 +73,7 @@ function WaterLedgerTable({ bills }: { bills: WaterBillSummary[] }) {
           <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900">
             Consumption
           </th>
-          <th className="px-3 py-3.5  text-left text-sm font-semibold text-zinc-900">
+          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900">
             Unit Cost
           </th>
           <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900">
@@ -75,13 +97,13 @@ function WaterLedgerTable({ bills }: { bills: WaterBillSummary[] }) {
                 window.location.href = `/water/${bill.id}`;
               }
             }}
-            className="cursor-pointer hover:bg-zinc-50 focus-visible:bg-zinc-50 focus-visible:outline-none test"
+            className="cursor-pointer hover:bg-zinc-50 focus-visible:bg-zinc-50 focus-visible:outline-none"
           >
             <td className="py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap text-zinc-900 sm:pl-0">
               {formatServiceMonth(bill.bill_date)}
             </td>
             <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
-              {bill.bill_date}
+              {formatPeruvianDate(bill.bill_date)}
             </td>
             <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
               {formatReading(bill.previous_reading)}
@@ -105,7 +127,10 @@ function WaterLedgerTable({ bills }: { bills: WaterBillSummary[] }) {
   );
 }
 
-export function WaterLedgerWorkspace({ bills }: Props) {
+export function WaterLedgerWorkspace({ bills, previousReading }: Props) {
+  const router = useRouter();
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const previousComposeOpenRef = useRef(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | "open" | "locked">("all");
   const [sortKey, setSortKey] = useState<"newest" | "oldest">("newest");
@@ -136,88 +161,111 @@ export function WaterLedgerWorkspace({ bills }: Props) {
     return filtered;
   }, [bills, query, sortKey, status]);
 
+  useEffect(() => {
+    if (previousComposeOpenRef.current && !composeOpen) {
+      triggerRef.current?.focus();
+    }
+    previousComposeOpenRef.current = composeOpen;
+  }, [composeOpen]);
+
+  function openModal() {
+    setComposeOpen(true);
+  }
+
+  function closeModal() {
+    setComposeOpen(false);
+  }
+
+  function handleSuccess() {
+    setComposeOpen(false);
+    router.refresh();
+  }
+
   return (
     <section className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <h1 className="inline-block text-2xl font-semibold tracking-tight text-zinc-950">
           Common Water Ledger
         </h1>
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search"
-          className="h-11 w-full max-w-xs rounded-md border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950"
-        />
-        <select
-          value={status}
-          onChange={(event) => setStatus(event.target.value as typeof status)}
-          className="h-11 rounded-md border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition focus:border-zinc-950"
-        >
-          <option value="all">Filter</option>
-          <option value="open">Open</option>
-          <option value="locked">Locked</option>
-        </select>
-        <select
-          value={sortKey}
-          onChange={(event) => setSortKey(event.target.value as typeof sortKey)}
-          className="h-11 rounded-md border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition focus:border-zinc-950"
-        >
-          <option value="newest">Sort</option>
-          <option value="oldest">Oldest first</option>
-          <option value="newest">Newest first</option>
-        </select>
-        <Button
-          type="button"
-          variant="primary"
-          shape="pill"
-          onClick={() => setComposeOpen((open) => !open)}
-        >
-          + Monthly Reading
-        </Button>
-      </div>
-
-      <div className="relative">
-        <div className="absolute bottom-full left-0 z-20 mb-3 w-full max-w-sm">
-          <Panel
-            className={`transition ${
-              composeOpen
-                ? "pointer-events-auto opacity-100"
-                : "pointer-events-none opacity-0"
-            }`}
+        <div className="flex w-full flex-col gap-3 xl:ml-auto xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end">
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search"
+            className="h-11 w-full min-w-0 max-w-xs rounded-md border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 xl:w-[22rem]"
+          />
+          <SelectMenu
+            ariaLabel="Filter water bills"
+            icon={<FunnelSimple />}
+            items={filterItems}
+            selectedId={status}
+            onSelect={(id) => setStatus(id as typeof status)}
+          />
+          <SelectMenu
+            ariaLabel="Sort water bills"
+            icon={<SortAscending />}
+            items={sortItems}
+            selectedId={sortKey}
+            onSelect={(id) => setSortKey(id as typeof sortKey)}
+          />
+          <Button
+            ref={triggerRef}
+            type="button"
+            variant="primary"
+            shape="pill"
+            className="cursor-pointer"
+            onClick={openModal}
           >
-            <CommonWaterBillForm
-              action={createCommonWaterBillAction}
-              submitLabel="Save Reading"
-              previousReadingHelpText="Loaded automatically from the most recent prior Sedapal reading."
-              previousReadingLabel="Previous Reading"
-              previousReadingReadOnly
-              showDescription={false}
-              showNotes={false}
-              showSummary={false}
-              compact
-              hideCancel={false}
-              onCancel={() => setComposeOpen(false)}
-            />
-          </Panel>
+            <PlusCircleIcon size={20} />
+            Monthly Reading
+          </Button>
         </div>
+      </div>
 
-        {filteredBills.length === 0 ? (
-          <Panel className="border-dashed border-zinc-300 text-center text-sm text-zinc-600">
-            No common water bills recorded yet.
-          </Panel>
-        ) : (
-          <div className="flow-root">
-            <div className="-mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-              <div className="inline-block min-w-full align-middle sm:px-6 lg:px-8">
-                <WaterLedgerTable bills={filteredBills} />
-              </div>
+      {filteredBills.length === 0 ? (
+        <Panel className="border-dashed border-zinc-300 text-center text-sm text-zinc-600">
+          No common water bills recorded yet.
+        </Panel>
+      ) : (
+        <div className="flow-root">
+          <div className="-mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+            <div className="inline-block min-w-full align-middle sm:px-6 lg:px-8">
+              <WaterLedgerTable bills={filteredBills} />
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      <Dialog
+        open={composeOpen}
+        title="Add Monthly Reading"
+        description="Record the current master-meter reading and supplier invoice amount."
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            closeModal();
+          } else {
+            openModal();
+          }
+        }}
+      >
+        <CommonWaterBillForm
+          action={createCommonWaterBillAction}
+          submitLabel="Save Reading"
+          previousReadingHelpText="Loaded automatically from the most recent prior Sedapal reading."
+          previousReadingLabel="Previous Reading"
+          previousReadingReadOnly
+          initialValues={{
+            previous_reading: previousReading,
+          }}
+          showDescription={false}
+          showNotes={false}
+          showSummary={false}
+          compact
+          hideCancel={false}
+          onCancel={closeModal}
+          onSuccess={handleSuccess}
+        />
+      </Dialog>
     </section>
   );
 }

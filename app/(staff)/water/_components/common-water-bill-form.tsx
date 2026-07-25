@@ -1,8 +1,13 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { Panel } from "@/components/ui/panel";
+import {
+  formatMonthYear,
+  getChargeMonthFromServiceMonth,
+  getServiceMonthFromReadingDate,
+} from "@/lib/water-dates";
 import type { WaterBillFormState } from "@/server/water";
 
 type Props = {
@@ -28,6 +33,7 @@ type Props = {
   compact?: boolean;
   hideCancel?: boolean;
   onCancel?: () => void;
+  onSuccess?: () => void;
   showSummary?: boolean;
 };
 
@@ -57,9 +63,11 @@ export function CommonWaterBillForm({
   compact = false,
   hideCancel = false,
   onCancel,
+  onSuccess,
   showSummary = true,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  const lastSuccessRef = useRef<string | undefined>(undefined);
   const [billDate, setBillDate] = useState(
     state.values?.bill_date ?? initialValues?.bill_date ?? "",
   );
@@ -95,22 +103,13 @@ export function CommonWaterBillForm({
   }, [amount, totalConsumption]);
 
   const serviceMonth = useMemo(() => {
-    if (!billDate) return "";
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      year: "numeric",
-    }).format(new Date(`${billDate}T00:00:00`));
+    return formatMonthYear(getServiceMonthFromReadingDate(billDate));
   }, [billDate]);
 
   const chargeMonth = useMemo(() => {
-    if (!billDate) return "";
-    const date = new Date(`${billDate}T00:00:00`);
-    if (Number.isNaN(date.getTime())) return "";
-    date.setMonth(date.getMonth() + 1);
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      year: "numeric",
-    }).format(date);
+    return formatMonthYear(
+      getChargeMonthFromServiceMonth(getServiceMonthFromReadingDate(billDate)),
+    );
   }, [billDate]);
 
   const summary = [
@@ -120,12 +119,18 @@ export function CommonWaterBillForm({
     { label: "Unit Cost", value: unitCost },
   ];
 
+  useEffect(() => {
+    if (!state.success || state.success === lastSuccessRef.current) return;
+    lastSuccessRef.current = state.success;
+    onSuccess?.();
+  }, [onSuccess, state.success]);
+
   return (
     <Panel
       key={JSON.stringify(state.values ?? initialValues ?? {})}
       as="form"
       action={formAction}
-      padding={compact ? "compact" : "default"}
+      padding={compact ? "spacious" : "default"}
       className="space-y-6"
     >
       {utilityBillId ? (
@@ -134,7 +139,7 @@ export function CommonWaterBillForm({
       <input type="hidden" name="previous_reading" value={previousReading} />
       <div className="grid gap-4">
         <label className="space-y-2">
-          <span className="block text-sm font-medium text-zinc-900">
+          <span className="block text-lg font-medium text-zinc-900">
             Reading date
           </span>
           <input
@@ -142,7 +147,7 @@ export function CommonWaterBillForm({
             type="date"
             value={billDate}
             onChange={(event) => setBillDate(event.target.value)}
-            className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none transition focus:border-zinc-950"
+            className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none transition selection:bg-zinc-200 selection:text-zinc-950 focus:border-zinc-950"
           />
           {fieldError("bill_date", state) ? (
             <p className="text-sm text-red-600">{fieldError("bill_date", state)}</p>
@@ -150,7 +155,7 @@ export function CommonWaterBillForm({
         </label>
 
         <label className="space-y-2">
-          <span className="block text-sm font-medium text-zinc-900">
+          <span className="block text-lg font-medium text-zinc-900">
             Invoice amount
           </span>
           <input
@@ -169,7 +174,7 @@ export function CommonWaterBillForm({
         </label>
 
         <label className="space-y-2">
-          <span className="block text-sm font-medium text-zinc-900">
+          <span className="block text-lg font-medium text-zinc-900">
             {previousReadingLabel}
           </span>
           <input
@@ -196,7 +201,7 @@ export function CommonWaterBillForm({
         </label>
 
         <label className="space-y-2">
-          <span className="block text-sm font-medium text-zinc-900">
+          <span className="block text-lg font-medium text-zinc-900">
             Current reading
           </span>
           <input
@@ -231,7 +236,7 @@ export function CommonWaterBillForm({
                 {item.value === null || item.value === ""
                   ? "—"
                   : item.label === "Unit Cost"
-                    ? `${item.value.toFixed(4)}`
+                    ? `${Number(item.value).toFixed(4)}`
                     : typeof item.value === "number"
                       ? item.value.toFixed(3).replace(/\.?0+$/, "")
                       : item.value}
@@ -243,7 +248,7 @@ export function CommonWaterBillForm({
 
       {showDescription ? (
         <label className="block space-y-2">
-          <span className="block text-sm font-medium text-zinc-900">
+          <span className="block text-lg font-medium text-zinc-900">
             Description
           </span>
           <input
@@ -263,7 +268,7 @@ export function CommonWaterBillForm({
 
       {showNotes ? (
         <label className="block space-y-2">
-          <span className="block text-sm font-medium text-zinc-900">Notes</span>
+          <span className="block text-lg font-medium text-zinc-900">Notes</span>
           <textarea
             name="notes"
             rows={4}
@@ -287,7 +292,7 @@ export function CommonWaterBillForm({
         <button
           type="submit"
           disabled={pending}
-          className="inline-flex h-12 items-center justify-center rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-70"
+          className="inline-flex h-12 cursor-pointer items-center justify-center rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {pending ? "Saving..." : submitLabel}
         </button>
@@ -295,7 +300,7 @@ export function CommonWaterBillForm({
           <button
             type="button"
             onClick={onCancel}
-            className="inline-flex h-12 items-center justify-center rounded-xl border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950"
+            className="inline-flex h-12 cursor-pointer items-center justify-center rounded-xl border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950"
           >
             Cancel
           </button>

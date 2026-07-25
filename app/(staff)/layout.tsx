@@ -32,21 +32,16 @@ export default async function StaffLayout({
       <header className="border-b border-zinc-200 bg-white">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <Image
-              src="/TB810.svg"
-              alt={brandConfig.shortName}
-              width={105}
-              height={27}
-              priority
-            />
+            <Link href="/dashboard" aria-label="Go to dashboard">
+              <Image
+                src="/TB810.svg"
+                alt={brandConfig.shortName}
+                width={105}
+                height={27}
+                priority
+              />
+            </Link>
             <nav className="ml-12 flex items-center gap-6 text-md font-medium text-zinc-700">
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-2 transition hover:text-zinc-950"
-              >
-                <Gauge aria-hidden size={18} />
-                Dashboard
-              </Link>
               <Link href="/owners" className="inline-flex items-center gap-2 transition hover:text-zinc-950">
                 <UsersThree aria-hidden size={18} />
                 Owners

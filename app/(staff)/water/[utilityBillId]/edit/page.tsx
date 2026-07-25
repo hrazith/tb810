@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import { formatPeruvianDate } from "@/lib/water-dates";
 import {
   getCommonWaterReadingDefaults,
   getWaterBillById,
@@ -63,6 +64,9 @@ export default async function EditWaterBillPage({ params }: PageProps) {
               {canEditPreviousReading ? "Opening Reading" : "Previous Reading"}:{" "}
               {formatReading(bill.previous_reading)}
             </p>
+            <p className="text-sm text-zinc-500">
+              Reading Date: {formatPeruvianDate(bill.bill_date)}
+            </p>
           </div>
           <Button asChild variant="secondary" size="sm">
             <Link href={`/water/${bill.id}`}>Back to bill</Link>
@@ -72,7 +76,6 @@ export default async function EditWaterBillPage({ params }: PageProps) {
 
       <CommonWaterBillForm
         action={updateCommonWaterBillAction}
-        cancelHref={`/water/${bill.id}`}
         submitLabel="Update bill"
         previousReadingHelpText={
           canEditPreviousReading

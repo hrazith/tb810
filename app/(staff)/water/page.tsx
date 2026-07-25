@@ -1,12 +1,13 @@
 import { getCurrentBuilding } from "@/server/units";
-import { listCommonWaterBills } from "@/server/water";
+import { getCommonWaterReadingDefaults, listCommonWaterBills } from "@/server/water";
 
 import { WaterLedgerWorkspace } from "./_components/water-ledger-workspace";
 
 export default async function WaterPage() {
-  const [buildingResult, billsResult] = await Promise.all([
+  const [buildingResult, billsResult, defaultsResult] = await Promise.all([
     getCurrentBuilding(),
     listCommonWaterBills(),
+    getCommonWaterReadingDefaults(),
   ]);
 
   if (buildingResult.error) {
@@ -17,16 +18,18 @@ export default async function WaterPage() {
     throw new Error(billsResult.error);
   }
 
-  const building = buildingResult.data;
+  if (defaultsResult.error) {
+    throw new Error(defaultsResult.error);
+  }
 
-  if (!building) {
+  if (!buildingResult.data) {
     return <p className="text-sm text-zinc-600">No building is available.</p>;
   }
 
   return (
     <WaterLedgerWorkspace
-      buildingName={building.name}
       bills={billsResult.data}
+      previousReading={String(defaultsResult.data?.previousReading ?? "")}
     />
   );
 }

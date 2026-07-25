@@ -3,6 +3,11 @@ import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import {
+  formatMonthYear,
+  formatPeruvianDate,
+  getServiceMonthFromReadingDate,
+} from "@/lib/water-dates";
 import { getWaterBillById } from "@/server/water";
 
 type PageProps = {
@@ -49,7 +54,7 @@ export default async function WaterBillDetailPage({ params }: PageProps) {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">
-              {bill.bill_date}
+              {formatPeruvianDate(bill.bill_date)}
             </h1>
             <p className="max-w-2xl text-sm text-zinc-600">
               {canEdit
@@ -81,7 +86,7 @@ export default async function WaterBillDetailPage({ params }: PageProps) {
           <dl className="mt-4 grid gap-3 text-sm text-zinc-600">
             <div className="flex items-center justify-between gap-4">
               <dt className="font-medium text-zinc-900">Period</dt>
-              <dd>{new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(new Date(`${bill.bill_date}T00:00:00`))}</dd>
+              <dd>{formatMonthYear(getServiceMonthFromReadingDate(bill.bill_date))}</dd>
             </div>
             <div className="flex items-center justify-between gap-4">
               <dt className="font-medium text-zinc-900">Amount invoiced</dt>

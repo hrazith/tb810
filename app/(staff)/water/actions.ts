@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import {
@@ -65,7 +66,11 @@ export async function createCommonWaterBillAction(
     return { error: result.error, values };
   }
 
-  redirect(`/water/${result.data.id}`);
+  revalidatePath("/water");
+  return {
+    success: "Reading saved.",
+    values: {},
+  };
 }
 
 export async function updateCommonWaterBillAction(

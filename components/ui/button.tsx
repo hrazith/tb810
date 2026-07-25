@@ -1,9 +1,11 @@
 import {
   cloneElement,
   isValidElement,
+  forwardRef,
   type AnchorHTMLAttributes,
   type ButtonHTMLAttributes,
   type ReactElement,
+  type Ref,
   type ReactNode,
 } from "react";
 
@@ -86,7 +88,7 @@ function getButtonClasses({
   className?: string;
 }) {
   return joinClasses(
-    "inline-flex items-center justify-center gap-2 border font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed",
+    "inline-flex cursor-pointer items-center justify-center gap-2 border font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed",
     variantClasses[variant],
     sizeClasses[size],
     shapeClasses[shape],
@@ -94,7 +96,10 @@ function getButtonClasses({
   );
 }
 
-export function Button(props: ButtonProps) {
+export const Button = forwardRef(function Button(
+  props: ButtonProps,
+  ref: Ref<HTMLButtonElement>,
+) {
   if ("asChild" in props && props.asChild) {
     const {
       asChild,
@@ -148,8 +153,8 @@ export function Button(props: ButtonProps) {
   });
 
   return (
-    <button type={type} className={buttonClasses} {...rest}>
+    <button ref={ref} type={type} className={buttonClasses} {...rest}>
       {children}
     </button>
   );
-}
+});
