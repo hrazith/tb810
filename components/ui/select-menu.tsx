@@ -211,7 +211,7 @@ export function SelectMenu({
         aria-expanded={open}
         aria-controls={menuId}
         className={joinClasses(
-          "inline-flex h-12 w-12 items-center justify-center rounded-full bg-zinc-200 text-zinc-700 shadow-sm transition-colors hover:bg-zinc-300 active:bg-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+          "inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-zinc-200 text-zinc-700 shadow-sm transition-colors hover:bg-zinc-300 active:bg-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
         )}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={handleKeyDown}
@@ -226,7 +226,7 @@ export function SelectMenu({
         aria-label={ariaLabel}
         aria-hidden={!open}
         className={joinClasses(
-          "absolute top-[calc(100%+0.75rem)] z-30 w-[280px]  origin-top rounded-lg border border-zinc-200 bg-white p-4 shadow-xl transition duration-150 ease-out",
+          "absolute top-[calc(100%+0.75rem)] z-30 w-[280px]  origin-top rounded-lg border border-zinc-200 bg-white  p-4 shadow-xl transition duration-150 ease-out",
           menuAlignment,
           open
             ? "pointer-events-auto scale-100 opacity-100"

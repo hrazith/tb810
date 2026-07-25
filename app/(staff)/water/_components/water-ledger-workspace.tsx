@@ -183,11 +183,11 @@ export function WaterLedgerWorkspace({ bills, previousReading }: Props) {
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <h1 className="inline-block text-2xl font-semibold tracking-tight text-zinc-950">
+      <div className="grid gap-4 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center">
+        <h1 className="whitespace-nowrap text-2xl font-semibold tracking-tight text-zinc-950">
           Common Water Ledger
         </h1>
-        <div className="flex w-full flex-col gap-3 xl:ml-auto xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end">
+        <div className="flex w-full flex-col gap-3 xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end xl:ml-auto">
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
