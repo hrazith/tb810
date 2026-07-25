@@ -1,9 +1,7 @@
-import Link from "next/link";
-
-import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { listOwners } from "@/server/owners";
 
+import { OwnersControls } from "./_components/owners-controls";
 import { OwnersTable } from "./_components/owners-table";
 
 type PageProps = {
@@ -21,43 +19,16 @@ export default async function OwnersPage({ searchParams }: PageProps) {
   });
 
   return (
-    <section className="">
-      <div className="sm:flex sm:items-center justify-between">
-        
-          <h1 className="text-2xl font-semibold text-zinc-900">Owners</h1>
-          
-        
-        <div className="sm:mt-0 sm:ml-16 sm:flex-none items-center flex">
-          <form
-        method="get"
-        className="mt-6  grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto]"
-      >
-        <input
-          name="q"
-          defaultValue={params.q ?? ""}
-          placeholder="Search owners"
-          className="h-11 rounded-md border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950"
+    <section className="space-y-6">
+      <div className="grid gap-4 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center">
+        <h1 className="whitespace-nowrap text-2xl font-semibold tracking-tight text-zinc-950">
+          Owners
+        </h1>
+        <OwnersControls
+          initialQuery={params.q ?? ""}
+          initialStatus={params.status ?? "active"}
         />
-        <select
-          name="status"
-          defaultValue={params.status ?? "active"}
-          className="h-11 rounded-md border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition focus:border-zinc-950"
-        >
-          <option value="active">Active</option>
-          <option value="archived">Archived</option>
-          <option value="all">All</option>
-        </select>
-        <button className="h-11 rounded-md border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-xs transition hover:border-zinc-950 hover:text-zinc-950">
-          Filter
-        </button>
-          </form>
-          <Button asChild variant="primary" shape="pill">
-  <Link href="/owners/new">Add Owner</Link>
-          </Button>
-        </div>
       </div>
-
-      
 
       {result.error ? (
         <Panel className="mt-6 border-red-200 bg-red-50 text-sm text-red-700">

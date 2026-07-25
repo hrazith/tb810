@@ -4,11 +4,9 @@ import { redirect } from "next/navigation";
 
 import {
   brandConfig,
-  Buildings,
   Gauge,
   SignOut,
-  Stack,
-  UsersThree,
+ 
 } from "@/brand";
 import { createClient } from "@/lib/supabase/server";
 
@@ -43,18 +41,18 @@ export default async function StaffLayout({
             </Link>
             <nav className="ml-12 flex items-center gap-6 text-md font-medium text-zinc-700">
               <Link href="/owners" className="inline-flex items-center gap-2 transition hover:text-zinc-950">
-                <UsersThree aria-hidden size={18} />
+               
                 Owners
               </Link>
               <Link href="/units" className="inline-flex items-center gap-2 transition hover:text-zinc-950">
-                <Buildings aria-hidden size={18} />
+                
                 Units
               </Link>
               <Link
                 href="/water"
                 className="inline-flex items-center gap-2 transition hover:text-zinc-950"
               >
-                <Stack aria-hidden size={18} />
+               
                 Water
               </Link>
             </nav>

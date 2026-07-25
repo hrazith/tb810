@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Panel } from "@/components/ui/panel";
 import { listUnitTypes, listUnits } from "@/server/units";
 
+import { UnitsControls } from "./_components/units-controls";
+
 type PageProps = {
   searchParams?: Promise<{
     q?: string;
@@ -30,38 +32,16 @@ export default async function UnitsPage({ searchParams }: PageProps) {
 
   return (
     <section className="space-y-6">
-      <div className="sm:flex sm:items-center sm:justify-between">
-        <div className="sm:flex-auto">
-          <h1 className="text-2xl font-semibold text-zinc-900">Units</h1>
-          <p className="mt-2 text-sm text-zinc-700">
-            A staff view of asset records in TB810 with type, location, meter capability, lifecycle, and last update details.
-          </p>
-        </div>
-      </div>
-
-      <Panel as="form" method="get" padding="compact" className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto]">
-        <input
-          name="q"
-          defaultValue={params.q ?? ""}
-          placeholder="Search by unit number, floor, or type"
-          className="h-11 rounded-xl border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950"
+      <div className="grid gap-4 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center">
+        <h1 className="whitespace-nowrap text-2xl font-semibold tracking-tight text-zinc-950">
+          Units
+        </h1>
+        <UnitsControls
+          initialQuery={params.q ?? ""}
+          initialUnitTypeId={params.unitTypeId ?? ""}
+          unitTypes={unitTypesResult.data}
         />
-        <select
-          name="unitTypeId"
-          defaultValue={params.unitTypeId ?? ""}
-          className="h-11 rounded-xl border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition focus:border-zinc-950"
-        >
-          <option value="">All types</option>
-          {unitTypesResult.data.map((unitType) => (
-            <option key={unitType.id} value={unitType.id}>
-              {unitType.name}
-            </option>
-          ))}
-        </select>
-        <button className="h-11 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-xs transition hover:border-zinc-950 hover:text-zinc-950">
-          Filter
-        </button>
-      </Panel>
+      </div>
 
       {unitsResult.error ? (
         <Panel className="border-red-200 bg-red-50 text-sm text-red-700">
