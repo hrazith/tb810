@@ -48,39 +48,6 @@ function classifyOwnershipRow(
   return "past";
 }
 
-async function getUnitLookup(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  unitId: string,
-) {
-  const { data, error } = await supabase
-    .from("tb810_units")
-    .select("id, unit_number, unit_type_id")
-    .eq("id", unitId)
-    .maybeSingle();
-
-  if (error) return { data: null, error: error.message };
-  if (!data) return { data: null, error: null };
-
-  const { data: unitType, error: unitTypeError } = await supabase
-    .from("tb810_unit_types")
-    .select("code, name")
-    .eq("id", data.unit_type_id)
-    .maybeSingle();
-
-  if (unitTypeError) return { data: null, error: unitTypeError.message };
-  if (!unitType) return { data: null, error: null };
-
-  return {
-    data: {
-      id: data.id,
-      unit_number: data.unit_number,
-      unit_type_code: unitType.code as UnitTypeCode,
-      unit_type_name: unitType.name,
-    },
-    error: null,
-  };
-}
-
 async function getUnitAccountSummary(
   supabase: Awaited<ReturnType<typeof createClient>>,
   unitId: string,

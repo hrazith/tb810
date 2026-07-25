@@ -1834,11 +1834,15 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          current_reading: number
           id: string
           legacy_id: string | null
           legacy_metadata: Json
           legacy_table: string | null
           notes: string | null
+          previous_reading: number
+          total_consumption: number
+          unit_cost: number
           status: string
           supplier_id: string | null
           updated_at: string
@@ -1854,11 +1858,15 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          current_reading: number
           id?: string
           legacy_id?: string | null
           legacy_metadata?: Json
           legacy_table?: string | null
           notes?: string | null
+          previous_reading: number
+          total_consumption?: number
+          unit_cost?: number
           status?: string
           supplier_id?: string | null
           updated_at?: string
@@ -1874,11 +1882,15 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          current_reading?: number
           id?: string
           legacy_id?: string | null
           legacy_metadata?: Json
           legacy_table?: string | null
           notes?: string | null
+          previous_reading?: number
+          total_consumption?: number
+          unit_cost?: number
           status?: string
           supplier_id?: string | null
           updated_at?: string

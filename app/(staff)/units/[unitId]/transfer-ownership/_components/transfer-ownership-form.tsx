@@ -69,10 +69,12 @@ export function TransferOwnershipForm({
   const ownerError = fieldError("owner_id", state);
   const notesError = fieldError("notes", state);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setOwnerId(String(values.owner_id ?? ""));
     setEffectiveMonth(String(values.effective_month ?? ""));
   }, [values.owner_id, values.effective_month]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const isAssign = !defaults.currentOwnership;
   const currentOwnerThrough = useMemo(

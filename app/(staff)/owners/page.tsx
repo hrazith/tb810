@@ -22,23 +22,15 @@ export default async function OwnersPage({ searchParams }: PageProps) {
 
   return (
     <section className="">
-      <div className="sm:flex sm:items-center">
-        <div className="sm:flex-auto">
-          <h1 className="text-base font-semibold text-zinc-900">Owners</h1>
-          <p className="mt-2 text-sm text-zinc-700">
-            A list of all owners in TB810 including their reference, contact details, status, and unit count.
-          </p>
-        </div>
-        <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-          <Button asChild variant="primary" shape="pill">
-  <Link href="/owners/new">Add Owner</Link>
-</Button>
-        </div>
-      </div>
-
-      <form
+      <div className="sm:flex sm:items-center justify-between">
+        
+          <h1 className="text-2xl font-semibold text-zinc-900">Owners</h1>
+          
+        
+        <div className="sm:mt-0 sm:ml-16 sm:flex-none items-center flex">
+          <form
         method="get"
-        className="mt-6 grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto]"
+        className="mt-6  grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto]"
       >
         <input
           name="q"
@@ -58,7 +50,14 @@ export default async function OwnersPage({ searchParams }: PageProps) {
         <button className="h-11 rounded-md border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-xs transition hover:border-zinc-950 hover:text-zinc-950">
           Filter
         </button>
-      </form>
+          </form>
+          <Button asChild variant="primary" shape="pill">
+  <Link href="/owners/new">Add Owner</Link>
+          </Button>
+        </div>
+      </div>
+
+      
 
       {result.error ? (
         <Panel className="mt-6 border-red-200 bg-red-50 text-sm text-red-700">

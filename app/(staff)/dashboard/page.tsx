@@ -5,17 +5,12 @@ import { Panel } from "@/components/ui/panel";
 export default function DashboardPage() {
   return (
     <section className="space-y-6">
-      <Panel as="div" className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm leading-6 text-zinc-600">
-          TB810 staff access is ready.
-        </p>
-      </Panel>
+      
 
       <Link href="/finance/budget-plans/2027" className="block">
         <Panel
           as="div"
-          className="group space-y-3 border-zinc-200 transition hover:border-zinc-950 hover:shadow-md"
+          className="max-w-xl group space-y-3 border-zinc-200 transition hover:border-zinc-950 hover:shadow-md"
         >
           <div className="flex items-center justify-between gap-4">
             <div>

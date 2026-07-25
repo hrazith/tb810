@@ -230,9 +230,16 @@ Billing Periods is the next milestone because it establishes the operational mon
 - no Draft/Open/Ready/Active/Closed/Archived Billing Period lifecycle states are modeled as the domain definition
 - invoice generation, payments, allocation and reconciliation remain in their respective downstream domains
 
-## Next Milestone After Billing Periods
+### 7. Water
 
-The next architecture domain after the frozen finance foundation is Unit Ledger, because the Billing Period model now provides the monthly operational context and the remaining finance work needs a stable account-history boundary.
+- Purpose: model water meter readings, supplier bills, and deterministic water allocation before accounting snapshots are created.
+- Why here: the Water domain depends on Units and the monthly operational context, but it remains separate from Monthly Financial Obligations and payments.
+- Key dependency: Units, Budget Plans, Billing Periods, and supplier facts.
+- Definition of done: water meter reading capture, supplier bill capture, deterministic water calculations, attachments, correction handling, and historical snapshot boundaries.
+
+## Next Milestone After Billing Periods and Water
+
+The next architecture domain after the frozen finance foundation is Unit Ledger, because the Billing Period and Water models now provide the monthly operational context and calculation boundary and the remaining finance work needs a stable account-history boundary.
 
 ### Why Unit Ledger Comes Next
 

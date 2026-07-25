@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useActionState } from "react";
-import Link from "next/link";
+import { useActionState, useMemo, useState } from "react";
 
 import { Panel } from "@/components/ui/panel";
 import type { WaterBillFormState } from "@/server/water";
@@ -11,7 +10,6 @@ type Props = {
     prevState: WaterBillFormState,
     formData: FormData,
   ) => Promise<WaterBillFormState>;
-  cancelHref: string;
   submitLabel: string;
   previousReadingHelpText: string;
   previousReadingLabel: string;
@@ -25,6 +23,12 @@ type Props = {
     description: string;
     notes: string;
   }>;
+  showDescription?: boolean;
+  showNotes?: boolean;
+  compact?: boolean;
+  hideCancel?: boolean;
+  onCancel?: () => void;
+  showSummary?: boolean;
 };
 
 const initialState: WaterBillFormState = {};
@@ -42,13 +46,18 @@ function toNumber(value: string) {
 
 export function CommonWaterBillForm({
   action,
-  cancelHref,
   submitLabel,
   previousReadingHelpText,
   previousReadingLabel,
   previousReadingReadOnly = true,
   utilityBillId,
   initialValues,
+  showDescription = true,
+  showNotes = true,
+  compact = false,
+  hideCancel = false,
+  onCancel,
+  showSummary = true,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [billDate, setBillDate] = useState(
@@ -66,69 +75,67 @@ export function CommonWaterBillForm({
   const [description, setDescription] = useState(
     state.values?.description ?? initialValues?.description ?? "",
   );
-  const [notes, setNotes] = useState(state.values?.notes ?? initialValues?.notes ?? "");
-
-  useEffect(() => {
-    if (!state.values) return;
-
-    if (state.values.bill_date !== undefined) {
-      setBillDate(state.values.bill_date);
-    }
-    if (state.values.previous_reading !== undefined) {
-      setPreviousReading(state.values.previous_reading);
-    }
-    if (state.values.current_reading !== undefined) {
-      setCurrentReading(state.values.current_reading);
-    }
-    if (state.values.amount !== undefined) {
-      setAmount(state.values.amount);
-    }
-    if (state.values.description !== undefined) {
-      setDescription(state.values.description);
-    }
-    if (state.values.notes !== undefined) {
-      setNotes(state.values.notes);
-    }
-  }, [state.values]);
+  const [notes, setNotes] = useState(
+    state.values?.notes ?? initialValues?.notes ?? "",
+  );
 
   const totalConsumption = useMemo(() => {
     const prev = toNumber(previousReading);
     const curr = toNumber(currentReading);
-
-    if (prev === null || curr === null) {
-      return null;
-    }
-
+    if (prev === null || curr === null) return null;
     const value = curr - prev;
-    return value > 0 ? value : null;
+    return value >= 0 ? value : null;
   }, [currentReading, previousReading]);
 
   const unitCost = useMemo(() => {
     const total = totalConsumption;
     const totalAmount = toNumber(amount);
-
-    if (total === null || totalAmount === null || total === 0) {
-      return null;
-    }
-
+    if (total === null || totalAmount === null || total === 0) return null;
     return totalAmount / total;
   }, [amount, totalConsumption]);
 
+  const serviceMonth = useMemo(() => {
+    if (!billDate) return "";
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      year: "numeric",
+    }).format(new Date(`${billDate}T00:00:00`));
+  }, [billDate]);
+
+  const chargeMonth = useMemo(() => {
+    if (!billDate) return "";
+    const date = new Date(`${billDate}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return "";
+    date.setMonth(date.getMonth() + 1);
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      year: "numeric",
+    }).format(date);
+  }, [billDate]);
+
   const summary = [
+    { label: "Service Month", value: serviceMonth },
+    { label: "Charge Month", value: chargeMonth },
     { label: "Total Consumption", value: totalConsumption },
     { label: "Unit Cost", value: unitCost },
   ];
 
   return (
-    <Panel as="form" action={formAction} className="space-y-6">
+    <Panel
+      key={JSON.stringify(state.values ?? initialValues ?? {})}
+      as="form"
+      action={formAction}
+      padding={compact ? "compact" : "default"}
+      className="space-y-6"
+    >
       {utilityBillId ? (
         <input type="hidden" name="utility_bill_id" value={utilityBillId} />
       ) : null}
       <input type="hidden" name="previous_reading" value={previousReading} />
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4">
         <label className="space-y-2">
           <span className="block text-sm font-medium text-zinc-900">
-            Bill date
+            Reading date
           </span>
           <input
             name="bill_date"
@@ -144,7 +151,7 @@ export function CommonWaterBillForm({
 
         <label className="space-y-2">
           <span className="block text-sm font-medium text-zinc-900">
-            Invoiced amount
+            Invoice amount
           </span>
           <input
             name="amount"
@@ -210,54 +217,65 @@ export function CommonWaterBillForm({
         </label>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {summary.map((item) => (
-          <div key={item.label} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-              {item.label}
-            </p>
-            <p className="mt-2 text-lg font-semibold text-zinc-950">
-              {item.value === null
-                ? "—"
-                : item.label === "Unit Cost"
-                  ? `PEN ${item.value.toFixed(4)}`
-                  : item.value.toFixed(3).replace(/\.?0+$/, "")}
-            </p>
-          </div>
-        ))}
-      </div>
+      {showSummary ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {summary.map((item) => (
+            <div
+              key={item.label}
+              className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"
+            >
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                {item.label}
+              </p>
+              <p className="mt-2 text-lg font-semibold text-zinc-950">
+                {item.value === null || item.value === ""
+                  ? "—"
+                  : item.label === "Unit Cost"
+                    ? `${item.value.toFixed(4)}`
+                    : typeof item.value === "number"
+                      ? item.value.toFixed(3).replace(/\.?0+$/, "")
+                      : item.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
-      <label className="block space-y-2">
-        <span className="block text-sm font-medium text-zinc-900">
-          Description
-        </span>
-        <input
-          name="description"
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none transition focus:border-zinc-950"
-          placeholder="Sedapal invoice reference"
-        />
-        {fieldError("description", state) ? (
-          <p className="text-sm text-red-600">
-            {fieldError("description", state)}
-          </p>
-        ) : null}
-      </label>
+      {showDescription ? (
+        <label className="block space-y-2">
+          <span className="block text-sm font-medium text-zinc-900">
+            Description
+          </span>
+          <input
+            name="description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none transition focus:border-zinc-950"
+            placeholder="Sedapal invoice reference"
+          />
+          {fieldError("description", state) ? (
+            <p className="text-sm text-red-600">
+              {fieldError("description", state)}
+            </p>
+          ) : null}
+        </label>
+      ) : null}
 
-      <label className="block space-y-2">
-        <span className="block text-sm font-medium text-zinc-900">Notes</span>
-        <textarea
-          name="notes"
-          rows={4}
-          value={notes}
-          onChange={(event) => setNotes(event.target.value)}
-          className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
-        />
-        {fieldError("notes", state) ? (
-          <p className="text-sm text-red-600">{fieldError("notes", state)}</p>
-        ) : null}
-      </label>
+      {showNotes ? (
+        <label className="block space-y-2">
+          <span className="block text-sm font-medium text-zinc-900">Notes</span>
+          <textarea
+            name="notes"
+            rows={4}
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
+          />
+          {fieldError("notes", state) ? (
+            <p className="text-sm text-red-600">{fieldError("notes", state)}</p>
+          ) : null}
+        </label>
+      ) : null}
 
       {state.error ? (
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -273,12 +291,15 @@ export function CommonWaterBillForm({
         >
           {pending ? "Saving..." : submitLabel}
         </button>
-        <Link
-          href={cancelHref}
-          className="inline-flex h-12 items-center justify-center rounded-xl border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950"
-        >
-          Cancel
-        </Link>
+        {hideCancel ? null : onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex h-12 items-center justify-center rounded-xl border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950"
+          >
+            Cancel
+          </button>
+        ) : null}
       </div>
     </Panel>
   );

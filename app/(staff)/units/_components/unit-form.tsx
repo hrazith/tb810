@@ -27,10 +27,6 @@ function fieldError(field: string, state: UnitFormState) {
   ];
 }
 
-function yesNoValue(value?: boolean) {
-  return value ? "yes" : "no";
-}
-
 function typeLabel(unitType: UnitTypeRecord) {
   switch (unitType.code) {
     case "condo":
@@ -59,11 +55,13 @@ export function UnitForm({ defaults, action, submitLabel }: Props) {
     values.has_meter ? "yes" : "no",
   );
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const nextTypeId = values.unit_type_id ?? defaults.unitTypes[0]?.id ?? "";
     setSelectedTypeId(nextTypeId);
     setMeterValue(values.has_meter ? "yes" : "no");
   }, [defaults.unitTypes, values.has_meter, values.unit_type_id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const meterIsAllowed = meterAllowed(selectedTypeId, defaults.unitTypes);
   const effectiveMeterValue = meterIsAllowed ? meterValue : "no";

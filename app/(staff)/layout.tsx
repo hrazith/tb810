@@ -2,7 +2,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { brandConfig, Buildings, Gauge, SignOut, UsersThree } from "@/brand";
+import {
+  brandConfig,
+  Buildings,
+  Gauge,
+  SignOut,
+  Stack,
+  UsersThree,
+} from "@/brand";
 import { createClient } from "@/lib/supabase/server";
 
 import { signOut } from "./actions";
@@ -48,6 +55,13 @@ export default async function StaffLayout({
                 <Buildings aria-hidden size={18} />
                 Units
               </Link>
+              <Link
+                href="/water"
+                className="inline-flex items-center gap-2 transition hover:text-zinc-950"
+              >
+                <Stack aria-hidden size={18} />
+                Water
+              </Link>
             </nav>
           </div>
 
@@ -66,7 +80,7 @@ export default async function StaffLayout({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-6 py-16">{children}</main>
+      <main className="mx-auto w-full max-w-6xl px-6 py-20">{children}</main>
     </div>
   );
 }

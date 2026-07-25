@@ -41,7 +41,7 @@ export type ButtonProps = ButtonAsButtonProps | ButtonAsChildProps;
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "border-zinc-950 bg-zinc-950 text-white shadow-sm hover:border-zinc-800 hover:bg-zinc-800 focus-visible:outline-zinc-950 disabled:border-zinc-300 disabled:bg-zinc-300 disabled:text-zinc-500",
+    "border-zinc-950 bg-zinc-950 text-white shadow-sm hover:border-zinc-800 hover:bg-zinc-800 focus-visible:outline-zinc-950 disabled:border-zinc-300 disabled:bg-zinc-300 disabled:text-zinc-500 ",
 
   secondary:
     "border-zinc-300 bg-white text-zinc-900 shadow-sm hover:border-zinc-950 hover:text-zinc-950 focus-visible:outline-zinc-950 disabled:border-zinc-200 disabled:bg-zinc-50 disabled:text-zinc-400",
@@ -97,7 +97,7 @@ function getButtonClasses({
 export function Button(props: ButtonProps) {
   if ("asChild" in props && props.asChild) {
     const {
-      asChild: _asChild,
+      asChild,
       variant = "primary",
       size = "md",
       shape = "default",
@@ -105,6 +105,7 @@ export function Button(props: ButtonProps) {
       children,
       ...rest
     } = props;
+    void asChild;
 
     if (!isValidElement(children)) {
       throw new Error("Button with asChild expects a single element child.");

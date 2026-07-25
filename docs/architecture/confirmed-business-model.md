@@ -192,6 +192,49 @@ See also:
 
 - [`docs/architecture/finance-map.md`](/Users/roon/dev/tb810/docs/architecture/finance-map.md)
 
+## Finance Progression
+
+TB810 finance should follow this sequence:
+
+Facts → Calculations → Accounting → Planning
+
+Facts are observable or authoritative business inputs, such as:
+
+- Monthly Operating Budget entered by Carlos
+- Unit participation percentage
+- Water meter reading
+- Sedapal supplier invoice
+- one-off charge entered by authorized staff
+
+Calculations are deterministic financial consequences derived by Asset-Edge, such as:
+
+- Fixed Monthly Assessment
+- Unit water consumption
+- Private water charge
+- Common water allocation
+- Total Unit Water Charge
+
+Accounting is the historical record created from finalized calculation outputs, such as:
+
+- Monthly Financial Obligations
+- Payments
+- Payment allocations
+- Unit balances
+- Owner statements
+- Adjustments
+
+Planning is forward-looking decision support, such as:
+
+- Budget Planning
+- reserve forecasting
+- cash-flow projections
+- scenario planning
+
+Humans provide or verify source facts. Asset-Edge derives financial facts. Finalized financial consequences are snapshotted into accounting records. Historical accounting data may later support planning and recommendations.
+
+MVP1 is deterministic, explainable, and auditable.
+MVP2 may introduce planning intelligence and document extraction, but it must not compromise the auditability of MVP1 accounting.
+
 ## Budget Plan
 
 The legacy `Presupuesto` concept is the Budget Plan, a deliberately small year-scoped configuration record.
@@ -223,6 +266,28 @@ The Budget Plan may be edited, but if invoicing has already begun the legacy sys
 See also:
 
 - [`docs/domain-models/budget-plans.md`](/Users/roon/dev/tb810/docs/domain-models/budget-plans.md)
+
+## Water Domain
+
+Water is a separate financial input and calculation domain.
+
+It does not belong to:
+
+- Unit ownership
+- the Unit record
+- payments
+- Monthly Financial Obligations
+
+The Water domain produces calculated Unit water charges that are later snapshotted into Monthly Financial Obligations.
+
+The current TB810 workflow is staff-operated:
+
+- Giuliana collects or receives photographs of individual condo water meters.
+- Giuliana records each current cumulative meter reading.
+- Giuliana records the Sedapal supplier invoice facts.
+- The system calculates consumption and water allocation.
+- Carlos does not approve water calculations.
+- Carlos’s approval responsibility applies to expenses, which is a separate future domain.
 
 ## Billing Period
 

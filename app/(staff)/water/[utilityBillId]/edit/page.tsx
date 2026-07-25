@@ -48,7 +48,7 @@ export default async function EditWaterBillPage({ params }: PageProps) {
     <section className="space-y-6">
       <Panel as="div" className="space-y-3">
         <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-          Common Water Ledger
+          Sedapal Invoice
         </p>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">

@@ -14,6 +14,7 @@ Finance:
 
 - Budget Plan
 - Monthly Assessment
+- Water
 - Billing Period
 - Monthly Financial Obligations
 - Unit Ledger
@@ -35,6 +36,10 @@ The year-scoped administrative record that stores the Monthly Assessment Pool.
 ### Monthly Assessment
 
 The monthly contribution derived from the Budget Plan and each Unit's participation percentage.
+
+### Water
+
+The separate financial input and calculation domain that turns meter and supplier facts into per-Unit water charges before accounting snapshots.
 
 ### Billing Period
 

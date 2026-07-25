@@ -168,6 +168,49 @@ Configuration is not accounting:
 - configuration drives financial operations
 - configuration itself is not the financial ledger
 
+## Principle 16 - Facts, calculations, accounting, and planning are distinct
+
+TB810 finance should follow this progression:
+
+Facts → Calculations → Accounting → Planning
+
+Facts are observable or authoritative business inputs, such as:
+
+- Monthly Operating Budget entered by Carlos
+- Unit participation percentage
+- Water meter reading
+- Sedapal supplier invoice
+- one-off charge entered by authorized staff
+
+Calculations are deterministic financial consequences derived by Asset-Edge, such as:
+
+- Fixed Monthly Assessment
+- Unit water consumption
+- Private water charge
+- Common water allocation
+- Total Unit Water Charge
+
+Accounting is historical financial record created from finalized calculation outputs, such as:
+
+- Monthly Financial Obligations
+- Payments
+- Payment allocations
+- Unit balances
+- Owner statements
+- Adjustments
+
+Planning is forward-looking decision support, such as:
+
+- Budget Planning
+- reserve forecasting
+- cash-flow projections
+- scenario planning
+
+Humans provide or verify source facts. Asset-Edge derives financial facts. Finalized financial consequences are snapshotted into accounting records. Historical accounting data may later support planning and recommendations.
+
+MVP1 is deterministic, explainable, and auditable.
+MVP2 may introduce planning intelligence and document extraction, but it must not compromise the auditability of MVP1 accounting.
+
 ## Principle 11 - The business must outlive the operator
 
 Do not design workflows around Carlos or any individual administrator.

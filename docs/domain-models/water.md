@@ -1,74 +1,126 @@
-# Water Domain
+# Common Water Ledger
 
-The authoritative finance architecture is frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md). This document captures the Water domain architecture that emerged from the current design sprint.
+The authoritative finance architecture is frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md). This document captures the canonical Common Water Ledger design for TB810.
 
 ## Purpose
 
-Water is a separate financial input and calculation domain.
+The Common Water Ledger represents the monthly supplier Sedapal invoice and the master building water meter reading.
 
-It turns authoritative source facts into explainable per-Unit water charges that can later be snapshotted into Monthly Financial Obligations.
+It is the authoritative supplier record from which downstream calculations are derived.
 
-Water does not belong to:
+It is not responsible for:
 
-- Unit ownership
-- the Unit record
-- payments
-- Monthly Financial Obligations
+- Common Consumption allocation
+- Unit Water Charges
+- Monthly Obligations
+- Financial Adjustments
 
-## Core Objects
+Those are downstream domains.
 
-### Water Meter
+## Business Workflow
 
-Represents the physical meter device.
+Every month:
 
-- belongs to a metered Unit
-- exists independently from readings
-- should support installation and retirement/replacement history
-- exact metadata and replacement workflow remain pending confirmation from Carlos
+Sedapal issues invoice
+↓
 
-### Meter Reading
+Giuliana enters Common Water Ledger
+↓
 
-A historical observation associated with a Water Meter.
+System derives calculated values
+↓
 
-- contains the cumulative reading value
-- contains the reading date
-- contains the applicable consumption period
-- may include a source photo or attachment
-- includes audit information
-- the human enters or verifies the cumulative reading
-- consumption is not manually entered
+Record reviewed
+↓
 
-### Supplier Utility Bill
+Month closes
+↓
 
-Represents the Sedapal building-level invoice.
+Record becomes immutable
 
-- remains separate from Unit-level water allocations
-- stores authoritative supplier facts
-- may include billing period, invoice amount, provider consumption, supplied meter readings, and attachments
+## MVP1 Assumptions
 
-### Water Allocation
+- TB810 records exactly one Sedapal invoice every service month.
+- The monthly sequence is uninterrupted.
+- Previous Reading is inherited from the previous month's Current Reading.
+- Previous Reading is editable only for the very first ledger record.
+- Once a service month closes, the record becomes immutable.
+- Historical records are never edited.
+- Corrections after lock are outside MVP1.
+- Missing service months are outside MVP1.
 
-Represents the system’s calculation for a building and billing period.
+## Data Entry Philosophy
 
-- combines supplier bill facts
-- combines Unit consumption
-- uses the water unit rate
-- uses common water consumption
-- uses participation percentages where appropriate
-- produces explainable per-Unit water results
+Only supplier facts are manually entered.
 
-### Calculated Unit Water Charge
+User enters:
 
-The per-Unit output of the Water Allocation.
+- Reading Date
+- Current Reading
+- Invoice Amount
 
-- remains live and recalculable until the applicable accounting period closes
-- is not itself the final historical accounting record
+System derives:
 
-## Legacy Implementation Findings
+- Service Month
+- Previous Reading
+- Total Consumption
+- Unit Cost
+- Charge Month
 
-The legacy TB810 database did not model a standalone meter-device entity. Instead it stored monthly reading history in a `meters` table.
+Building, provider and unit of measure are fixed.
 
-The legacy water-related tables were:
+## Terminology
+
+Use these names consistently:
+
+- Service Month
+- Reading Date
+- Previous Reading
+- Current Reading
+- Total Consumption
+- Invoice Amount
+- Unit Cost
+- Charge Month
+
+Do not use "Billed Month".
+
+## Record Lifecycle
+
+Current Service Month
+
+- editable
+
+Historical Service Months
+
+- immutable
+
+No historical editing.
+
+## MVP2 Backlog
+
+### Missing Service Months
+
+Potential future capability:
+
+- detect skipped service months
+- continuity estimation
+- configurable estimation strategies
+- adjustment workflow
+- Operational Intelligence predictions
+- preserve audit history
+
+Do not design or implement MVP2 here.
+
+## Design Principles
+
+- Supplier facts should never be fabricated.
+- Derived values should be computed whenever possible.
+- Historical supplier records become immutable.
+- Missing operational data should not halt the business forever, but this capability belongs to MVP2.
+
+## Legacy Implementation Context
+
+Legacy water-related tables included:
 
 - `meters`
 - `utilities`
@@ -86,90 +138,14 @@ The legacy model also used:
 - `units.has_meter` for meter capability
 - `units.bill_adjustment` for historical adjustment behavior
 
-## Legacy Water Workflow
+## Canonical Notes
 
-The legacy workflow was staff-operated:
+This document intentionally stops at the supplier-ledger boundary.
 
-1. Giuliana collects or receives photographs of individual condo water meters.
-2. Giuliana records each current cumulative meter reading.
-3. Giuliana records the Sedapal supplier invoice facts.
-4. The system calculates consumption and water allocation.
-5. Carlos does not approve water calculations.
-6. Carlos’s approval responsibility applies to expenses, which is a separate future domain.
+It does not define:
 
-## Deterministic Calculations
-
-Water calculations are explainable and deterministic.
-
-### Unit Consumption
-
-`Current Accepted Reading - Previous Accepted Reading = Unit Consumption`
-
-### Water Unit Rate
-
-`Supplier Invoice Amount ÷ Supplier Total Consumption = Water Unit Rate`
-
-### Common Consumption
-
-`Supplier Total Consumption - Sum of all Unit Consumption = Common Consumption`
-
-### Private Water Charge
-
-`Unit Consumption × Water Unit Rate = Private Water Charge`
-
-### Building Common Water Amount
-
-`Common Consumption × Water Unit Rate = Building Common Water Amount`
-
-### Unit Common Water Allocation
-
-`Building Common Water Amount × Unit Participation Percentage = Unit Common Water Allocation`
-
-### Total Unit Water Charge
-
-`Private Water Charge + Unit Common Water Allocation = Total Unit Water Charge`
-
-## Business Rules
-
-- Water is not approval-driven in MVP1.
-- Water is event-driven: facts arrive, calculations update, accounting snapshots close the period.
-- Closed historical obligations must not be silently edited or recalculated.
-- Corrections must be represented through explicit adjustment records or prior-period adjustments.
-- Missing readings remain an open business decision requiring Carlos confirmation.
-- Condos may have water meters.
-- Parking and storage do not have water meters.
-- Parking and storage may still participate in other percentage-based or one-off charges depending on the governing rule.
-- The system should not assume that every Unit receives a private water charge.
-
-## Historical Integrity
-
-The Fixed Monthly Assessment is a derived planning value.
-
-Historical monthly charges are represented by Monthly Financial Obligations, which snapshot the Fixed Monthly Assessment at the time obligations are generated.
-
-For Water, the same principle applies:
-
-- live calculated values may change while the period is open
-- finalized accounting snapshots must remain historically explainable
-- corrections must preserve the original issued amount
-
-## Open Questions
-
-- exact meter replacement procedure
-- exact required meter metadata
-- exact missing-reading policy
-- exact scheduler and timezone model for closing periods
-- exact correction placement rules when multiple historical months are affected
-
-## Future Boundaries
-
-The Water domain should not absorb:
-
-- ownership history
+- unit allocation formulas
+- monthly obligation generation
 - payment settlement
-- general accounting balances
-- expense approval logic
-- budget planning
-
-Those belong to their own domains.
-
+- adjustment posting rules
+- billing-period orchestration

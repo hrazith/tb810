@@ -44,7 +44,7 @@ export default async function WaterBillDetailPage({ params }: PageProps) {
     <section className="space-y-6">
       <Panel as="div" className="space-y-3">
         <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-          Common Water Ledger
+          Sedapal Invoice
         </p>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
@@ -80,8 +80,8 @@ export default async function WaterBillDetailPage({ params }: PageProps) {
           <h2 className="text-lg font-semibold text-zinc-950">Invoice facts</h2>
           <dl className="mt-4 grid gap-3 text-sm text-zinc-600">
             <div className="flex items-center justify-between gap-4">
-              <dt className="font-medium text-zinc-900">Bill date</dt>
-              <dd>{bill.bill_date}</dd>
+              <dt className="font-medium text-zinc-900">Period</dt>
+              <dd>{new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(new Date(`${bill.bill_date}T00:00:00`))}</dd>
             </div>
             <div className="flex items-center justify-between gap-4">
               <dt className="font-medium text-zinc-900">Amount invoiced</dt>
@@ -93,7 +93,7 @@ export default async function WaterBillDetailPage({ params }: PageProps) {
             </div>
             <div className="flex items-center justify-between gap-4">
               <dt className="font-medium text-zinc-900">Description</dt>
-              <dd>{bill.description ?? "Sedapal common water invoice"}</dd>
+              <dd>{bill.description ?? "Sedapal invoice"}</dd>
             </div>
             <div className="flex items-center justify-between gap-4">
               <dt className="font-medium text-zinc-900">Notes</dt>

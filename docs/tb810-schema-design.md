@@ -151,8 +151,9 @@ The schema is intentionally staff-first. There is no owner portal yet.
 ### `tb810_utility_bills`
 
 - Purpose: supplier bill for water or common utilities
-- Key fields: `building_id`, `utility_type_id`, `billing_period_id`, `supplier_id`, `bill_date`, `amount`, `status`
+- Key fields: `building_id`, `utility_type_id`, `billing_period_id`, `supplier_id`, `bill_date`, `amount`, `previous_reading`, `current_reading`, `total_consumption`, `unit_cost`, `status`
 - Newly introduced: yes
+- Notes: the TB810 common-water slice uses this table as an immutable historical ledger for monthly Sedapal bills. Consumption and unit cost are calculated at entry time, and the row is treated as write-once operational history.
 
 ### `tb810_meter_readings`
 
@@ -258,4 +259,3 @@ Also keep unique constraints on:
 - `tb810_invoices(building_id, invoice_number)`
 - `tb810_role_permissions(role_id, permission_id)`
 - `tb810_staff_roles(staff_profile_id, role_id)`
-

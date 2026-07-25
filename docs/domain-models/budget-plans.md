@@ -53,6 +53,29 @@ The calculation is deterministic and should always be derived.
 - Invoices persist the calculated amounts that were billed.
 - Budget Plans do not.
 
+## Finance Boundary
+
+The Budget Plan belongs to the finance planning side of the model, not the accounting side.
+
+Budget Plan is a source fact for:
+
+- Monthly Operating Budget
+- Fixed Monthly Assessment
+
+It does not own:
+
+- Monthly Financial Obligations
+- Payments
+- payment allocations
+- balances
+- owner statements
+
+The broader finance progression is:
+
+Facts → Calculations → Accounting → Planning
+
+Within that progression, the Budget Plan contributes the planning facts that fuel calculations, while Monthly Financial Obligations preserve the historical accounting snapshot.
+
 ## Budget Preview
 
 Creating or editing a Budget Plan should eventually lead to a Budget Preview.
