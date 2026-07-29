@@ -1,43 +1,73 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { brandConfig } from "@/brand";
-import { Header } from "@/components/header";
-import { createClient } from "@/lib/supabase/server";
-import { signOut } from "./(staff)/actions";
+import Image from "next/image";
+import { SignOut } from "@/brand";
 
 const shortcuts = [
+
   {
-    href: "/water",
-    title: "Water",
-    description: "Enter the water domain and monthly ledger.",
+    href: "/water/sedapal",
+    title: "Sedapal Water Bill",
+    description: "You have not started yet.",
   },
   {
-    href: "/units",
-    title: "Units",
-    description: "Review physical units and their billing context.",
+    href: "/unit-water",
+    title: "Unit Water Readings",
+    description: "Enter metered reding for individual units",
   },
 ] as const;
 
-export default async function Home() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
-
-  if (!user) {
-    redirect("/login");
-  }
-
+export default function Home() {
   return (
     <main className="min-h-screen bg-zinc-50">
-      <Header userEmail={user.email ?? ""} signOutAction={signOut} />
+      <header className="border-b border-zinc-200 bg-white">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/" aria-label="Go to operations home">
+              <Image
+                src="/TB810.svg"
+                alt={brandConfig.shortName}
+                width={105}
+                height={27}
+                priority
+              />
+            </Link>
+            <nav className="ml-12 flex items-center gap-6 text-md font-medium text-zinc-700">
+              <Link href="/owners" className="inline-flex items-center gap-2 transition hover:text-zinc-950">
+                Owners
+              </Link>
+              <Link href="/units" className="inline-flex items-center gap-2 transition hover:text-zinc-950">
+                Units
+              </Link>
+              <Link
+                href="/water"
+                className="inline-flex items-center gap-2 transition hover:text-zinc-950"
+              >
+                Water
+              </Link>
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-zinc-600">hrazith@gmail.com</p>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-md border border-zinc-300 px-6 py-2 text-sm font-medium text-zinc-700 transition hover:cursor-pointer hover:border-zinc-950 hover:text-zinc-950"
+              >
+                <SignOut aria-hidden size={16} />
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
 
       <section className="mx-auto w-full max-w-3xl space-y-10 px-6 py-16">
         <div className="space-y-10 rounded-[2rem] border border-zinc-200 bg-white p-8 shadow-sm sm:p-10">
           <div className="space-y-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-zinc-500">
-              {brandConfig.shortName}
-            </p>
+           
             <h1 className="text-4xl font-semibold tracking-tight text-zinc-950">
               Good morning, Guliana.
             </h1>
@@ -48,7 +78,7 @@ export default async function Home() {
 
           <div className="space-y-4">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">
-              Operations
+              JULY 2026
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               {shortcuts.map((shortcut) => (
