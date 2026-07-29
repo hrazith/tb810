@@ -209,3 +209,7 @@ It does not define:
 - payment settlement
 - adjustment posting rules
 - billing-period orchestration
+
+Historical note:
+
+The downstream allocation rule for TB810 vNext is now canonical: the remaining Sedapal water cost is divided equally among the 64 residential condominiums after subtracting all individually metered water charges. This rule lives in the downstream water-allocation and monthly-obligations documentation, not in the supplier-ledger model itself.

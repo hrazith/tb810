@@ -218,6 +218,15 @@ Do not design workflows around Carlos or any individual administrator.
 The business continues to exist regardless of who performs the operational work.
 
 Time advances.
+
+## Navigation Philosophy
+
+- The authenticated root `/` is the user's operational home.
+- URLs identify business domains.
+- URLs identify business objects.
+- Workflow steps are views of a business object.
+- Workflow steps should not become independent top-level resources.
+- Navigation follows business context rather than technical modules.
 Billing periods exist.
 Financial obligations exist.
 

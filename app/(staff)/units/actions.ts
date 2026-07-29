@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { updateUnit } from "@/server/units";
+import { createUnit, updateUnit } from "@/server/units";
 import type { UnitFormState } from "@/server/units/types";
 import { unitInputSchema } from "@/server/units/validation";
 
@@ -68,4 +68,24 @@ export async function updateUnitAction(
   if (result.error) return toFormStateError(result.error, values);
 
   redirect(`/units/${unitId}`);
+}
+
+export async function createUnitAction(
+  _prev: UnitFormState,
+  formData: FormData,
+): Promise<UnitFormState> {
+  const values = toUnitInput(formData);
+  const validation = unitInputSchema.safeParse(values);
+  if (!validation.success) {
+    return {
+      error: "Please fix the highlighted fields.",
+      fieldErrors: mapFieldErrors(validation.error.issues),
+      values,
+    };
+  }
+
+  const result = await createUnit(validation.data);
+  if (result.error) return toFormStateError(result.error, values);
+
+  redirect(`/units/${result.data.id}`);
 }

@@ -185,7 +185,8 @@ Historical months remain historically correct.
 
 - building-level monthly source amount
 - applies only to apartment / condo Units
-- allocated by each apartment’s participation percentage
+- calculated as the Sedapal invoice amount minus the sum of all individually metered water charges
+- divided equally among the 64 residential condominiums
 - parking and storage are excluded
 
 ### Gas

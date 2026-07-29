@@ -246,6 +246,30 @@ export async function updateUnit(
   return { data, error: null };
 }
 
+export async function createUnit(
+  input: UnitInput,
+): Promise<QueryResult<UnitRecord>> {
+  const supabase = await createClient();
+  const payload = input;
+  const { data, error } = await supabase
+    .from("tb810_units")
+    .insert({
+      building_id: payload.building_id,
+      unit_type_id: payload.unit_type_id,
+      unit_number: payload.unit_number,
+      floor: payload.floor,
+      registered_area_m2: payload.registered_area_m2,
+      participation_percentage: payload.participation_percentage,
+      has_meter: payload.has_meter,
+      notes: payload.notes,
+    })
+    .select(UNIT_SELECT)
+    .single();
+
+  if (error) return { data: null as never, error: error.message };
+  return { data, error: null };
+}
+
 export async function getUnitFormDefaults(
   unitId?: string,
 ): Promise<QueryResult<UnitFormDefaults>> {

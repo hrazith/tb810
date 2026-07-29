@@ -1,66 +1,61 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
 import { brandConfig } from "@/brand";
+import { Header } from "@/components/header";
+import { createClient } from "@/lib/supabase/server";
+import { signOut } from "./(staff)/actions";
 
 const shortcuts = [
   {
-    href: "/dashboard",
-    title: "Dashboard",
-    description: "See the current operational picture for TB810.",
-  },
-  {
-    href: "/owners",
-    title: "Owners",
-    description: "Browse owners, ownership history, and unit assignments.",
+    href: "/water",
+    title: "Water",
+    description: "Enter the water domain and monthly ledger.",
   },
   {
     href: "/units",
     title: "Units",
-    description: "Review physical assets, participation, and billing context.",
+    description: "Review physical units and their billing context.",
   },
 ] as const;
 
-export default function Home() {
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_#ffffff_0%,_#fafafa_45%,_#f4f4f5_100%)] px-6 py-16">
-      <section className="w-full max-w-5xl rounded-[2rem] border border-zinc-200 bg-white/90 p-8 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.35)] backdrop-blur sm:p-10 lg:p-14">
-        <div className="grid gap-10 lg:grid-cols-[1.3fr_0.7fr] lg:items-start">
-          <div className="space-y-6 ">
-            <div className="space-y-3">
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                {brandConfig.shortName}
-              </p>
-              <h1 className="max-w-2xl text-4xl font-black tracking-tight text-zinc-950 sm:text-5xl">
-                The operational home for TB810.
-              </h1>
-              <p className="max-w-2xl text-lg leading-8 text-zinc-600">
-                Navigate owners, units, and monthly operations from one place.
-                The app is built for the business rhythm, not a generic module
-                maze.
-              </p>
-            </div>
+export default async function Home() {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  const user = data.user;
 
-            <div className="flex flex-wrap gap-3">
-              <Button asChild variant="primary" shape="pill">
-                <Link href="/dashboard">Open Dashboard</Link>
-              </Button>
-              <Button asChild variant="secondary" shape="pill">
-                <Link href="/owners">Browse Owners</Link>
-              </Button>
-            </div>
+  if (!user) {
+    redirect("/login");
+  }
+
+  return (
+    <main className="min-h-screen bg-zinc-50">
+      <Header userEmail={user.email ?? ""} signOutAction={signOut} />
+
+      <section className="mx-auto w-full max-w-3xl space-y-10 px-6 py-16">
+        <div className="space-y-10 rounded-[2rem] border border-zinc-200 bg-white p-8 shadow-sm sm:p-10">
+          <div className="space-y-4">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-zinc-500">
+              {brandConfig.shortName}
+            </p>
+            <h1 className="text-4xl font-semibold tracking-tight text-zinc-950">
+              Good morning, Guliana.
+            </h1>
+            <p className="max-w-2xl text-base leading-7 text-zinc-600">
+              This is the operational home for TB810.
+            </p>
           </div>
 
-          <aside className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-5">
+          <div className="space-y-4">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">
-              Quick Links
+              Operations
             </p>
-            <div className="mt-4 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               {shortcuts.map((shortcut) => (
                 <Link
                   key={shortcut.href}
                   href={shortcut.href}
-                  className="block rounded-2xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-950 hover:shadow-sm"
+                  className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 transition hover:border-zinc-950 hover:bg-white"
                 >
                   <p className="text-sm font-semibold text-zinc-950">
                     {shortcut.title}
@@ -71,9 +66,24 @@ export default function Home() {
                 </Link>
               ))}
             </div>
-          </aside>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">
+              Recent Activity
+            </p>
+            <PanelPlaceholder />
+          </div>
         </div>
       </section>
     </main>
+  );
+}
+
+function PanelPlaceholder() {
+  return (
+    <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-6 text-sm text-zinc-500">
+      Placeholder
+    </div>
   );
 }

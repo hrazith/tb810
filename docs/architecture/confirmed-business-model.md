@@ -108,7 +108,7 @@ A Unit invoice may contain charge line items from:
 1. Monthly participation-based assessment
 2. Previous month’s private water charge, where applicable
 3. Previous month’s gas charge, where the Unit has gas service
-4. Common water charge for apartment / condo Units
+4. Common water charge for apartment / condo Units, calculated by dividing the remaining Sedapal water cost equally among the 64 residential condominiums
 5. Approved one-off additional charges assigned to that Unit Account and billing period
 
 Invoice lines should be modeled as charge types rather than hardcoded invoice columns.
@@ -127,6 +127,28 @@ The Billing Period exists because the calendar exists.
 It is not something Carlos manually creates or opens.
 
 The dashboard should communicate operational health rather than workflow state.
+
+## Operations
+
+Operations is not a module.
+
+Operations is the authenticated home experience.
+
+The root URL `/` is the operational home, and different roles may see different dashboards while sharing the same URL.
+
+Example:
+
+`/`
+
+↓
+
+Operations Dashboard
+
+↓
+
+Today's Work
+
+Different roles may see different dashboards while sharing the same URL.
 
 Billing Period is frozen as a domain concept. Downstream activity details remain in their respective domains.
 
@@ -148,6 +170,12 @@ The system must preserve:
 - rates
 - calculation inputs
 - resulting obligation
+
+Water calculations include the canonical common-water rule:
+
+- total metered water charges are subtracted from the Sedapal invoice amount
+- the remaining common water cost is divided equally among the 64 residential condominiums
+- every residential condominium receives the same AGUA COMUN amount for that billing cycle
 
 Future edits to budgets, ownership percentages or rates must never silently rewrite previous months.
 
@@ -288,6 +316,10 @@ The current TB810 workflow is staff-operated:
 - The system calculates consumption and water allocation.
 - Carlos does not approve water calculations.
 - Carlos’s approval responsibility applies to expenses, which is a separate future domain.
+
+Historical note:
+
+The legacy SQL suggested a participation-based water allocation model, but Carlos confirmed that TB810 vNext intentionally uses equal allocation of the remaining Sedapal water cost across the 64 residential condominiums. This supersedes earlier implementation hypotheses.
 
 ## Billing Period
 
