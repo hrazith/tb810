@@ -12,7 +12,7 @@ const shortcuts = [
     description: "You have not started yet.",
   },
   {
-    href: "/unit-water",
+    href: "/water/unit-meter-readings",
     title: "Unit Water Readings",
     description: "Enter metered reding for individual units",
   },
