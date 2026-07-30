@@ -1,0 +1,32 @@
+{
+  "source": {
+    "legacyUnitCount": 172,
+    "legacyParticipationTotal": 99.9840000000001,
+    "detectedParticipationScale": "percentage_points"
+  },
+  "imported": {
+    "residentialCount": 64,
+    "parkingCount": 60,
+    "storageCount": 48,
+    "totalUnits": 172
+  },
+  "validation": {
+    "duplicateUnitNumbers": [],
+    "duplicateLegacyIds": [],
+    "missingLegacyIds": [],
+    "unknownUnitTypes": [],
+    "missingBuildingReferences": [],
+    "invalidParticipationPercentages": [],
+    "provenanceComplete": true,
+    "unitsWithNullHasMeter": 108,
+    "skippedRows": 0,
+    "warnings": []
+  },
+  "comparison": {
+    "legacyInventoryMatchesCanonicalInventory": true,
+    "legacyCount": 172,
+    "canonicalCount": 172,
+    "legacyParticipationTotal": 99.9840000000001,
+    "canonicalParticipationTotal": 99.9840000000001
+  }
+}

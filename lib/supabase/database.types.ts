@@ -1758,8 +1758,9 @@ export type Database = {
           building_id: string
           created_at: string
           display_name: string | null
+          display_order: number
           floor: string | null
-          has_meter: boolean
+          has_meter: boolean | null
           id: string
           legacy_id: string | null
           legacy_metadata: Json
@@ -1776,8 +1777,9 @@ export type Database = {
           building_id: string
           created_at?: string
           display_name?: string | null
+          display_order?: number
           floor?: string | null
-          has_meter?: boolean
+          has_meter?: boolean | null
           id?: string
           legacy_id?: string | null
           legacy_metadata?: Json
@@ -1794,8 +1796,9 @@ export type Database = {
           building_id?: string
           created_at?: string
           display_name?: string | null
+          display_order?: number
           floor?: string | null
-          has_meter?: boolean
+          has_meter?: boolean | null
           id?: string
           legacy_id?: string | null
           legacy_metadata?: Json

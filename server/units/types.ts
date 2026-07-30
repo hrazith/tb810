@@ -11,9 +11,10 @@ export type UnitRecord = {
   unit_type_id: string;
   unit_number: string;
   floor: string | null;
+  display_order: number;
   registered_area_m2: number | null;
   participation_percentage: number;
-  has_meter: boolean;
+  has_meter: boolean | null;
   notes: string | null;
   active: boolean;
   created_at: string;
