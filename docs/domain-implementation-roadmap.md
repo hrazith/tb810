@@ -59,18 +59,27 @@ Complete:
 - fixed inventory decision
 - no co-ownership decision
 - one permanent Unit Account per Unit decision
+- Units imported before Owners migration sequence
+- Unit Type capability model for operational modules
+- canonical Unit import from `legacy/sql/torrebal_admincondo.sql`
+- prototype Unit cleanup completed on the remote TB810 project
 
 ## Core Rules That Shape the Roadmap
 
 - TB810 currently manages one building, so no Buildings CRUD is planned for the user-facing application
 - the Building remains a first-class database entity and root aggregate
 - Owners and Units are separate
+- Units are master data and a closed inventory
+- Units are imported before Owners, and Owners before Ownerships
 - Ownerships connect Owners to Units over time
 - registered area belongs to the Unit
 - participation percentage is a persisted legal coefficient on the Unit
 - participation percentage is not automatically recalculated yet
 - there is no co-ownership support
 - ownership share is not a required TB810 concept
+- Unit Type defines operational capability
+- operational modules consume Unit Type capability rather than hardcoding asset exclusions
+- per-unit capability overrides are reserved for genuine exceptions
 - debts belong to the asset account, not the owner
 - ownership changes do not erase or reset debt
 - the incoming owner becomes responsible for the existing asset balance
@@ -84,7 +93,7 @@ Complete:
 
 - Purpose: define the physical/legal asset root for the rest of the model.
 - Why here: Ownerships, Unit Accounts, billing, and all asset-linked workflows depend on a stable Unit aggregate first.
-- Key dependency: unit type, registered area, participation percentage, and lifecycle rules.
+- Key dependency: unit type capability, registered area, participation percentage, lifecycle rules, and migration order.
 - Definition of done: `/units`, `/units/[unitId]`, and `/units/[unitId]/edit` with list/search/type filtering and metadata editing, with the asset model finalized enough for Ownerships and Unit Accounts to attach to it cleanly.
 
 ### 2. Ownerships
