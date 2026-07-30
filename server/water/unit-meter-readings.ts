@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentBuilding, listUnitTypes, listUnits } from "@/server/units";
+import { getCurrentBuilding, listUnits } from "@/server/units";
 
 type QueryResult<T> = {
   data: T;
   error: string | null;
 };
+
+export type UnitMeterReadingStatus = "recorded" | "reviewed" | "approved" | "void";
 
 export type UnitMeterReadingRecord = {
   id: string;
@@ -16,7 +18,7 @@ export type UnitMeterReadingRecord = {
   reading_end: number | null;
   consumption: number | null;
   unit_of_measure: string;
-  status: "recorded" | "reviewed" | "approved" | "void";
+  status: UnitMeterReadingStatus;
   notes: string | null;
   legacy_table: string | null;
   legacy_id: string | null;
@@ -32,16 +34,19 @@ export type UnitMeterReadingRecord = {
 export type UnitMeterReadingRow = UnitMeterReadingRecord & {
   unit_number: string;
   floor: string | null;
-  unit_type_name: string;
-  previous_reading_label: string;
   reading_month_label: string;
+  previous_reading: number | null;
+  previous_reading_label: string;
+  previous_reading_date: string | null;
+  current_month_editable: boolean;
+  alert_label: string | null;
 };
 
 export type UnitMeterReadingFilters = {
   query?: string;
   unitId?: string;
-  status?: "all" | UnitMeterReadingRecord["status"];
   month?: string;
+  status?: "all" | UnitMeterReadingStatus;
 };
 
 export type UnitMeterReadingInput = {
@@ -49,11 +54,18 @@ export type UnitMeterReadingInput = {
   reading_date: string;
   reading_end: string;
   reading_start?: string;
-  status: UnitMeterReadingRecord["status"];
+  status: UnitMeterReadingStatus;
   notes?: string;
 };
 
-type UnitOptions = {
+export type UnitMeterReadingDefaults = {
+  readingMonth: string;
+  readingMonthKey: string;
+  previousReading: number | null;
+  previousReadingDate: string | null;
+};
+
+export type UnitOption = {
   id: string;
   unit_number: string;
   floor: string | null;
@@ -62,57 +74,140 @@ type UnitOptions = {
 const READING_SELECT =
   "id, building_id, unit_id, utility_type_id, reading_date, reading_start, reading_end, consumption, unit_of_measure, status, notes, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, entered_by, entered_at, created_at, updated_at" as const;
 
-function parseReadingDate(readingDate: string) {
-  const parsed = new Date(`${readingDate}T00:00:00Z`);
+function parseDate(date: string) {
+  const parsed = new Date(`${date}T00:00:00Z`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function formatReadingMonth(readingDate: string) {
-  const parsed = parseReadingDate(readingDate);
-  if (!parsed) return readingDate;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(parsed);
+export function getActiveReadingMonth(now = new Date()) {
+  const utc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  return {
+    key: `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, "0")}`,
+    start: `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, "0")}-01`,
+    end: new Date(Date.UTC(utc.getUTCFullYear(), utc.getUTCMonth() + 1, 0)).toISOString().slice(0, 10),
+    label: new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(utc),
+  };
 }
 
-function monthKey(readingDate: string) {
-  const parsed = parseReadingDate(readingDate);
+function monthKeyFromDate(date: string) {
+  const parsed = parseDate(date);
   if (!parsed) return null;
-  const year = parsed.getUTCFullYear();
-  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
+  return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-async function getUnitTypeId(supabase: Awaited<ReturnType<typeof createClient>>) {
+function monthLabelFromDate(date: string) {
+  const parsed = parseDate(date);
+  if (!parsed) return date;
+  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(parsed);
+}
+
+function readingToText(value: number | null) {
+  return value == null ? "—" : value.toFixed(3).replace(/\.?0+$/, "");
+}
+
+async function getUtilityTypeId(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data, error } = await supabase
     .from("tb810_utility_types")
     .select("id, code, name")
     .eq("code", "common_water")
     .maybeSingle();
-
   if (error) return { data: null, error: error.message };
   if (!data) return { data: null, error: "Common Water utility type is missing." };
   return { data, error: null };
 }
 
-async function getCondoUnits() {
-  const [{ data: unitTypes, error: unitTypesError }, unitsResult] = await Promise.all([
-    listUnitTypes(),
-    listUnits(),
-  ]);
-  if (unitTypesError) return { data: null, error: unitTypesError };
-  const condoType = unitTypes.find((unitType) => unitType.code === "condo");
-  if (!condoType) return { data: null, error: "Condo unit type is missing." };
-  const units = (unitsResult.data ?? [])
-    .filter((unit) => unit.unit_type_code === condoType.code)
-    .map((unit) => ({
-      id: unit.id,
-      unit_number: unit.unit_number,
-      floor: unit.floor,
-    }));
-  return { data: units, error: unitsResult.error };
+async function getCondoUnits(): Promise<QueryResult<UnitOption[]>> {
+  const unitsResult = await listUnits();
+  if (unitsResult.error) return { data: [], error: unitsResult.error };
+  return {
+    data: unitsResult.data
+      .filter((unit) => unit.unit_type_code === "condo")
+      .map((unit) => ({
+        id: unit.id,
+        unit_number: unit.unit_number,
+        floor: unit.floor,
+      })),
+    error: null,
+  };
+}
+
+async function getPriorReadingForUnit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  buildingId: string,
+  utilityTypeId: string,
+  unitId: string,
+  beforeDate: string,
+) {
+  const { data, error } = await supabase
+    .from("tb810_meter_readings")
+    .select("id, reading_date, reading_end, reading_start, created_at")
+    .eq("building_id", buildingId)
+    .eq("utility_type_id", utilityTypeId)
+    .eq("unit_id", unitId)
+    .lt("reading_date", beforeDate)
+    .order("reading_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return { data: null, error: error.message };
+  return { data, error: null };
+}
+
+async function getCurrentMonthReadingForUnit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  buildingId: string,
+  utilityTypeId: string,
+  unitId: string,
+  readingDate: string,
+) {
+  const { data, error } = await supabase
+    .from("tb810_meter_readings")
+    .select(READING_SELECT)
+    .eq("building_id", buildingId)
+    .eq("utility_type_id", utilityTypeId)
+    .eq("unit_id", unitId)
+    .eq("reading_date", readingDate)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return { data: null, error: error.message };
+  return { data, error: null };
+}
+
+export async function getReadingDefaults(readingDate?: string): Promise<QueryResult<UnitMeterReadingDefaults | null>> {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: null, error: buildingResult.error };
+  if (!buildingResult.data) return { data: null, error: null };
+
+  const supabase = await createClient();
+  const utilityType = await getUtilityTypeId(supabase);
+  if (utilityType.error) return { data: null, error: utilityType.error };
+  if (!utilityType.data) return { data: null, error: "Common Water utility type is missing." };
+
+  const active = getActiveReadingMonth();
+  const date = readingDate ?? active.start;
+  const unitResult = await getCondoUnits();
+  if (unitResult.error) return { data: null, error: unitResult.error };
+  const firstUnit = unitResult.data[0];
+
+  const prior = firstUnit
+    ? await getPriorReadingForUnit(supabase, buildingResult.data.id, utilityType.data.id, firstUnit.id, date)
+    : { data: null, error: null };
+  if (prior.error) return { data: null, error: prior.error };
+
+  return {
+    data: {
+      readingMonth: active.label,
+      readingMonthKey: active.key,
+      previousReading: prior.data?.reading_end ?? null,
+      previousReadingDate: prior.data?.reading_date ?? null,
+    },
+    error: null,
+  };
+}
+
+export async function getUnitOptions(): Promise<QueryResult<UnitOption[]>> {
+  return getCondoUnits();
 }
 
 export async function listUnitMeterReadings(
@@ -123,31 +218,28 @@ export async function listUnitMeterReadings(
   if (!buildingResult.data) return { data: [], error: null };
 
   const supabase = await createClient();
-  const [{ data: utilityType, error: utilityTypeError }, unitsResult] = await Promise.all([
-    getUnitTypeId(supabase),
-    getCondoUnits(),
-  ]);
-  if (utilityTypeError) return { data: [], error: utilityTypeError };
-  if (unitsResult.error) return { data: [], error: unitsResult.error };
-  if (!utilityType) return { data: [], error: "Common Water utility type is missing." };
+  const utilityType = await getUtilityTypeId(supabase);
+  const unitResult = await getCondoUnits();
+  if (utilityType.error) return { data: [], error: utilityType.error };
+  if (unitResult.error) return { data: [], error: unitResult.error };
+  if (!utilityType.data) return { data: [], error: "Common Water utility type is missing." };
 
   let request = supabase
     .from("tb810_meter_readings")
     .select(READING_SELECT)
     .eq("building_id", buildingResult.data.id)
-    .eq("utility_type_id", utilityType.id);
+    .eq("utility_type_id", utilityType.data.id);
 
   if (filters.unitId) request = request.eq("unit_id", filters.unitId);
   if (filters.status && filters.status !== "all") request = request.eq("status", filters.status);
   if (filters.month) {
-    const parsed = parseReadingDate(`${filters.month}-01`);
-    if (!parsed) return { data: [], error: "Invalid month filter." };
-    const start = new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), 1));
-    const end = new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth() + 1, 0));
-    request = request.gte("reading_date", start.toISOString().slice(0, 10)).lte(
-      "reading_date",
-      end.toISOString().slice(0, 10),
-    );
+    const monthStart = parseDate(`${filters.month}-01`);
+    if (!monthStart) return { data: [], error: "Invalid month filter." };
+    const start = `${monthStart.getUTCFullYear()}-${String(monthStart.getUTCMonth() + 1).padStart(2, "0")}-01`;
+    const end = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0))
+      .toISOString()
+      .slice(0, 10);
+    request = request.gte("reading_date", start).lte("reading_date", end);
   }
 
   const { data, error } = await request.order("reading_date", { ascending: false }).order("created_at", {
@@ -155,30 +247,35 @@ export async function listUnitMeterReadings(
   });
   if (error) return { data: [], error: error.message };
 
-  const unitById = new Map((unitsResult.data ?? []).map((unit) => [unit.id, unit]));
+  const unitById = new Map((unitResult.data ?? []).map((unit) => [unit.id, unit]));
+  const currentMonthKey = getActiveReadingMonth().key;
   const rows = (data ?? []).map((row) => {
     const unit = unitById.get(row.unit_id);
+    const previousDate = row.reading_start == null ? null : row.reading_date;
+    const alertLabel =
+      row.consumption != null && row.consumption < 0
+        ? "Consumption below previous reading"
+        : row.reading_end == null
+          ? "Current reading missing"
+          : null;
     return {
-      ...row,
-      status: row.status as UnitMeterReadingRecord["status"],
+      ...(row as UnitMeterReadingRecord),
+      status: row.status as UnitMeterReadingStatus,
       unit_number: unit?.unit_number ?? "Unknown unit",
       floor: unit?.floor ?? null,
-      unit_type_name: "Condo",
-      previous_reading_label: row.reading_start == null ? "—" : row.reading_start.toFixed(3).replace(/\.?0+$/, ""),
-      reading_month_label: formatReadingMonth(row.reading_date),
+      reading_month_label: monthLabelFromDate(row.reading_date),
+      previous_reading: row.reading_start,
+      previous_reading_label: readingToText(row.reading_start),
+      previous_reading_date: previousDate,
+      current_month_editable: monthKeyFromDate(row.reading_date) === currentMonthKey,
+      alert_label: alertLabel,
     };
   });
 
   const query = (filters.query ?? "").trim().toLowerCase();
   const filtered = query
     ? rows.filter((row) =>
-        [
-          row.unit_number,
-          row.reading_date,
-          row.reading_month_label,
-          row.status,
-          row.notes ?? "",
-        ]
+        [row.unit_number, row.reading_date, row.reading_month_label, row.notes ?? ""]
           .join(" ")
           .toLowerCase()
           .includes(query),
@@ -188,49 +285,10 @@ export async function listUnitMeterReadings(
   return { data: filtered, error: null };
 }
 
-export async function getUnitMeterReadingById(
-  readingId: string,
-): Promise<QueryResult<UnitMeterReadingRow | null>> {
+export async function getUnitMeterReadingById(readingId: string) {
   const result = await listUnitMeterReadings();
   if (result.error) return { data: null, error: result.error };
   return { data: result.data.find((row) => row.id === readingId) ?? null, error: null };
-}
-
-export async function getUnitOptions(): Promise<QueryResult<UnitOptions[]>> {
-  const units = await getCondoUnits();
-  if (units.error) return { data: [], error: units.error };
-  return { data: units.data ?? [], error: null };
-}
-
-export async function getReadingDefaults(readingDate?: string) {
-  const buildingResult = await getCurrentBuilding();
-  if (buildingResult.error) return { data: null, error: buildingResult.error };
-  if (!buildingResult.data) return { data: null, error: null };
-  const supabase = await createClient();
-  const utilityType = await getUnitTypeId(supabase);
-  if (utilityType.error) return { data: null, error: utilityType.error };
-  if (!utilityType.data) return { data: null, error: "Common Water utility type is missing." };
-
-  let request = supabase
-    .from("tb810_meter_readings")
-    .select("reading_end, reading_date, unit_id, created_at")
-    .eq("building_id", buildingResult.data.id)
-    .eq("utility_type_id", utilityType.data.id);
-  if (readingDate) {
-    request = request.lt("reading_date", readingDate);
-  }
-
-  const { data, error } = await request.order("reading_date", { ascending: false }).order("created_at", {
-    ascending: false,
-  }).limit(1).maybeSingle();
-  if (error) return { data: null, error: error.message };
-  return {
-    data: {
-      previousReading: data?.reading_end ?? null,
-      previousDate: data?.reading_date ?? null,
-    },
-    error: null,
-  };
 }
 
 function parseNumberValue(value: string) {
@@ -240,62 +298,111 @@ function parseNumberValue(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function normalizeDate(date: string) {
+  const parsed = parseDate(date);
+  return parsed ? parsed.toISOString().slice(0, 10) : null;
+}
+
+async function validateReading(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  buildingId: string,
+  utilityTypeId: string,
+  input: UnitMeterReadingInput,
+  excludeReadingId?: string,
+) {
+  const active = getActiveReadingMonth();
+  const readingDate = normalizeDate(input.reading_date);
+  if (!readingDate) return { error: "Reading date is required and must be valid." };
+  if (monthKeyFromDate(readingDate) !== active.key) {
+    return { error: "Reading date must belong to the active reading month." };
+  }
+
+  const readingEnd = parseNumberValue(input.reading_end);
+  if (readingEnd === null || readingEnd < 0) {
+    return { error: "Current reading must be zero or greater." };
+  }
+
+  const duplicateQuery = supabase
+    .from("tb810_meter_readings")
+    .select("id")
+    .eq("building_id", buildingId)
+    .eq("utility_type_id", utilityTypeId)
+    .eq("unit_id", input.unit_id)
+    .eq("reading_date", readingDate);
+  if (excludeReadingId) duplicateQuery.eq("id", excludeReadingId);
+  const { data: duplicate } = await duplicateQuery.maybeSingle();
+  if (duplicate) {
+    return { error: "A meter reading already exists for that unit in the active month." };
+  }
+
+  const prior = await getPriorReadingForUnit(
+    supabase,
+    buildingId,
+    utilityTypeId,
+    input.unit_id,
+    readingDate,
+  );
+  if (prior.error) return { error: prior.error };
+
+  const readingStart =
+    input.reading_start?.trim() && Number.isFinite(Number(input.reading_start))
+      ? Number(input.reading_start)
+      : prior.data?.reading_end ?? null;
+
+  if (readingStart !== null && readingEnd < readingStart) {
+    return { error: "Current reading must be greater than or equal to previous reading." };
+  }
+
+  const consumption = readingStart == null ? null : Number((readingEnd - readingStart).toFixed(3));
+
+  return {
+    error: null,
+    data: {
+      readingDate,
+      readingEnd,
+      readingStart,
+      consumption,
+      prior,
+    },
+  } as const;
+}
+
 export async function createUnitMeterReading(input: UnitMeterReadingInput) {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: null as never, error: buildingResult.error };
   if (!buildingResult.data) return { data: null as never, error: "Current building not found." };
 
   const supabase = await createClient();
-  const [{ data: utilityType, error: utilityTypeError }, unitsResult] = await Promise.all([
-    getUnitTypeId(supabase),
-    getCondoUnits(),
-  ]);
-  if (utilityTypeError) return { data: null as never, error: utilityTypeError };
-  if (unitsResult.error) return { data: null as never, error: unitsResult.error };
-  if (!utilityType) return { data: null as never, error: "Common Water utility type is missing." };
+  const utilityType = await getUtilityTypeId(supabase);
+  if (utilityType.error) return { data: null as never, error: utilityType.error };
+  if (!utilityType.data) return { data: null as never, error: "Common Water utility type is missing." };
 
-  const unit = (unitsResult.data ?? []).find((row) => row.id === input.unit_id);
+  const validated = await validateReading(supabase, buildingResult.data.id, utilityType.data.id, input);
+  if (validated.error) return { data: null as never, error: validated.error };
+  const safe = validated.data!;
+
+  const unitResult = await getCondoUnits();
+  if (unitResult.error) return { data: null as never, error: unitResult.error };
+  const unit = unitResult.data.find((row) => row.id === input.unit_id);
   if (!unit) return { data: null as never, error: "Invalid unit." };
-
-  const readingDate = parseReadingDate(input.reading_date);
-  if (!readingDate) return { data: null as never, error: "Invalid reading date." };
-
-  const reading_end = parseNumberValue(input.reading_end);
-  if (reading_end === null || reading_end < 0) {
-    return { data: null as never, error: "Reading value must be zero or greater." };
-  }
-
-  let reading_start = parseNumberValue(input.reading_start ?? "");
-  if (reading_start === null) {
-    const defaults = await getReadingDefaults(input.reading_date);
-    if (defaults.error) return { data: null as never, error: defaults.error };
-    reading_start = defaults.data?.previousReading ?? null;
-  }
-
-  if (reading_start !== null && reading_end < reading_start) {
-    return { data: null as never, error: "Current reading must be greater than or equal to previous reading." };
-  }
-
-  const consumption =
-    reading_start === null ? null : Number((reading_end - reading_start).toFixed(3));
 
   const { data, error } = await supabase
     .from("tb810_meter_readings")
     .insert({
       building_id: buildingResult.data.id,
       unit_id: unit.id,
-      utility_type_id: utilityType.id,
-      reading_date: readingDate.toISOString().slice(0, 10),
-      reading_start,
-      reading_end,
-      consumption,
+      utility_type_id: utilityType.data.id,
+      reading_date: safe.readingDate,
+      reading_start: safe.readingStart,
+      reading_end: safe.readingEnd,
+      consumption: safe.consumption,
       unit_of_measure: "m3",
       status: input.status,
       notes: input.notes?.trim() || null,
+      entered_at: new Date().toISOString(),
     })
     .select(READING_SELECT)
     .single();
-
   if (error) return { data: null as never, error: error.message };
   return { data, error: null };
 }
@@ -306,55 +413,30 @@ export async function updateUnitMeterReading(readingId: string, input: UnitMeter
   if (!buildingResult.data) return { data: null as never, error: "Current building not found." };
 
   const supabase = await createClient();
-  const [{ data: utilityType, error: utilityTypeError }, unitsResult] = await Promise.all([
-    getUnitTypeId(supabase),
-    getCondoUnits(),
-  ]);
-  if (utilityTypeError) return { data: null as never, error: utilityTypeError };
-  if (unitsResult.error) return { data: null as never, error: unitsResult.error };
-  if (!utilityType) return { data: null as never, error: "Common Water utility type is missing." };
-  const unit = (unitsResult.data ?? []).find((row) => row.id === input.unit_id);
-  if (!unit) return { data: null as never, error: "Invalid unit." };
+  const utilityType = await getUtilityTypeId(supabase);
+  if (utilityType.error) return { data: null as never, error: utilityType.error };
+  if (!utilityType.data) return { data: null as never, error: "Common Water utility type is missing." };
 
-  const readingDate = parseReadingDate(input.reading_date);
-  if (!readingDate) return { data: null as never, error: "Invalid reading date." };
-
-  const reading_end = parseNumberValue(input.reading_end);
-  if (reading_end === null || reading_end < 0) {
-    return { data: null as never, error: "Reading value must be zero or greater." };
-  }
-
-  let reading_start = parseNumberValue(input.reading_start ?? "");
-  if (reading_start === null) {
-    const defaults = await getReadingDefaults(input.reading_date);
-    if (defaults.error) return { data: null as never, error: defaults.error };
-    reading_start = defaults.data?.previousReading ?? null;
-  }
-
-  if (reading_start !== null && reading_end < reading_start) {
-    return { data: null as never, error: "Current reading must be greater than or equal to previous reading." };
-  }
-
-  const consumption =
-    reading_start === null ? null : Number((reading_end - reading_start).toFixed(3));
+  const validated = await validateReading(supabase, buildingResult.data.id, utilityType.data.id, input, readingId);
+  if (validated.error) return { data: null as never, error: validated.error };
+  const safe = validated.data!;
 
   const { data, error } = await supabase
     .from("tb810_meter_readings")
     .update({
-      unit_id: unit.id,
-      reading_date: readingDate.toISOString().slice(0, 10),
-      reading_start,
-      reading_end,
-      consumption,
+      unit_id: input.unit_id,
+      reading_date: safe.readingDate,
+      reading_start: safe.readingStart,
+      reading_end: safe.readingEnd,
+      consumption: safe.consumption,
       status: input.status,
       notes: input.notes?.trim() || null,
     })
     .eq("id", readingId)
     .eq("building_id", buildingResult.data.id)
-    .eq("utility_type_id", utilityType.id)
+    .eq("utility_type_id", utilityType.data.id)
     .select(READING_SELECT)
     .single();
-
   if (error) return { data: null as never, error: error.message };
   return { data, error: null };
 }
@@ -364,17 +446,15 @@ export async function deleteUnitMeterReading(readingId: string) {
   if (buildingResult.error) return { data: null as never, error: buildingResult.error };
   if (!buildingResult.data) return { data: null as never, error: "Current building not found." };
   const supabase = await createClient();
-  const utilityType = await getUnitTypeId(supabase);
+  const utilityType = await getUtilityTypeId(supabase);
   if (utilityType.error) return { data: null as never, error: utilityType.error };
   if (!utilityType.data) return { data: null as never, error: "Common Water utility type is missing." };
-
   const { error } = await supabase
     .from("tb810_meter_readings")
     .delete()
     .eq("id", readingId)
     .eq("building_id", buildingResult.data.id)
     .eq("utility_type_id", utilityType.data.id);
-
   if (error) return { data: null as never, error: error.message };
   return { data: true, error: null };
 }

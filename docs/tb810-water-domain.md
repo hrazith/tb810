@@ -238,6 +238,35 @@ The obligation is the final monthly financial result of the water cycle.
 - Calculations are system-generated.
 - Private consumption and shared water are both part of the monthly water obligation.
 - AGUA COMUN is computed by equal division of the remaining Sedapal water cost among the 64 residential condominiums.
+
+## 9. Canonical Live URLs
+
+- `/` is the authenticated operations home.
+- `/water` is the Water domain home.
+- `/water/{period}` is the Monthly Water Ledger.
+- `/water/sedapal` is the Sedapal / common-water CRUD surface.
+- `/water/unit-meter-readings` is the Unit Water Meter Readings CRUD surface.
+
+## 10. Current Implementation Notes
+
+- The Monthly Water Ledger and the Unit Water Meter Readings surface both reuse the canonical reading records stored in `tb810_meter_readings`.
+- Unit meter readings are currently entered and edited through the operational UI, with the active reading month derived from the current calendar month.
+- The Unit Water Meter Readings workflow does not expose a Building field in the operator form.
+- The operator supplies Unit, Reading Date, Current Reading, and optional Notes where supported by the schema.
+- The system supplies the previous reading, previous reading date, month context, consumption calculation, and audit metadata.
+- Current-month unit rows are editable inline on the ledger page; historical rows are read-only.
+- The Unit Meter Readings page is the primary operational ledger.
+- The first row functions as an inline creation row.
+- The operational ledger is the primary entry experience.
+- The dedicated New Reading page is no longer exposed through the UI.
+- New records are created through the permanent Add Row.
+- Newly created readings are inserted immediately beneath the Add Row.
+- Save/Cancel buttons have been replaced with automatic persistence.
+- Permanent inline "Saved" statuses were intentionally removed.
+- Previous Reading Date is intentionally omitted from the operational ledger to reduce visual noise.
+- Current-month edits auto-save on blur or Enter.
+- Explicit Save and Cancel buttons were intentionally removed to optimize operational data entry.
+- Excel import is intentionally deferred in this slice. The import route exists as a scaffold, but `.xlsx` parsing is not implemented yet.
 - Owners receive obligations, but collection belongs to another domain.
 
 ## 9. Open Questions

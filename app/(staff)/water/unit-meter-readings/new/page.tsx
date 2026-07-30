@@ -11,7 +11,7 @@ export default async function NewUnitMeterReadingPage() {
       action={createUnitMeterReadingAction}
       submitLabel="Save Reading"
       units={units.data}
-      readingDefaults={defaults.data ?? undefined}
+      readingDefaults={defaults.data}
     />
   );
 }

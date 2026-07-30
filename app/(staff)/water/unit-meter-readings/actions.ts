@@ -36,7 +36,30 @@ export async function createUnitMeterReadingAction(
     return { error: result.error, values: Object.fromEntries(formData.entries().map(([k, v]) => [k, String(v)])) };
   }
   revalidatePath("/water/unit-meter-readings");
-  redirect(`/water/unit-meter-readings/${result.data.id}`);
+  redirect("/water/unit-meter-readings");
+}
+
+export async function createInlineUnitMeterReadingAction(
+  _prev: MeterReadingFormState,
+  formData: FormData,
+): Promise<MeterReadingFormState> {
+  const result = await createUnitMeterReading(toInput(formData));
+  if (result.error) {
+    return {
+      error: result.error,
+      values: Object.fromEntries(formData.entries().map(([k, v]) => [k, String(v)])),
+    };
+  }
+  revalidatePath("/water/unit-meter-readings");
+  return {
+    success: "Reading added.",
+    values: {
+      unit_id: "",
+      reading_date: String(formData.get("reading_date") ?? ""),
+      reading_end: "",
+      notes: "",
+    },
+  };
 }
 
 export async function updateUnitMeterReadingAction(
@@ -49,7 +72,26 @@ export async function updateUnitMeterReadingAction(
     return { error: result.error, values: Object.fromEntries(formData.entries().map(([k, v]) => [k, String(v)])) };
   }
   revalidatePath("/water/unit-meter-readings");
-  redirect(`/water/unit-meter-readings/${result.data.id}`);
+  redirect("/water/unit-meter-readings");
+}
+
+export async function updateInlineUnitMeterReadingAction(
+  _prev: MeterReadingFormState,
+  formData: FormData,
+): Promise<MeterReadingFormState> {
+  const readingId = String(formData.get("reading_id") ?? "");
+  const result = await updateUnitMeterReading(readingId, toInput(formData));
+  if (result.error) {
+    return {
+      error: result.error,
+      values: Object.fromEntries(formData.entries().map(([k, v]) => [k, String(v)])),
+    };
+  }
+  revalidatePath("/water/unit-meter-readings");
+  return {
+    success: "Reading saved.",
+    values: Object.fromEntries(formData.entries().map(([k, v]) => [k, String(v)])),
+  };
 }
 
 export async function deleteUnitMeterReadingAction(formData: FormData) {

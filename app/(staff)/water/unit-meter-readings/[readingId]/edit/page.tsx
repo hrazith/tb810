@@ -28,7 +28,7 @@ export default async function EditUnitMeterReadingPage({ params }: PageProps) {
         action={updateUnitMeterReadingAction}
         submitLabel="Update Reading"
         units={unitsResult.data}
-        readingDefaults={defaults.data ?? undefined}
+        readingDefaults={defaults.data}
         initialValues={{
           reading_id: readingResult.data.id,
           unit_id: readingResult.data.unit_id,
