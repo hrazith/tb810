@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import {
   getActiveReadingMonth,
@@ -14,6 +13,7 @@ import {
 } from "../actions";
 import { AddMeterReadingRow } from "./add-meter-reading-row";
 import { CurrentMeterReadingRow } from "./current-meter-reading-row";
+import { UploadCompletedTemplateButton } from "./upload-completed-template-button";
 import { LEDGER_GRID_CLASS } from "./ledger-layout";
 import { MonthLedgerSelector } from "./month-ledger-selector";
 
@@ -60,9 +60,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted }: Prop
               className="h-11 min-w-56 rounded-xl border border-zinc-300 px-3 text-sm"
             />
           </form>
-          <Button asChild variant="secondary" shape="pill">
-            <a href="/water/unit-meter-readings/import">Import</a>
-          </Button>
+          {isActiveMonth ? <UploadCompletedTemplateButton /> : null}
         </div>
       </div>
 

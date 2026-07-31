@@ -92,6 +92,10 @@ Examples:
 - focus ring
 - default typography
 
+Feature pages should not recreate canonical control styles with repeated Tailwind
+classes. Shared primitives should own the recurring appearance so global input
+changes can happen once in the primitive or in brand tokens.
+
 ## Layout
 
 The Layout layer defines how pages and regions are composed.
@@ -241,6 +245,14 @@ expand only when repeated application needs justify a new primitive.
 - `Table`
 - `EmptyState`
 - `Dialog`
+
+`Input` is the canonical single-line form control in TB810.
+
+- It owns control appearance and native input behavior.
+- It does not own labels, help text, validation messages, or domain rules.
+- Domain forms provide semantics and validation.
+- A future `Field` primitive will compose `label`, `Input`, description, and
+  error text.
 
 ### Domains
 

@@ -114,6 +114,28 @@ flowchart LR
 - Delete is hidden
 - inline editing is disabled
 
+## Workbook Template Contract
+
+The approved temporary operational workbook is `lecturas.xlsx`.
+
+Worksheet:
+
+- `Worksheet`
+
+Required columns:
+
+- `Unidad`
+- `Lectura`
+
+Compatibility aliases accepted only by the parser adapter:
+
+- `Unit` → `Unidad`
+- `Reading` → `Lectura`
+
+The parser normalizes `DEP-201` → `201`, preserves unit numbers as strings, and treats blank readings as null during this parsing slice.
+
+The workbook contract does not include Building, Unit ID, month, date, or utility type fields. Those are derived by TB810 from route context and canonical master data.
+
 ## Future Correction Workflow
 
 Sprint 1A intentionally does not introduce a historical correction workflow.
@@ -127,4 +149,3 @@ If historical corrections are needed later, they should be handled by an explici
 - [`server/water/unit-meter-readings.ts`](/Users/roon/dev/tb810/server/water/unit-meter-readings.ts)
 - [`app/(staff)/water/unit-meter-readings/_components/current-meter-reading-row.tsx`](/Users/roon/dev/tb810/app/(staff)/water/unit-meter-readings/_components/current-meter-reading-row.tsx)
 - [`app/(staff)/water/unit-meter-readings/_components/add-meter-reading-row.tsx`](/Users/roon/dev/tb810/app/(staff)/water/unit-meter-readings/_components/add-meter-reading-row.tsx)
-

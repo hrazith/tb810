@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 
+import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
 import type {
   UnitFormDefaults,
@@ -76,7 +77,9 @@ export function UnitForm({ defaults, action, submitLabel }: Props) {
 
       <div className="grid gap-6 md:grid-cols-2">
         <fieldset className="space-y-3 md:col-span-2">
-          <legend className="block text-lg font-medium text-zinc-900">Type</legend>
+          <legend className="block text-lg font-medium text-zinc-900">
+            Type
+          </legend>
           <div
             role="radiogroup"
             aria-label="Type"
@@ -122,10 +125,10 @@ export function UnitForm({ defaults, action, submitLabel }: Props) {
           <span className="block text-lg font-medium text-zinc-900">
             Unit number
           </span>
-          <input
+          <Input
             name="unit_number"
             defaultValue={values.unit_number ?? ""}
-            className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
+            aria-invalid={Boolean(fieldError("unit_number", state)) || undefined}
           />
           {fieldError("unit_number", state) ? (
             <p className="text-sm text-red-600">
@@ -136,10 +139,10 @@ export function UnitForm({ defaults, action, submitLabel }: Props) {
 
         <label className="space-y-2">
           <span className="block text-lg font-medium text-zinc-900">Floor</span>
-          <input
+          <Input
             name="floor"
             defaultValue={values.floor ?? ""}
-            className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
+            aria-invalid={Boolean(fieldError("floor", state)) || undefined}
           />
           {fieldError("floor", state) ? (
             <p className="text-sm text-red-600">{fieldError("floor", state)}</p>
@@ -150,13 +153,15 @@ export function UnitForm({ defaults, action, submitLabel }: Props) {
           <span className="block text-lg font-medium text-zinc-900">
             Registered area (m²)
           </span>
-          <input
+          <Input
             name="registered_area_m2"
             type="number"
             step="0.001"
             min="0"
             defaultValue={values.registered_area_m2 ?? ""}
-            className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
+            aria-invalid={
+              Boolean(fieldError("registered_area_m2", state)) || undefined
+            }
           />
           {fieldError("registered_area_m2", state) ? (
             <p className="text-sm text-red-600">
@@ -169,14 +174,16 @@ export function UnitForm({ defaults, action, submitLabel }: Props) {
           <span className="block text-lg font-medium text-zinc-900">
             Participation percentage
           </span>
-          <input
+          <Input
             name="participation_percentage"
             type="number"
             step="0.0001"
             min="0"
             max="100"
             defaultValue={values.participation_percentage ?? 0}
-            className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
+            aria-invalid={
+              Boolean(fieldError("participation_percentage", state)) || undefined
+            }
           />
           {fieldError("participation_percentage", state) ? (
             <p className="text-sm text-red-600">

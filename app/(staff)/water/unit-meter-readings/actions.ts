@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import type { WaterBillFormState } from "@/server/water";
+import { parseMeterReadingTemplateWorkbook } from "@/server/import/excel/meter-reading-template";
 import {
   createUnitMeterReading,
   deleteUnitMeterReading,
@@ -14,6 +15,12 @@ type MeterReadingFormState = {
   success?: string;
   error?: string;
   values?: Record<string, string>;
+};
+
+type ImportFormState = {
+  success?: string;
+  error?: string;
+  summary?: Awaited<ReturnType<typeof parseMeterReadingTemplateWorkbook>>;
 };
 
 function toInput(formData: FormData) {
@@ -107,4 +114,25 @@ export async function deleteUnitMeterReadingAction(
   redirect(
     `/water/unit-meter-readings?deleted=${encodeURIComponent(`Reading deleted for Unit ${result.data.unit_number}.`)}`,
   );
+}
+
+export async function uploadCompletedTemplateAction(
+  _prev: ImportFormState,
+  formData: FormData,
+): Promise<ImportFormState> {
+  const template = formData.get("template");
+  if (!(template instanceof File)) {
+    return { error: "Unable to open workbook." };
+  }
+
+  try {
+    const summary = await parseMeterReadingTemplateWorkbook(template);
+    return {
+      success: "Workbook successfully opened.",
+      summary,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Workbook unreadable.";
+    return { error: message };
+  }
 }

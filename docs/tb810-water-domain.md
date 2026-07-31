@@ -19,7 +19,6 @@ This document captures the frozen business definition of the water domain for TB
 - `/water/{period}` is the Monthly Water Ledger.
 - `/water/sedapal` is the Sedapal / common-water CRUD surface.
 - `/water/unit-meter-readings` is the Unit Water Meter Readings operational ledger.
-- `/water/unit-meter-readings/import` is the import scaffold for unit readings.
 
 These routes support the monthly water workflow as separate operational tools.
 Sedapal bills and unit meter readings are captured separately, but both feed the broader monthly Water workflow.
@@ -39,7 +38,7 @@ Captured behavior:
 - consumption is auto-calculated;
 - month selector;
 - search;
-- import entry point;
+- Upload Completed Template modal entry point;
 - dedicated CRUD routes still exist, but they are no longer the preferred workflow.
 
 Current visible column order:
@@ -79,9 +78,7 @@ Changing month immediately refreshes the ledger.
 
 ### Import
 
-Import is the primary action entry point for the page.
-
-The import route currently routes to the scaffold only.
+Import is exposed through the in-page "Upload Completed Template" modal.
 Excel parsing has intentionally not been implemented yet.
 
 ### Canonical Data
@@ -260,12 +257,27 @@ System derives:
 
 ### Excel Template
 
-The agreed v1 template uses required columns only:
+The approved temporary operational workbook is:
 
-- Unit Number
-- New Reading
+- `lecturas.xlsx`
 
-The remaining columns are system-derived where possible.
+Worksheet:
+
+- `Worksheet`
+
+Required columns:
+
+- Unidad
+- Lectura
+
+Legacy compatibility aliases may be accepted by the parser adapter during transition:
+
+- Unit → Unidad
+- Reading → Lectura
+
+The current MVP import contract uses the uploaded workbook as temporary scaffolding.
+TB810 adapts to this workflow and keeps the canonical ledger as the source of truth.
+The parser normalizes `DEP-201` → `201` and preserves the remaining unit number as a string.
 
 ## 5. Monthly Business Workflow
 
@@ -452,7 +464,7 @@ Do not design or implement MVP2 details in this document.
 - Previous Reading Date is intentionally omitted from the operational ledger to reduce visual noise.
 - Current-month edits auto-save on blur or Enter.
 - Explicit Save and Cancel buttons were intentionally removed to optimize operational data entry.
-- Excel import is intentionally deferred in this slice. The import route exists as a scaffold, but `.xlsx` parsing is not implemented yet.
+- Excel import is intentionally deferred beyond workbook understanding. The import UI now reads the workbook and returns a structured summary, but no rows are persisted yet.
 - Owners receive obligations, but collection belongs to another domain.
 
 ## 12. Open Questions

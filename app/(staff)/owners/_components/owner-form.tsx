@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
+import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
 import type { OwnerFormState, OwnerInput } from "@/server/owners/types";
 
@@ -40,11 +41,11 @@ export function OwnerForm({
           <span className="block text-lg font-medium text-gray-900">
             Full name
           </span>
-          <input
+          <Input
             name="full_name"
             defaultValue={values.full_name ?? ""}
-            className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
             required
+            aria-invalid={Boolean(fieldError("full_name", state)) || undefined}
           />
           {fieldError("full_name", state) ? (
             <p className="text-sm text-red-600">
@@ -55,11 +56,11 @@ export function OwnerForm({
 
         <label className="space-y-2">
           <span className="block text-lg font-medium text-gray-900">Email</span>
-          <input
+          <Input
             name="email"
             type="email"
             defaultValue={values.email ?? ""}
-            className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+            aria-invalid={Boolean(fieldError("email", state)) || undefined}
           />
           {fieldError("email", state) ? (
             <p className="text-sm text-red-600">{fieldError("email", state)}</p>
@@ -70,10 +71,9 @@ export function OwnerForm({
           <span className="block text-lg font-medium text-gray-900">
             Telephone
           </span>
-          <input
+          <Input
             name="phone_number"
             defaultValue={values.phone_number ?? ""}
-            className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
           />
         </label>
       </div>
