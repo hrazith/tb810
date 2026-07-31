@@ -1,0 +1,75 @@
+# June 2026 Historical Import
+
+Status: Canonical historical data import.
+
+## Why June 2026 Was Imported
+
+June 2026 was the first real historical month needed to seed the canonical unit meter-reading system with production data.
+
+The import was done to establish:
+
+- a real baseline reading month
+- a trustworthy previous-reading anchor for July 2026
+- a production-quality test of the operational ledger workflow
+
+## Why This Is Canonical Historical Data
+
+The June 2026 readings are not test data.
+
+They are imported legacy facts that now serve as the canonical historical baseline for TB810 Water.
+
+They must remain part of the permanent reading history unless a future correction process explicitly replaces them.
+
+## Source
+
+- Legacy table: `meters`
+- Legacy dump: [`legacy/sql/torrebal_admincondo.sql`](/Users/roon/dev/tb810/legacy/sql/torrebal_admincondo.sql)
+- Legacy month rows imported: June 2026 meter rows for the 64 residential units
+
+## Mapping
+
+The import maps legacy meter readings to canonical `tb810_meter_readings`.
+
+Key mapping choices:
+
+- legacy `reading` -> canonical `reading_end`
+- `reading_date` -> canonical reading date
+- canonical `reading_month` is derived from `reading_date`
+- legacy `month_consumption` and timestamps are preserved in `legacy_metadata`
+
+## Validation
+
+The import was reconciled before and after insertion:
+
+- 64 legacy June rows found
+- 64 canonical residential units matched
+- 0 unmatched rows
+- 0 duplicate legacy unit readings
+- 0 missing residential units
+
+## Provenance
+
+Provenance is preserved in:
+
+- `legacy_table`
+- `legacy_id`
+- `legacy_metadata`
+
+This allows future developers to trace each canonical row back to the exact legacy source row.
+
+## Why Provenance Matters
+
+Provenance distinguishes:
+
+- imported history
+- manual operational corrections
+- future spreadsheet imports
+
+That matters when deciding what can be deleted, corrected, or reimported later.
+
+## Implementation References
+
+- [`scripts/import-june-2026-meter-readings.js`](/Users/roon/dev/tb810/scripts/import-june-2026-meter-readings.js)
+- [`reports/tb810-meter-readings-june-2026-reconciliation.json`](/Users/roon/dev/tb810/reports/tb810-meter-readings-june-2026-reconciliation.json)
+- [`server/water/unit-meter-readings.ts`](/Users/roon/dev/tb810/server/water/unit-meter-readings.ts)
+

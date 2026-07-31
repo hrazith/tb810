@@ -1,0 +1,149 @@
+{
+  "project": {
+    "ref": "fcwnqxpgyqtvckjedgco",
+    "url": "https://fcwnqxpgyqtvckjedgco.supabase.co"
+  },
+  "schemaVerification": {
+    "tb810_units": {
+      "display_order": {
+        "exists": true,
+        "is_nullable": "NO",
+        "data_type": "integer",
+        "default": "0",
+        "constraints": [
+          "tb810_units_display_order_non_negative"
+        ],
+        "indexes": [
+          "tb810_units_building_display_order_idx",
+          "tb810_units_building_id_idx",
+          "tb810_units_building_id_unit_number_key",
+          "tb810_units_pkey",
+          "tb810_units_unit_type_id_idx"
+        ]
+      },
+      "has_meter": {
+        "is_nullable": "YES",
+        "data_type": "boolean",
+        "default": null
+      }
+    },
+    "appliedMigrations": [
+      "20260711190000",
+      "20260713190000",
+      "20260713191000",
+      "20260715190000",
+      "20260716220000",
+      "20260716233000",
+      "20260719090000",
+      "20260723100000",
+      "20260730161432",
+      "20260730183000"
+    ]
+  },
+  "remoteSnapshot": {
+    "buildingCount": 1,
+    "unitTypeCount": 3,
+    "unitCount": 4,
+    "ownerCount": 3,
+    "ownershipCount": 4,
+    "unitAccountCount": 4,
+    "unitsGroupedByType": [
+      {
+        "unit_type_id": "c2bc6a40-7d8e-4d1d-8c8b-8a1a76f3e001",
+        "count": 2
+      },
+      {
+        "unit_type_id": "c2bc6a40-7d8e-4d1d-8c8b-8a1a76f3e002",
+        "count": 1
+      },
+      {
+        "unit_type_id": "c2bc6a40-7d8e-4d1d-8c8b-8a1a76f3e003",
+        "count": 1
+      }
+    ],
+    "units": [
+      {
+        "id": "e4b7598b-d1ef-4acb-a69d-c562757b03e0",
+        "unit_number": "352",
+        "unit_type_id": "c2bc6a40-7d8e-4d1d-8c8b-8a1a76f3e001",
+        "legacy_table": null,
+        "legacy_id": null
+      },
+      {
+        "id": "664877d4-8652-46ac-81ce-6797bee57402",
+        "unit_number": "TEST-A101",
+        "unit_type_id": "c2bc6a40-7d8e-4d1d-8c8b-8a1a76f3e001",
+        "legacy_table": null,
+        "legacy_id": null
+      },
+      {
+        "id": "e79f59c6-a5e8-4d70-90ca-c601e8d9f671",
+        "unit_number": "TEST-S01",
+        "unit_type_id": "c2bc6a40-7d8e-4d1d-8c8b-8a1a76f3e002",
+        "legacy_table": null,
+        "legacy_id": null
+      },
+      {
+        "id": "34180e3c-4123-4470-b191-eb43ba3c280a",
+        "unit_number": "Test-SP01",
+        "unit_type_id": "c2bc6a40-7d8e-4d1d-8c8b-8a1a76f3e003",
+        "legacy_table": null,
+        "legacy_id": null
+      }
+    ]
+  },
+  "prototypeCleanupReport": {
+    "cleanupCandidates": [
+      {
+        "unitId": "e4b7598b-d1ef-4acb-a69d-c562757b03e0",
+        "unitNumber": "352",
+        "reason": "No legacy provenance and not present in the authoritative legacy Units dump."
+      },
+      {
+        "unitId": "664877d4-8652-46ac-81ce-6797bee57402",
+        "unitNumber": "TEST-A101",
+        "reason": "No legacy provenance and not present in the authoritative legacy Units dump."
+      },
+      {
+        "unitId": "e79f59c6-a5e8-4d70-90ca-c601e8d9f671",
+        "unitNumber": "TEST-S01",
+        "reason": "No legacy provenance and not present in the authoritative legacy Units dump."
+      },
+      {
+        "unitId": "34180e3c-4123-4470-b191-eb43ba3c280a",
+        "unitNumber": "Test-SP01",
+        "reason": "No legacy provenance and not present in the authoritative legacy Units dump."
+      }
+    ],
+    "dependencyCountsByTable": {
+      "tb810_ownerships": 4,
+      "tb810_unit_accounts": 4
+    },
+    "dependencyDetails": [
+      {
+        "unitId": "e4b7598b-d1ef-4acb-a69d-c562757b03e0",
+        "unitNumber": "352",
+        "tb810_ownerships": 2,
+        "tb810_unit_accounts": 1
+      },
+      {
+        "unitId": "664877d4-8652-46ac-81ce-6797bee57402",
+        "unitNumber": "TEST-A101",
+        "tb810_ownerships": 1,
+        "tb810_unit_accounts": 1
+      },
+      {
+        "unitId": "e79f59c6-a5e8-4d70-90ca-c601e8d9f671",
+        "unitNumber": "TEST-S01",
+        "tb810_ownerships": 1,
+        "tb810_unit_accounts": 1
+      },
+      {
+        "unitId": "34180e3c-4123-4470-b191-eb43ba3c280a",
+        "unitNumber": "Test-SP01",
+        "tb810_ownerships": 0,
+        "tb810_unit_accounts": 1
+      }
+    ]
+  }
+}

@@ -1,0 +1,535 @@
+{
+  "summary": {
+    "legacySourceTable": "meters",
+    "legacyJuneRowsFound": 64,
+    "distinctLegacyUnitNumbers": 64,
+    "rowsMappedSuccessfully": 64,
+    "rowsUnmatched": 0,
+    "duplicateUnitReadings": 0,
+    "missingResidentialUnits": 0,
+    "juneRepresentedBy": "reading_date",
+    "readingInitialInterpretation": "not present in this legacy source; June unit readings store only a single monthly reading value",
+    "readingFinalInterpretation": "legacy reading.value mapped to tb810_meter_readings.reading_end",
+    "consumptionInterpretation": "legacy month_consumption is the prior-month delta; preserved only in legacy_metadata for traceability",
+    "canonicalBuilding": "TB810",
+    "canonicalUtilityType": "common_water",
+    "existingCanonicalJuneRows": 64
+  },
+  "unmatched": [],
+  "duplicates": [],
+  "missingUnits": [],
+  "rows": [
+    {
+      "unitNumber": "201",
+      "unitId": "2be2647e-dbbc-4fad-af37-316b0c562aaa",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2005,
+      "legacyId": "meters_june_2026:2612",
+      "existing": true
+    },
+    {
+      "unitNumber": "202",
+      "unitId": "c92cd897-bd32-407a-8efe-737dddd66e5a",
+      "readingDate": "2026-06-05",
+      "readingEnd": 605,
+      "legacyId": "meters_june_2026:2613",
+      "existing": true
+    },
+    {
+      "unitNumber": "203",
+      "unitId": "3415cdeb-81e9-4856-9296-e8bb3010a18d",
+      "readingDate": "2026-06-05",
+      "readingEnd": 512,
+      "legacyId": "meters_june_2026:2614",
+      "existing": true
+    },
+    {
+      "unitNumber": "204",
+      "unitId": "578b476a-cb97-4e93-987a-0a8a9370dc89",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1067,
+      "legacyId": "meters_june_2026:2615",
+      "existing": true
+    },
+    {
+      "unitNumber": "205",
+      "unitId": "fead053f-ef1b-4d33-ba81-7df5f03197ac",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1872,
+      "legacyId": "meters_june_2026:2616",
+      "existing": true
+    },
+    {
+      "unitNumber": "206",
+      "unitId": "84a81c05-12eb-4d2e-80ee-adbf2035f9c5",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1826,
+      "legacyId": "meters_june_2026:2617",
+      "existing": true
+    },
+    {
+      "unitNumber": "301",
+      "unitId": "cbc853d6-fc0d-4b4d-abf9-f7dc4aafd5e4",
+      "readingDate": "2026-06-05",
+      "readingEnd": 3200,
+      "legacyId": "meters_june_2026:2618",
+      "existing": true
+    },
+    {
+      "unitNumber": "302",
+      "unitId": "a07a72ca-0670-41e9-98cc-566a94d63eea",
+      "readingDate": "2026-06-05",
+      "readingEnd": 942,
+      "legacyId": "meters_june_2026:2619",
+      "existing": true
+    },
+    {
+      "unitNumber": "303",
+      "unitId": "17816900-610b-467c-a042-1b67bf76752b",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2737,
+      "legacyId": "meters_june_2026:2620",
+      "existing": true
+    },
+    {
+      "unitNumber": "304",
+      "unitId": "b530c44b-e884-4127-803a-f6d3de7807ca",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1881,
+      "legacyId": "meters_june_2026:2621",
+      "existing": true
+    },
+    {
+      "unitNumber": "305",
+      "unitId": "920697c7-12d2-4340-93cb-e746d81bebc6",
+      "readingDate": "2026-06-05",
+      "readingEnd": 3574,
+      "legacyId": "meters_june_2026:2622",
+      "existing": true
+    },
+    {
+      "unitNumber": "306",
+      "unitId": "2853cd6f-b73e-4d04-85fa-8ce525f637ef",
+      "readingDate": "2026-06-05",
+      "readingEnd": 3456,
+      "legacyId": "meters_june_2026:2623",
+      "existing": true
+    },
+    {
+      "unitNumber": "401",
+      "unitId": "3f68c0a2-4adb-4aeb-85b8-e9119449aaf8",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1691,
+      "legacyId": "meters_june_2026:2624",
+      "existing": true
+    },
+    {
+      "unitNumber": "402",
+      "unitId": "9c850e85-f042-4466-bf0a-a7291c33f63d",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1463,
+      "legacyId": "meters_june_2026:2625",
+      "existing": true
+    },
+    {
+      "unitNumber": "403",
+      "unitId": "3f301cbd-2aed-4527-9b97-aa07bb2a708f",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2101,
+      "legacyId": "meters_june_2026:2626",
+      "existing": true
+    },
+    {
+      "unitNumber": "404",
+      "unitId": "3f8940b4-5c98-48ff-bfc9-80091883f927",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2425,
+      "legacyId": "meters_june_2026:2627",
+      "existing": true
+    },
+    {
+      "unitNumber": "405",
+      "unitId": "7fdd5b63-f781-4d9b-98f9-34f9b63c577c",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1932,
+      "legacyId": "meters_june_2026:2628",
+      "existing": true
+    },
+    {
+      "unitNumber": "406",
+      "unitId": "5f1cb3a2-e598-4524-bc33-e546eea65dd6",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2962,
+      "legacyId": "meters_june_2026:2629",
+      "existing": true
+    },
+    {
+      "unitNumber": "501",
+      "unitId": "f48b688d-461b-42de-981f-aa567012632d",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1745,
+      "legacyId": "meters_june_2026:2630",
+      "existing": true
+    },
+    {
+      "unitNumber": "502",
+      "unitId": "ffd180d8-61ef-471f-91ec-8d07ea956567",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1743,
+      "legacyId": "meters_june_2026:2631",
+      "existing": true
+    },
+    {
+      "unitNumber": "503",
+      "unitId": "18f8f965-009a-4e53-8cda-4208e3d551f8",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1302,
+      "legacyId": "meters_june_2026:2632",
+      "existing": true
+    },
+    {
+      "unitNumber": "504",
+      "unitId": "2b001b11-a20d-434d-ad76-3378e82d78b0",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1310,
+      "legacyId": "meters_june_2026:2633",
+      "existing": true
+    },
+    {
+      "unitNumber": "505",
+      "unitId": "85f076a0-e518-4b2c-9fb4-1bf97ed3966f",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2107,
+      "legacyId": "meters_june_2026:2634",
+      "existing": true
+    },
+    {
+      "unitNumber": "506",
+      "unitId": "118fa3ab-b3f4-4952-a57b-8197a56fa775",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1171,
+      "legacyId": "meters_june_2026:2635",
+      "existing": true
+    },
+    {
+      "unitNumber": "601",
+      "unitId": "c48897a8-362c-4865-af83-7d8d776b140a",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1193,
+      "legacyId": "meters_june_2026:2636",
+      "existing": true
+    },
+    {
+      "unitNumber": "602",
+      "unitId": "7cb7aef4-0591-4aae-8177-a2bb5ef7c1a4",
+      "readingDate": "2026-06-05",
+      "readingEnd": 255,
+      "legacyId": "meters_june_2026:2637",
+      "existing": true
+    },
+    {
+      "unitNumber": "603",
+      "unitId": "fe04685a-4f1f-4737-8d45-47a15a939525",
+      "readingDate": "2026-06-05",
+      "readingEnd": 4262,
+      "legacyId": "meters_june_2026:2638",
+      "existing": true
+    },
+    {
+      "unitNumber": "604",
+      "unitId": "c61a93bf-9ae3-44f0-bb92-9382bc432161",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1604,
+      "legacyId": "meters_june_2026:2639",
+      "existing": true
+    },
+    {
+      "unitNumber": "605",
+      "unitId": "e084d356-2067-46e5-b327-a7e6d52a7c00",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1404,
+      "legacyId": "meters_june_2026:2640",
+      "existing": true
+    },
+    {
+      "unitNumber": "606",
+      "unitId": "dfd9bdd1-e2ff-4203-bb63-b212016de1d5",
+      "readingDate": "2026-06-05",
+      "readingEnd": 726,
+      "legacyId": "meters_june_2026:2641",
+      "existing": true
+    },
+    {
+      "unitNumber": "701",
+      "unitId": "868854f4-065c-477d-b9e8-6b64cf1e7bf3",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1524,
+      "legacyId": "meters_june_2026:2642",
+      "existing": true
+    },
+    {
+      "unitNumber": "702",
+      "unitId": "b4065ad6-8f41-4e26-a9e0-3c58b7af0d40",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1464,
+      "legacyId": "meters_june_2026:2643",
+      "existing": true
+    },
+    {
+      "unitNumber": "703",
+      "unitId": "b4e1ca3f-a3bc-48c5-88c4-e4a0681a0f9c",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2741,
+      "legacyId": "meters_june_2026:2644",
+      "existing": true
+    },
+    {
+      "unitNumber": "704",
+      "unitId": "7ccd186c-e600-42f1-88c7-ba52165f560b",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2012,
+      "legacyId": "meters_june_2026:2645",
+      "existing": true
+    },
+    {
+      "unitNumber": "801",
+      "unitId": "b7bbedf4-ee59-4aea-88bc-34afd84370f7",
+      "readingDate": "2026-06-05",
+      "readingEnd": 3531,
+      "legacyId": "meters_june_2026:2646",
+      "existing": true
+    },
+    {
+      "unitNumber": "802",
+      "unitId": "1f282ccb-cbb0-4e5c-9dfa-84b95bec935c",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1427,
+      "legacyId": "meters_june_2026:2647",
+      "existing": true
+    },
+    {
+      "unitNumber": "803",
+      "unitId": "59eff1aa-33fb-4fed-908f-558bd6cde3d6",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2731,
+      "legacyId": "meters_june_2026:2648",
+      "existing": true
+    },
+    {
+      "unitNumber": "804",
+      "unitId": "d2c9a962-700c-49b6-9d16-952965eaffdb",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1277,
+      "legacyId": "meters_june_2026:2649",
+      "existing": true
+    },
+    {
+      "unitNumber": "901",
+      "unitId": "22635da2-1e08-4cce-a9c4-2fa3ed572eee",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2511,
+      "legacyId": "meters_june_2026:2650",
+      "existing": true
+    },
+    {
+      "unitNumber": "902",
+      "unitId": "a4070ca8-f65e-46ec-a1eb-5e064a243aa1",
+      "readingDate": "2026-06-05",
+      "readingEnd": 622,
+      "legacyId": "meters_june_2026:2651",
+      "existing": true
+    },
+    {
+      "unitNumber": "903",
+      "unitId": "024526e9-c3ae-4fd7-a033-4cf1b361d8e0",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2763,
+      "legacyId": "meters_june_2026:2652",
+      "existing": true
+    },
+    {
+      "unitNumber": "904",
+      "unitId": "accba2ee-eb24-4084-8540-0ccc7af3b2ca",
+      "readingDate": "2026-06-05",
+      "readingEnd": 777,
+      "legacyId": "meters_june_2026:2653",
+      "existing": true
+    },
+    {
+      "unitNumber": "1001",
+      "unitId": "4774ef1f-d25f-4a4a-bb0a-3473949aa92a",
+      "readingDate": "2026-06-05",
+      "readingEnd": 3697,
+      "legacyId": "meters_june_2026:2654",
+      "existing": true
+    },
+    {
+      "unitNumber": "1002",
+      "unitId": "fbc90562-72ab-495f-8b33-06dd8dc18666",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1622,
+      "legacyId": "meters_june_2026:2655",
+      "existing": true
+    },
+    {
+      "unitNumber": "1003",
+      "unitId": "325101ea-e9b4-4d36-b810-ef7ece43f255",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2024,
+      "legacyId": "meters_june_2026:2656",
+      "existing": true
+    },
+    {
+      "unitNumber": "1101",
+      "unitId": "75011a83-2baf-4ec0-9784-ffaa4898f069",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1818,
+      "legacyId": "meters_june_2026:2657",
+      "existing": true
+    },
+    {
+      "unitNumber": "1102",
+      "unitId": "6a35b3f0-4ca4-4146-9003-3fdcd92e27f5",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2830,
+      "legacyId": "meters_june_2026:2658",
+      "existing": true
+    },
+    {
+      "unitNumber": "1103",
+      "unitId": "bfe5bbeb-fe13-46f2-802a-8f8c97c8a673",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1955,
+      "legacyId": "meters_june_2026:2659",
+      "existing": true
+    },
+    {
+      "unitNumber": "1201",
+      "unitId": "09bb9b69-a0d5-4d18-b1fb-600bf443450d",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2047,
+      "legacyId": "meters_june_2026:2660",
+      "existing": true
+    },
+    {
+      "unitNumber": "1202",
+      "unitId": "b8a634e3-8d52-49ce-bcfd-1acb0616baf8",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1886,
+      "legacyId": "meters_june_2026:2661",
+      "existing": true
+    },
+    {
+      "unitNumber": "1203",
+      "unitId": "95dfba2f-2ff8-4969-89f5-8300e33a925d",
+      "readingDate": "2026-06-05",
+      "readingEnd": 5339,
+      "legacyId": "meters_june_2026:2662",
+      "existing": true
+    },
+    {
+      "unitNumber": "1301",
+      "unitId": "b34b0dd1-08c8-490d-b340-878c01104616",
+      "readingDate": "2026-06-05",
+      "readingEnd": 3704,
+      "legacyId": "meters_june_2026:2663",
+      "existing": true
+    },
+    {
+      "unitNumber": "1302",
+      "unitId": "f78e0c80-beed-41a3-9af9-6f4b43460de5",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2553,
+      "legacyId": "meters_june_2026:2664",
+      "existing": true
+    },
+    {
+      "unitNumber": "1303",
+      "unitId": "9bf58132-0ef1-4dfc-ac63-d81c53cace33",
+      "readingDate": "2026-06-05",
+      "readingEnd": 4553,
+      "legacyId": "meters_june_2026:2665",
+      "existing": true
+    },
+    {
+      "unitNumber": "1401",
+      "unitId": "1d97108a-d9cd-407c-bcbb-3697d439ce49",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1470,
+      "legacyId": "meters_june_2026:2666",
+      "existing": true
+    },
+    {
+      "unitNumber": "1402",
+      "unitId": "26de4514-7151-44d4-ad54-a1d89983ed35",
+      "readingDate": "2026-06-05",
+      "readingEnd": 141,
+      "legacyId": "meters_june_2026:2667",
+      "existing": true
+    },
+    {
+      "unitNumber": "1403",
+      "unitId": "ccab9f00-2e87-4ebd-9603-8dddd9c2150a",
+      "readingDate": "2026-06-05",
+      "readingEnd": 5048,
+      "legacyId": "meters_june_2026:2668",
+      "existing": true
+    },
+    {
+      "unitNumber": "1501",
+      "unitId": "b5d799fd-07c5-441b-9bdc-56fcdf30b34f",
+      "readingDate": "2026-06-05",
+      "readingEnd": 5879,
+      "legacyId": "meters_june_2026:2669",
+      "existing": true
+    },
+    {
+      "unitNumber": "1502",
+      "unitId": "f23e2170-2cf6-4c26-b9a7-7be7c529c352",
+      "readingDate": "2026-06-05",
+      "readingEnd": 3025,
+      "legacyId": "meters_june_2026:2670",
+      "existing": true
+    },
+    {
+      "unitNumber": "1503",
+      "unitId": "2bb94387-730b-46d8-9fe6-59c5fe2a427a",
+      "readingDate": "2026-06-05",
+      "readingEnd": 5269,
+      "legacyId": "meters_june_2026:2671",
+      "existing": true
+    },
+    {
+      "unitNumber": "1601",
+      "unitId": "4d3e629a-abda-4476-b8f2-ad0806a897d1",
+      "readingDate": "2026-06-05",
+      "readingEnd": 3244,
+      "legacyId": "meters_june_2026:2672",
+      "existing": true
+    },
+    {
+      "unitNumber": "1602",
+      "unitId": "a49f18cd-ab62-4bea-b3d5-57ead0e18232",
+      "readingDate": "2026-06-05",
+      "readingEnd": 2886,
+      "legacyId": "meters_june_2026:2673",
+      "existing": true
+    },
+    {
+      "unitNumber": "1701",
+      "unitId": "3b2b6243-a9ae-4227-8d47-44a753d01f51",
+      "readingDate": "2026-06-05",
+      "readingEnd": 3904,
+      "legacyId": "meters_june_2026:2674",
+      "existing": true
+    },
+    {
+      "unitNumber": "1702",
+      "unitId": "2af563a5-bbe9-4feb-af28-4a241fbd48fe",
+      "readingDate": "2026-06-05",
+      "readingEnd": 1973,
+      "legacyId": "meters_june_2026:2675",
+      "existing": true
+    }
+  ]
+}

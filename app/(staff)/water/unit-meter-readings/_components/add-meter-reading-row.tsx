@@ -13,15 +13,6 @@ type FormState = {
 
 type UnitOption = { id: string; unit_number: string; floor: string | null };
 
-type AddedRow = {
-  id: string;
-  unit_label: string;
-  current_reading: string;
-  previous_reading: string;
-  consumption: string;
-  reading_date: string;
-};
-
 type Props = {
   action: (prevState: FormState, formData: FormData) => Promise<FormState>;
   units: UnitOption[];
@@ -41,17 +32,14 @@ function toNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function makeId() {
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 export function AddMeterReadingRow({ action, units, readingDate, previousByUnitId }: Props) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [unitText, setUnitText] = useState("");
   const [currentReading, setCurrentReading] = useState("");
   const [date, setDate] = useState(readingDate);
-  const [recentRows, setRecentRows] = useState<AddedRow[]>([]);
-  const lastSuccessRef = useRef<string | undefined>(undefined);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const submittedUnitLabelRef = useRef<string | null>(null);
+  const wasPendingRef = useRef(false);
   const formRef = useRef<HTMLFormElement | null>(null);
   const formId = "unit-meter-reading-add-row";
 
@@ -66,30 +54,48 @@ export function AddMeterReadingRow({ action, units, readingDate, previousByUnitI
       : toNumber(currentReading)! - previous;
 
   useEffect(() => {
-    if (!state.success || state.success === lastSuccessRef.current) return;
-    if (!matchedUnit) return;
-    lastSuccessRef.current = state.success;
-    const current = toNumber(currentReading);
-    setRecentRows((rows) => [
-      {
-        id: makeId(),
-        unit_label: unitText,
-        current_reading: readingValue(current),
-        previous_reading: readingValue(previous),
-        consumption: consumption == null ? "—" : readingValue(consumption),
-        reading_date: date,
-      },
-      ...rows,
-    ]);
+    if (pending) {
+      wasPendingRef.current = true;
+      return;
+    }
+
+    if (!wasPendingRef.current) {
+      return;
+    }
+
+    wasPendingRef.current = false;
+
+    if (!state.success) {
+      return;
+    }
+
+    setSuccessMessage(
+      submittedUnitLabelRef.current ? `Reading added for ${submittedUnitLabelRef.current}.` : "Reading added.",
+    );
     setUnitText("");
     setCurrentReading("");
     setDate(readingDate);
-  }, [currentReading, date, matchedUnit, previous, readingDate, state.success, unitText, consumption]);
+    submittedUnitLabelRef.current = null;
+  }, [pending, readingDate, state.success]);
+
+  useEffect(() => {
+    if (state.error) {
+      setSuccessMessage(null);
+    }
+  }, [state.error]);
 
   return (
     <>
-      <form ref={formRef} id={formId} action={formAction} className="hidden" />
-      <div className={`${LEDGER_GRID_CLASS} border-b border-zinc-100 px-4 py-4`}>
+        <form
+        ref={formRef}
+        id={formId}
+        action={formAction}
+        className="hidden"
+        onSubmit={() => {
+          submittedUnitLabelRef.current = matchedUnit ? `Unit ${matchedUnit.unit_number}` : null;
+        }}
+      />
+      <div className={`${LEDGER_GRID_CLASS} border-b border-zinc-100 px-4 py-4 inset-shadow-sm inset-shadow-indigo-500/50 bg-gray-100`}>
         <div>
           <input type="hidden" name="unit_id" form={formId} value={matchedUnit?.id ?? ""} />
           <input type="hidden" name="reading_start" form={formId} value={previous == null ? "" : String(previous)} />
@@ -164,16 +170,16 @@ export function AddMeterReadingRow({ action, units, readingDate, previousByUnitI
           </Button>
         </div>
       </div>
-      {recentRows.map((row) => (
-        <div key={row.id} className={`${LEDGER_GRID_CLASS} border-b border-zinc-100 px-4 py-4 bg-zinc-50`}>
-          <div className="text-sm font-medium text-zinc-950">{row.unit_label}</div>
-          <div className="text-sm text-zinc-600">{row.current_reading}</div>
-          <div className="text-sm text-zinc-600">{row.previous_reading}</div>
-          <div className="text-sm text-zinc-600">{row.consumption}</div>
-          <div className="text-sm text-zinc-600">{row.reading_date}</div>
-          <div />
-        </div>
-      ))}
+      {state.error ? (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {state.error}
+        </p>
+      ) : null}
+      {successMessage ? (
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {successMessage}
+        </p>
+      ) : null}
     </>
   );
 }

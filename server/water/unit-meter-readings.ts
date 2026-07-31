@@ -65,10 +65,21 @@ export type UnitMeterReadingDefaults = {
   previousReadingDate: string | null;
 };
 
+export type UnitMeterReadingDeleteResult = {
+  reading: UnitMeterReadingRecord;
+  readingMonthKey: string;
+  unit_number: string;
+};
+
 export type UnitOption = {
   id: string;
   unit_number: string;
   floor: string | null;
+};
+
+export type UnitMeterReadingMonthOption = {
+  key: string;
+  label: string;
 };
 
 const READING_SELECT =
@@ -95,6 +106,23 @@ function monthKeyFromDate(date: string) {
   return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+function monthStartFromKey(monthKey: string) {
+  return `${monthKey}-01`;
+}
+
+function nextMonthStartFromKey(monthKey: string) {
+  const parsed = parseDate(monthStartFromKey(monthKey));
+  if (!parsed) return null;
+  const next = new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth() + 1, 1));
+  return next.toISOString().slice(0, 10);
+}
+
+function monthLabelFromKey(monthKey: string) {
+  const parsed = parseDate(monthStartFromKey(monthKey));
+  if (!parsed) return monthKey;
+  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(parsed);
+}
+
 function monthLabelFromDate(date: string) {
   const parsed = parseDate(date);
   if (!parsed) return date;
@@ -103,6 +131,36 @@ function monthLabelFromDate(date: string) {
 
 function readingToText(value: number | null) {
   return value == null ? "—" : value.toFixed(3).replace(/\.?0+$/, "");
+}
+
+export async function listUnitMeterReadingMonths(): Promise<QueryResult<UnitMeterReadingMonthOption[]>> {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: [], error: buildingResult.error };
+  if (!buildingResult.data) return { data: [], error: null };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tb810_meter_readings")
+    .select("reading_date")
+    .eq("building_id", buildingResult.data.id)
+    .order("reading_date", { ascending: false });
+  if (error) return { data: [], error: error.message };
+
+  const seen = new Set<string>();
+  const months = [];
+  for (const row of data ?? []) {
+    const key = monthKeyFromDate(row.reading_date);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    months.push({ key, label: monthLabelFromKey(key) });
+  }
+
+  const active = getActiveReadingMonth();
+  if (!seen.has(active.key)) {
+    months.unshift({ key: active.key, label: active.label });
+  }
+
+  return { data: months.sort((a, b) => b.key.localeCompare(a.key)), error: null };
 }
 
 async function getUtilityTypeId(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -131,13 +189,23 @@ async function getCondoUnits(): Promise<QueryResult<UnitOption[]>> {
   };
 }
 
+async function getCondoUnitById(unitId: string) {
+  const units = await getCondoUnits();
+  if (units.error) return { data: null, error: units.error } as QueryResult<UnitOption | null>;
+  return {
+    data: units.data.find((unit) => unit.id === unitId) ?? null,
+    error: null,
+  } as QueryResult<UnitOption | null>;
+}
+
 async function getPriorReadingForUnit(
   supabase: Awaited<ReturnType<typeof createClient>>,
   buildingId: string,
   utilityTypeId: string,
   unitId: string,
-  beforeDate: string,
+  beforeMonthKey: string,
 ) {
+  const beforeDate = monthStartFromKey(beforeMonthKey);
   const { data, error } = await supabase
     .from("tb810_meter_readings")
     .select("id, reading_date, reading_end, reading_start, created_at")
@@ -247,10 +315,11 @@ export async function listUnitMeterReadings(
   });
   if (error) return { data: [], error: error.message };
 
-  const unitById = new Map((unitResult.data ?? []).map((unit) => [unit.id, unit]));
+  const unitById = new Map((unitResult.data ?? []).map((unit, index) => [unit.id, { unit, index }]));
   const currentMonthKey = getActiveReadingMonth().key;
   const rows = (data ?? []).map((row) => {
-    const unit = unitById.get(row.unit_id);
+    const unitEntry = unitById.get(row.unit_id);
+    const unit = unitEntry?.unit;
     const previousDate = row.reading_start == null ? null : row.reading_date;
     const alertLabel =
       row.consumption != null && row.consumption < 0
@@ -270,6 +339,11 @@ export async function listUnitMeterReadings(
       current_month_editable: monthKeyFromDate(row.reading_date) === currentMonthKey,
       alert_label: alertLabel,
     };
+  }).sort((a, b) => {
+    const orderA = unitById.get(a.unit_id)?.index ?? Number.MAX_SAFE_INTEGER;
+    const orderB = unitById.get(b.unit_id)?.index ?? Number.MAX_SAFE_INTEGER;
+    if (orderA !== orderB) return orderA - orderB;
+    return a.reading_date.localeCompare(b.reading_date);
   });
 
   const query = (filters.query ?? "").trim().toLowerCase();
@@ -308,12 +382,14 @@ async function validateReading(
   buildingId: string,
   utilityTypeId: string,
   input: UnitMeterReadingInput,
+  unitNumber: string,
   excludeReadingId?: string,
 ) {
   const active = getActiveReadingMonth();
   const readingDate = normalizeDate(input.reading_date);
   if (!readingDate) return { error: "Reading date is required and must be valid." };
-  if (monthKeyFromDate(readingDate) !== active.key) {
+  const readingMonthKey = monthKeyFromDate(readingDate);
+  if (readingMonthKey !== active.key) {
     return { error: "Reading date must belong to the active reading month." };
   }
 
@@ -328,11 +404,12 @@ async function validateReading(
     .eq("building_id", buildingId)
     .eq("utility_type_id", utilityTypeId)
     .eq("unit_id", input.unit_id)
-    .eq("reading_date", readingDate);
-  if (excludeReadingId) duplicateQuery.eq("id", excludeReadingId);
+    .gte("reading_date", monthStartFromKey(readingMonthKey))
+    .lt("reading_date", nextMonthStartFromKey(readingMonthKey) ?? monthStartFromKey(readingMonthKey));
+  if (excludeReadingId) duplicateQuery.neq("id", excludeReadingId);
   const { data: duplicate } = await duplicateQuery.maybeSingle();
   if (duplicate) {
-    return { error: "A meter reading already exists for that unit in the active month." };
+    return { error: `A water meter reading already exists for Unit ${unitNumber} for ${monthLabelFromKey(readingMonthKey)}.` };
   }
 
   const prior = await getPriorReadingForUnit(
@@ -340,7 +417,7 @@ async function validateReading(
     buildingId,
     utilityTypeId,
     input.unit_id,
-    readingDate,
+    readingMonthKey,
   );
   if (prior.error) return { error: prior.error };
 
@@ -363,6 +440,7 @@ async function validateReading(
       readingStart,
       consumption,
       prior,
+      readingMonthKey,
     },
   } as const;
 }
@@ -377,20 +455,19 @@ export async function createUnitMeterReading(input: UnitMeterReadingInput) {
   if (utilityType.error) return { data: null as never, error: utilityType.error };
   if (!utilityType.data) return { data: null as never, error: "Common Water utility type is missing." };
 
-  const validated = await validateReading(supabase, buildingResult.data.id, utilityType.data.id, input);
+  const unitResult = await getCondoUnitById(input.unit_id);
+  if (unitResult.error) return { data: null as never, error: unitResult.error };
+  if (!unitResult.data) return { data: null as never, error: "Invalid unit." };
+
+  const validated = await validateReading(supabase, buildingResult.data.id, utilityType.data.id, input, unitResult.data.unit_number);
   if (validated.error) return { data: null as never, error: validated.error };
   const safe = validated.data!;
-
-  const unitResult = await getCondoUnits();
-  if (unitResult.error) return { data: null as never, error: unitResult.error };
-  const unit = unitResult.data.find((row) => row.id === input.unit_id);
-  if (!unit) return { data: null as never, error: "Invalid unit." };
 
   const { data, error } = await supabase
     .from("tb810_meter_readings")
     .insert({
       building_id: buildingResult.data.id,
-      unit_id: unit.id,
+      unit_id: unitResult.data.id,
       utility_type_id: utilityType.data.id,
       reading_date: safe.readingDate,
       reading_start: safe.readingStart,
@@ -417,7 +494,18 @@ export async function updateUnitMeterReading(readingId: string, input: UnitMeter
   if (utilityType.error) return { data: null as never, error: utilityType.error };
   if (!utilityType.data) return { data: null as never, error: "Common Water utility type is missing." };
 
-  const validated = await validateReading(supabase, buildingResult.data.id, utilityType.data.id, input, readingId);
+  const unitResult = await getCondoUnitById(input.unit_id);
+  if (unitResult.error) return { data: null as never, error: unitResult.error };
+  if (!unitResult.data) return { data: null as never, error: "Invalid unit." };
+
+  const validated = await validateReading(
+    supabase,
+    buildingResult.data.id,
+    utilityType.data.id,
+    input,
+    unitResult.data.unit_number,
+    readingId,
+  );
   if (validated.error) return { data: null as never, error: validated.error };
   const safe = validated.data!;
 
@@ -441,20 +529,67 @@ export async function updateUnitMeterReading(readingId: string, input: UnitMeter
   return { data, error: null };
 }
 
-export async function deleteUnitMeterReading(readingId: string) {
+export async function deleteUnitMeterReading(readingId: string): Promise<QueryResult<UnitMeterReadingDeleteResult>> {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: null as never, error: buildingResult.error };
   if (!buildingResult.data) return { data: null as never, error: "Current building not found." };
+
   const supabase = await createClient();
   const utilityType = await getUtilityTypeId(supabase);
   if (utilityType.error) return { data: null as never, error: utilityType.error };
   if (!utilityType.data) return { data: null as never, error: "Common Water utility type is missing." };
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) return { data: null as never, error: userError.message };
+  if (!userData.user) return { data: null as never, error: "You must be signed in to delete meter readings." };
+
+  const [{ data: canManage, error: roleError }, { data: reading, error: readingError }] = await Promise.all([
+    supabase.rpc("has_tb810_role", { role_key: "building_manager" }),
+    supabase
+      .from("tb810_meter_readings")
+      .select(READING_SELECT)
+      .eq("id", readingId)
+      .eq("building_id", buildingResult.data.id)
+      .eq("utility_type_id", utilityType.data.id)
+      .maybeSingle(),
+  ]);
+
+  if (roleError) return { data: null as never, error: roleError.message };
+  if (readingError) return { data: null as never, error: readingError.message };
+  if (!canManage) {
+    const { data: isSuperAdmin, error: superAdminError } = await supabase.rpc("has_tb810_role", {
+      role_key: "super_admin",
+    });
+    if (superAdminError) return { data: null as never, error: superAdminError.message };
+    if (!isSuperAdmin) return { data: null as never, error: "You are not authorized to delete meter readings." };
+  }
+
+  if (!reading) {
+    return { data: null as never, error: "Meter reading not found." };
+  }
+
+  const active = getActiveReadingMonth();
+  if (monthKeyFromDate(reading.reading_date) !== active.key) {
+    return { data: null as never, error: "Only current-month meter readings can be deleted." };
+  }
+
+  const unitsResult = await getCondoUnits();
+  if (unitsResult.error) return { data: null as never, error: unitsResult.error };
+  const unit = unitsResult.data.find((row) => row.id === reading.unit_id);
+  if (!unit) {
+    return { data: null as never, error: "Meter reading unit is invalid." };
+  }
+
   const { error } = await supabase
     .from("tb810_meter_readings")
     .delete()
     .eq("id", readingId)
     .eq("building_id", buildingResult.data.id)
     .eq("utility_type_id", utilityType.data.id);
+
   if (error) return { data: null as never, error: error.message };
-  return { data: true, error: null };
+  return {
+    data: { reading: reading as UnitMeterReadingRecord, readingMonthKey: active.key, unit_number: unit.unit_number },
+    error: null,
+  };
 }

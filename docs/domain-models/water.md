@@ -1,6 +1,37 @@
 # Common Water Ledger
 
+For the Sprint 1A unit meter-reading slice, the canonical documentation set lives in:
+
+- [`docs/water/01-water-domain-overview.md`](/Users/roon/dev/tb810/docs/water/01-water-domain-overview.md)
+- [`docs/water/02-unit-meter-reading-domain.md`](/Users/roon/dev/tb810/docs/water/02-unit-meter-reading-domain.md)
+- [`docs/water/03-june-2026-import.md`](/Users/roon/dev/tb810/docs/water/03-june-2026-import.md)
+- [`docs/water/04-month-routing.md`](/Users/roon/dev/tb810/docs/water/04-month-routing.md)
+- [`docs/water/05-meter-reading-database.md`](/Users/roon/dev/tb810/docs/water/05-meter-reading-database.md)
+
 The authoritative finance architecture is frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md). This document captures the canonical Common Water Ledger design for TB810.
+
+## Current Live Implementation
+
+The live Water implementation is split across two operational surfaces:
+
+- `/water/{period}` for the Monthly Water Ledger
+- `/water/unit-meter-readings` for Unit Water Meter Readings
+
+Both surfaces consume the same canonical reading records.
+
+The live Unit Water Meter Readings workflow currently behaves like an operational ledger:
+
+- inline Add row;
+- autosave on blur or Enter;
+- current-month editing only;
+- previous-month rows read-only;
+- no Save button;
+- no Cancel button;
+- month selector as the only ledger context control;
+- search and import entry points remain available.
+
+The Month selector is contextual and immediately refreshes the ledger when changed.
+The current implementation intentionally removes the older unit/status filter form.
 
 ## Purpose
 

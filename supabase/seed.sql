@@ -43,7 +43,7 @@ insert into public.tb810_unit_types (
   legacy_metadata
 )
 values
-  ('c2bc6a40-7d8e-4d1d-8c8b-8a1a76f3e001', 'condo', 'Condo', 1, 'tb810_bootstrap', 'unit_type_condo', jsonb_build_object('seed', true)),
+  ('c2bc6a40-7d8e-4d1d-8c8b-8a1a76f3e001', 'condo', 'Residential', 1, 'tb810_bootstrap', 'unit_type_condo', jsonb_build_object('seed', true)),
   ('c2bc6a40-7d8e-4d1d-8c8b-8a1a76f3e002', 'parking', 'Parking', 2, 'tb810_bootstrap', 'unit_type_parking', jsonb_build_object('seed', true)),
   ('c2bc6a40-7d8e-4d1d-8c8b-8a1a76f3e003', 'storage', 'Storage', 3, 'tb810_bootstrap', 'unit_type_storage', jsonb_build_object('seed', true))
 on conflict (code) do update

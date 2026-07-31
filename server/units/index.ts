@@ -17,7 +17,7 @@ type QueryResult<T> = {
 };
 
 const UNIT_SELECT =
-  "id, building_id, unit_type_id, unit_number, floor, registered_area_m2, participation_percentage, has_meter, notes, active, created_at, updated_at" as const;
+  "id, building_id, unit_type_id, unit_number, floor, display_order, registered_area_m2, participation_percentage, has_meter, notes, active, created_at, updated_at" as const;
 
 function normalizeText(value: string | null | undefined) {
   return value?.trim() ?? "";
@@ -73,6 +73,7 @@ export async function listUnits(
   let request = supabase
     .from("tb810_units")
     .select(UNIT_SELECT)
+    .order("display_order", { ascending: true })
     .order("unit_number", { ascending: true });
 
   if (filters.unitTypeId) {
@@ -251,6 +252,16 @@ export async function createUnit(
 ): Promise<QueryResult<UnitRecord>> {
   const supabase = await createClient();
   const payload = input;
+  const { data: currentMax, error: maxError } = await supabase
+    .from("tb810_units")
+    .select("display_order")
+    .eq("building_id", payload.building_id)
+    .order("display_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (maxError) return { data: null as never, error: maxError.message };
+
   const { data, error } = await supabase
     .from("tb810_units")
     .insert({
@@ -258,6 +269,7 @@ export async function createUnit(
       unit_type_id: payload.unit_type_id,
       unit_number: payload.unit_number,
       floor: payload.floor,
+      display_order: (currentMax?.display_order ?? -1) + 1,
       registered_area_m2: payload.registered_area_m2,
       participation_percentage: payload.participation_percentage,
       has_meter: payload.has_meter,
@@ -293,14 +305,14 @@ export async function getUnitFormDefaults(
 
   const building = buildingResult.data;
   const values = unitResult.data
-    ? {
+      ? {
         building_id: unitResult.data.building_id,
         unit_type_id: unitResult.data.unit_type_id,
         unit_number: unitResult.data.unit_number,
         floor: unitResult.data.floor ?? "",
         registered_area_m2: unitResult.data.registered_area_m2 ?? undefined,
         participation_percentage: unitResult.data.participation_percentage,
-        has_meter: unitResult.data.has_meter,
+        has_meter: unitResult.data.has_meter ?? false,
         notes: unitResult.data.notes ?? "",
       }
     : building

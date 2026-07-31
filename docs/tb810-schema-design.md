@@ -160,7 +160,7 @@ The schema is intentionally staff-first. There is no owner portal yet.
 - Purpose: meter reading history for condo units
 - Key fields: `building_id`, `unit_id`, `utility_type_id`, `reading_date`, `reading_start`, `reading_end`, `consumption`
 - Legacy source: `meters`
-- Notes: parking and storage should not receive meter readings; this is expected to be enforced by application rules or a trigger later
+- Notes: meter-reading applicability is controlled by Unit Type capability and per-unit exception handling, not by hardcoded parking/storage exclusions
 
 ### `tb810_suppliers`
 

@@ -30,7 +30,7 @@ function fieldError(field: string, state: UnitFormState) {
 function typeLabel(unitType: UnitTypeRecord) {
   switch (unitType.code) {
     case "condo":
-      return "Apartment";
+      return "Residential";
     case "parking":
       return "Parking";
     case "storage":

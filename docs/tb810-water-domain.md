@@ -2,7 +2,94 @@
 
 Status: FROZEN ARCHITECTURE BASELINE
 
+For the post-Sprint 1A canonical documentation set, start with:
+
+- [`docs/water/01-water-domain-overview.md`](/Users/roon/dev/tb810/docs/water/01-water-domain-overview.md)
+- [`docs/water/02-unit-meter-reading-domain.md`](/Users/roon/dev/tb810/docs/water/02-unit-meter-reading-domain.md)
+- [`docs/water/04-month-routing.md`](/Users/roon/dev/tb810/docs/water/04-month-routing.md)
+- [`docs/water/05-meter-reading-database.md`](/Users/roon/dev/tb810/docs/water/05-meter-reading-database.md)
+
 This document captures the frozen business definition of the water domain for TB810. The live implementation may lag behind this baseline in specific areas, especially around downstream allocation and posting behavior.
+
+## Current Live Implementation
+
+### Water Domain Routes
+
+- `/water` is the Water domain home.
+- `/water/{period}` is the Monthly Water Ledger.
+- `/water/sedapal` is the Sedapal / common-water CRUD surface.
+- `/water/unit-meter-readings` is the Unit Water Meter Readings operational ledger.
+- `/water/unit-meter-readings/import` is the import scaffold for unit readings.
+
+These routes support the monthly water workflow as separate operational tools.
+Sedapal bills and unit meter readings are captured separately, but both feed the broader monthly Water workflow.
+
+### Unit Water Meter Readings
+
+The Unit Water Meter Readings surface is currently implemented as an operational ledger.
+
+Captured behavior:
+
+- inline Add row;
+- autosave on blur or Enter for current-month edits;
+- inline editing for current-month rows;
+- previous-month rows are read-only;
+- no Save button;
+- no Cancel button;
+- consumption is auto-calculated;
+- month selector;
+- search;
+- import entry point;
+- dedicated CRUD routes still exist, but they are no longer the preferred workflow.
+
+Current visible column order:
+
+- Unit
+- Current
+- Previous
+- Consumption
+- Reading Date
+
+Field behavior:
+
+- Unit is read-only after creation;
+- Previous is read-only;
+- Consumption is derived;
+- Current is editable;
+- Reading Date is editable during the current month.
+
+### Month Selector
+
+Month is now the single context control for the ledger.
+
+The UI currently uses:
+
+- a month heading;
+- a caret;
+- approximately six visible months in the popover;
+- scrolling for older months.
+
+Removed from the page:
+
+- Unit filter;
+- Status filter;
+- Apply button.
+
+Changing month immediately refreshes the ledger.
+
+### Import
+
+Import is the primary action entry point for the page.
+
+The import route currently routes to the scaffold only.
+Excel parsing has intentionally not been implemented yet.
+
+### Canonical Data
+
+`tb810_meter_readings` remains the single source of truth for meter readings.
+
+The Monthly Water Ledger consumes the same canonical records.
+There is no duplicate reading model.
 
 ## 1. Purpose
 
@@ -99,6 +186,86 @@ The following remain deferred to MVP2:
 - Review
 - Charge Generation
 - Permanent Unit Account Posting
+
+## Frozen Canonical Architecture
+
+### Water Philosophy
+
+Water is composed of multiple operational tools.
+
+Examples:
+
+- Sedapal Bills
+- Unit Meter Readings
+- Monthly Ledger
+
+These tools support the monthly operational workflow.
+The workflow itself is not responsible for data capture.
+
+### Operator Philosophy
+
+Never ask the operator for information the system already knows.
+
+Examples of system-derived data:
+
+- Building
+- Reading Month
+- Previous Reading
+- Consumption
+- Audit metadata
+
+### Reading Entry Season
+
+Current calendar month is editable.
+
+Previous months are read-only.
+Future months cannot receive readings.
+
+The transition happens automatically on the first day of the new month.
+
+There is:
+
+- no Close Month button;
+- no Close Reading Season button;
+- no billing-period flag controlling editability.
+
+Time controls editability.
+
+### Continuous Calculation
+
+The system is always calculating.
+
+Consumption is continuously recalculated.
+Changing a reading immediately updates dependent calculations.
+
+There is no manual recalculation action.
+
+### Manual Entry
+
+Operator enters:
+
+- Unit
+- Reading
+- Reading Date
+- Notes, when supported by the schema
+
+System derives:
+
+- Building
+- Reading Month
+- Previous Reading
+- Previous Reading Date
+- Consumption
+- Audit fields
+
+### Excel Template
+
+The agreed v1 template uses required columns only:
+
+- Unit Number
+- New Reading
+
+The remaining columns are system-derived where possible.
 
 ## 5. Monthly Business Workflow
 
@@ -247,7 +414,26 @@ The obligation is the final monthly financial result of the water cycle.
 - `/water/sedapal` is the Sedapal / common-water CRUD surface.
 - `/water/unit-meter-readings` is the Unit Water Meter Readings CRUD surface.
 
-## 10. Current Implementation Notes
+## 10. MVP2
+
+The following remain deferred to MVP2:
+
+- Review
+- Charge Generation
+- Permanent Unit Account Posting
+- document extraction
+- richer import automation
+
+MVP2 may store additional supplier ledger facts such as:
+
+- Consumption Period Start
+- Consumption Period End
+- Invoice Issue Date
+- Supplier Billed Month
+
+Do not design or implement MVP2 details in this document.
+
+## 11. Current Implementation Notes
 
 - The Monthly Water Ledger and the Unit Water Meter Readings surface both reuse the canonical reading records stored in `tb810_meter_readings`.
 - Unit meter readings are currently entered and edited through the operational UI, with the active reading month derived from the current calendar month.
@@ -269,7 +455,7 @@ The obligation is the final monthly financial result of the water cycle.
 - Excel import is intentionally deferred in this slice. The import route exists as a scaffold, but `.xlsx` parsing is not implemented yet.
 - Owners receive obligations, but collection belongs to another domain.
 
-## 9. Open Questions
+## 12. Open Questions
 
 The following details remain unresolved or only partially verified:
 
@@ -280,7 +466,7 @@ The following details remain unresolved or only partially verified:
 
 These are implementation or workflow details that were not fully recoverable from the business discussion alone.
 
-## 10. Frozen Decisions
+## 13. Frozen Decisions
 
 | Decision | Status | Notes |
 | --- | --- | --- |

@@ -94,10 +94,17 @@ export async function updateInlineUnitMeterReadingAction(
   };
 }
 
-export async function deleteUnitMeterReadingAction(formData: FormData) {
+export async function deleteUnitMeterReadingAction(
+  _prev: MeterReadingFormState,
+  formData: FormData,
+): Promise<MeterReadingFormState> {
   const readingId = String(formData.get("reading_id") ?? "");
   const result = await deleteUnitMeterReading(readingId);
-  if (result.error) throw new Error(result.error);
+  if (result.error) {
+    return { error: result.error };
+  }
   revalidatePath("/water/unit-meter-readings");
-  redirect("/water/unit-meter-readings");
+  redirect(
+    `/water/unit-meter-readings?deleted=${encodeURIComponent(`Reading deleted for Unit ${result.data.unit_number}.`)}`,
+  );
 }

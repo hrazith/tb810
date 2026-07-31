@@ -1,17 +1,30 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import { parseWaterMonthKey } from "@/server/water/month";
 import { getUnitMeterReadingById } from "@/server/water/unit-meter-readings";
 
-type PageProps = { params: Promise<{ readingId: string }> };
+type PageProps = {
+  params: Promise<{
+    month: string;
+    readingId: string;
+  }>;
+};
 
 export default async function UnitMeterReadingDetailPage({ params }: PageProps) {
-  const { readingId } = await params;
+  const { month, readingId } = await params;
+  const monthKey = parseWaterMonthKey(month);
   const result = await getUnitMeterReadingById(readingId);
   if (result.error) throw new Error(result.error);
   if (!result.data) notFound();
+
+  const resolvedMonth = result.data.reading_date.slice(0, 7);
+  if (!monthKey || monthKey !== resolvedMonth) {
+    redirect(`/water/unit-meter-readings/${resolvedMonth}/reading/${readingId}`);
+  }
+
   const reading = result.data;
 
   return (
@@ -40,9 +53,14 @@ export default async function UnitMeterReadingDetailPage({ params }: PageProps) 
         </Panel>
       </div>
       <div className="flex gap-3">
-        <Button asChild variant="secondary"><Link href="/water/unit-meter-readings">Back</Link></Button>
-        <Button asChild variant="primary"><Link href={`/water/unit-meter-readings/${reading.id}/edit`}>Edit</Link></Button>
+        <Button asChild variant="secondary">
+          <Link href={`/water/unit-meter-readings/${resolvedMonth}`}>Back</Link>
+        </Button>
+        <Button asChild variant="primary">
+          <Link href={`/water/unit-meter-readings/${resolvedMonth}/reading/${reading.id}/edit`}>Edit</Link>
+        </Button>
       </div>
     </section>
   );
 }
+

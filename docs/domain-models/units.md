@@ -1,6 +1,22 @@
 # Units Domain
 
-## Purpose
+## Current Live Implementation
+
+The live Units implementation treats Units as the canonical master-data inventory for the building.
+
+Current live behavior:
+
+- Units are a closed inventory and are not created or archived through normal operations;
+- Units are imported before Owners in the migration sequence;
+- Unit Type drives operational capability;
+- operational modules consume Unit Type capabilities rather than hardcoding asset exclusions;
+- parking and storage are not excluded by default;
+- per-unit capability overrides exist only for genuine exceptions;
+- Units feed Ownerships and Unit Accounts downstream.
+
+## Frozen Canonical Architecture
+
+### Purpose
 
 A Unit represents a physical/legal asset within Torre Balta 810.
 
@@ -14,7 +30,9 @@ The Unit is the durable asset record. It describes the thing that exists in the 
 
 Each Unit has one permanent financial account. The account is part of the Unit model conceptually, even though it is implemented through separate account tables.
 
-## Responsibilities
+### Core Model
+
+Units are master data.
 
 The Unit aggregate is responsible for:
 
@@ -29,6 +47,65 @@ The Unit aggregate is responsible for:
 - operational notes
 
 The Unit aggregate should stay focused on the asset itself. It should not absorb ownership history, financial balances, or billing transactions.
+
+The inventory is closed.
+
+TB810 does not expect Units to be:
+
+- added through normal operations
+- deleted through normal operations
+- subdivided
+- merged
+- removed from the property
+
+### Unit Type and Capability
+
+Unit Type defines operational capability.
+
+Operational modules consume those capabilities to determine whether a Unit participates in a given workflow.
+
+Do not hardcode parking or storage exclusions into downstream modules.
+
+Use per-unit capability overrides only for genuine exceptions.
+
+### Relationships
+
+Building
+→ Units
+→ Ownerships
+→ Unit Accounts
+
+The Unit also relates to:
+
+- meter readings
+- documents
+- invoices
+- payments
+
+Those relationships should be modeled through their own aggregates or transactional records, not by embedding them into the Unit itself.
+
+### Business Rules
+
+- A Unit may exist without an owner
+- ownership may change without changing the Unit
+- participation percentage does not change merely because ownership changes
+- registered area and participation percentage are separate stored facts
+- participation is not automatically recalculated yet
+- condo, parking, and storage are all first-class asset types
+- debt follows the asset account across ownership changes
+- there is no co-ownership support
+- a Unit has at most one current owner
+- Units are a fixed inventory and are not created or archived as a normal workflow
+- operational modules must consume Unit Type capability rather than infer asset exclusions by label
+- per-unit overrides are allowed only for genuine exceptions
+
+### Migration Sequence
+
+The canonical migration sequence is:
+
+Units → Owners → Ownerships
+
+Units must exist as master data before Owners and Ownerships are migrated or activated.
 
 ## Fields
 
@@ -168,35 +245,6 @@ These do not belong on Unit because they are ownership, billing, accounting, or 
 
 Asset debt is represented through the asset account or ledger, not as a Unit column.
 
-## Relationships
-
-Building
-→ Units
-→ Ownerships
-→ Unit Accounts
-
-The Unit also relates to:
-
-- meter readings
-- documents
-- invoices
-- payments
-
-Those relationships should be modeled through their own aggregates or transactional records, not by embedding them into the Unit itself.
-
-## Business Rules
-
-- A Unit may exist without an owner
-- ownership may change without changing the Unit
-- participation percentage does not change merely because ownership changes
-- registered area and participation percentage are separate stored facts
-- participation is not automatically recalculated yet
-- condo, parking, and storage are all first-class asset types
-- debt follows the asset account across ownership changes
-- there is no co-ownership support
-- a Unit has at most one current owner
-- Units are a fixed inventory and are not created or archived as a normal workflow
-
 ## Modernization Notes
 
 The first modernization pass intentionally aligned the Unit aggregate with the legacy core model while making the legal/physical boundary explicit.
@@ -212,3 +260,11 @@ Why these decisions were made:
 - The legacy audit proved that participation is a stored legal coefficient on the asset, not a derived value in the exported SQL
 - The asset’s registered area belongs on Unit as a factual physical/legal attribute
 - Billing adjustments are operational accounting rules and belong in the billing domain, not on the asset itself
+
+## MVP2
+
+The following remain MVP2 candidates:
+
+- dynamic capability inference from richer unit metadata
+- broader exception handling for unusual asset participation cases
+- additional operational overlays that do not belong in the asset core

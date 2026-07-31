@@ -13,7 +13,7 @@ Status meanings:
 
 | Domain | Architecture | Implementation | Status |
 | --- | --- | --- | --- |
-| Water | Frozen | Slice 1 Complete | Complete |
+| Water | Frozen | Slice 1A Complete | Complete |
 | Gas | Discovery | Not Started | Not Started |
 | Maintenance | Discovery | Not Started | Not Started |
 | Payroll | Discovery | Not Started | Not Started |
@@ -22,4 +22,4 @@ Status meanings:
 
 - This tracker is intentionally high-level.
 - It records project phase, not detailed task state.
-- The Water domain row reflects the first vertical slice only.
+- The Water domain row reflects the first vertical slice and its documentation baseline only.

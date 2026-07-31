@@ -1,29 +1,40 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
-import { Panel } from "@/components/ui/panel";
 import { getReadingDefaults, getUnitMeterReadingById, getUnitOptions } from "@/server/water/unit-meter-readings";
+import { parseWaterMonthKey } from "@/server/water/month";
 
-import { updateUnitMeterReadingAction } from "../../actions";
-import { UnitMeterReadingForm } from "../../_components/unit-meter-reading-form";
+import { updateUnitMeterReadingAction } from "../../../../actions";
+import { UnitMeterReadingForm } from "../../../../_components/unit-meter-reading-form";
 
-type PageProps = { params: Promise<{ readingId: string }> };
+type PageProps = {
+  params: Promise<{
+    month: string;
+    readingId: string;
+  }>;
+};
 
 export default async function EditUnitMeterReadingPage({ params }: PageProps) {
-  const { readingId } = await params;
-  const [readingResult, unitsResult] = await Promise.all([
-    getUnitMeterReadingById(readingId),
-    getUnitOptions(),
-  ]);
+  const { month, readingId } = await params;
+  const monthKey = parseWaterMonthKey(month);
+  const [readingResult, unitsResult] = await Promise.all([getUnitMeterReadingById(readingId), getUnitOptions()]);
   if (readingResult.error) throw new Error(readingResult.error);
   if (unitsResult.error) throw new Error(unitsResult.error);
   if (!readingResult.data) notFound();
+
+  const resolvedMonth = readingResult.data.reading_date.slice(0, 7);
+  if (!monthKey || monthKey !== resolvedMonth) {
+    redirect(`/water/unit-meter-readings/${resolvedMonth}/reading/${readingId}/edit`);
+  }
+
   const defaults = await getReadingDefaults(readingResult.data.reading_date);
   if (defaults.error) throw new Error(defaults.error);
+
   return (
     <section className="space-y-6">
-      <Panel><h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Edit Unit Water Meter Reading</h1></Panel>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-500">Unit Water Meter Reading</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Edit Reading</h1>
+      </div>
       <UnitMeterReadingForm
         action={updateUnitMeterReadingAction}
         submitLabel="Update Reading"

@@ -187,7 +187,7 @@ Historical months remain historically correct.
 - applies only to apartment / condo Units
 - calculated as the Sedapal invoice amount minus the sum of all individually metered water charges
 - divided equally among the 64 residential condominiums
-- parking and storage are excluded
+- applicability is driven by Unit Type capability and per-unit exception handling, not by hardcoded asset-name exclusions
 
 ### Gas
 
