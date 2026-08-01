@@ -59,6 +59,28 @@ Contains:
 
 This workspace converts operational facts into financial obligations.
 
+## Water-to-Obligation Timing Model
+
+The Water domain now uses a frozen timing model that distinguishes:
+
+- Service Dates
+- Reading Date
+- Service Month
+- Sedapal Billed Month
+- Obligation Month
+
+The canonical July 2026 example is:
+
+- Service Dates: 05 Jun 2026 - 06 Jul 2026
+- Reading Date: 06 Jul 2026
+- Service Month: Jun 2026
+- Sedapal Billed Month: Jul 2026
+- Obligation Month: Aug 2026
+
+This means a water charge may originate from an earlier Service Month while belonging to a later Obligation Month.
+
+Do not collapse those into a single month concept.
+
 ## Why the Workflows Stay Separate
 
 The operational ledger answers:
@@ -90,4 +112,3 @@ Combining them would blur auditability, make corrections harder, and risk turnin
 - [`app/(staff)/water/[period]/page.tsx`](/Users/roon/dev/tb810/app/(staff)/water/[period]/page.tsx)
 - [`server/water/unit-meter-readings.ts`](/Users/roon/dev/tb810/server/water/unit-meter-readings.ts)
 - [`server/water/month.ts`](/Users/roon/dev/tb810/server/water/month.ts)
-

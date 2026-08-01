@@ -29,6 +29,27 @@ It is not responsible for:
 - Reading Date: the date the reading was taken.
 - Previous Reading: the latest reading from a strictly earlier month.
 - Consumption: `reading_end - previous_reading`.
+- Service Month: the water service month from which the reading's downstream financial timing is derived.
+
+### Timing Relationship
+
+Unit meter readings capture operational facts, while downstream financial work may later assign them to a different Obligation Month.
+
+The canonical water timing model distinguishes:
+
+- Service Dates
+- Reading Date
+- Service Month
+- Sedapal Billed Month
+- Obligation Month
+
+For the July 2026 example:
+
+- Service Dates: 05 Jun 2026 - 06 Jul 2026
+- Reading Date: 06 Jul 2026
+- Service Month: Jun 2026
+- Sedapal Billed Month: Jul 2026
+- Obligation Month: Aug 2026
 
 ## Canonical Identity
 

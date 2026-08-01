@@ -88,6 +88,28 @@ Excel parsing has intentionally not been implemented yet.
 The Monthly Water Ledger consumes the same canonical records.
 There is no duplicate reading model.
 
+### Water-to-Obligation Timing
+
+The canonical timing model distinguishes:
+
+- Service Dates
+- Reading Date
+- Service Month
+- Sedapal Billed Month
+- Obligation Month
+
+For the approved legacy cadence, water service can originate in one month while the assessment obligation belongs to a later month.
+
+The July 2026 Sedapal bill is the canonical example:
+
+- Service Dates: 05 Jun 2026 - 06 Jul 2026
+- Reading Date: 06 Jul 2026
+- Service Month: Jun 2026
+- Sedapal Billed Month: Jul 2026
+- Obligation Month: Aug 2026
+
+The timing model must stay traceable across the Sedapal bill, meter readings, obligations, invoices, and payments.
+
 ## 1. Purpose
 
 The TB810 Water Domain governs the monthly water cycle for the condominium building.
@@ -248,6 +270,7 @@ Operator enters:
 
 System derives:
 
+- Service Dates
 - Building
 - Reading Month
 - Previous Reading

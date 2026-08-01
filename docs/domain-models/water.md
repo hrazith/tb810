@@ -10,6 +10,87 @@ For the Sprint 1A unit meter-reading slice, the canonical documentation set live
 
 The authoritative finance architecture is frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md). This document captures the canonical Common Water Ledger design for TB810.
 
+## Water-to-Obligation Timing Model
+
+TB810 distinguishes five different time concepts:
+
+- Service Dates
+- Reading Date
+- Service Month
+- Sedapal Billed Month
+- Obligation Month
+
+These concepts are related but not interchangeable.
+
+### Service Dates
+
+Service Dates are the exact range covered by Sedapal's measured water service.
+
+They are the calendar dates between the previous and current master-meter readings.
+
+The canonical service-date fields are conceptually:
+
+- `service_start_date`
+- `service_end_date`
+
+### Reading Date
+
+Reading Date is the date of the current master-meter reading.
+
+It is an operational event date.
+It is not the Service Month and it is not the Obligation Month.
+
+### Service Month
+
+Service Month is the TB810 accounting attribution month for the water service.
+
+For the approved legacy cadence:
+
+- the Service Month is the month immediately preceding the Reading Date month
+
+Example:
+
+- Reading Date: 06 Jul 2026
+- Service Month: Jun 2026
+
+### Sedapal Billed Month
+
+Sedapal Billed Month is the supplier-facing month printed on the bill.
+
+It is preserved for provenance and reconciliation.
+It is not the same thing as TB810's Obligation Month.
+
+### Obligation Month
+
+Obligation Month is the TB810 Unit Account billing cycle in which the charge is assessed.
+
+For the approved legacy cadence:
+
+- Water Service Month M
+- Obligation Month M + 2
+
+Example:
+
+- Service Month: Jun 2026
+- Obligation Month: Aug 2026
+
+### Canonical Timing Rule
+
+A charge may originate from an earlier Service Month while belonging to a later Obligation Month.
+
+TB810 preserves both identities:
+
+- source Service Month
+- target Obligation Month
+
+The timing model must remain traceable across:
+
+- Sedapal Utility Bill
+- Unit Meter Reading
+- Water Consumption Obligation
+- Invoice
+- Payment
+
 ## Current Live Implementation
 
 The live Water implementation is split across two operational surfaces:
@@ -93,6 +174,7 @@ User enters:
 System derives:
 
 - Service Month
+- Service Dates
 - Previous Reading
 - Total Consumption
 - Unit Cost
@@ -104,7 +186,9 @@ Building, provider and unit of measure are fixed.
 
 Use these names consistently:
 
+- Service Dates
 - Service Month
+- Sedapal Billed Month
 - Reading Date
 - Previous Reading
 - Current Reading
