@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { LEDGER_GRID_CLASS } from "./ledger-layout";
 
 type FormState = {
@@ -78,11 +79,7 @@ export function AddMeterReadingRow({ action, units, readingDate, previousByUnitI
     submittedUnitLabelRef.current = null;
   }, [pending, readingDate, state.success]);
 
-  useEffect(() => {
-    if (state.error) {
-      setSuccessMessage(null);
-    }
-  }, [state.error]);
+  const visibleSuccessMessage = state.error ? null : successMessage;
 
   return (
     <>
@@ -103,12 +100,11 @@ export function AddMeterReadingRow({ action, units, readingDate, previousByUnitI
           <input type="hidden" name="reading_date" form={formId} value={date} />
           <input type="hidden" name="status" form={formId} value="recorded" />
           <input type="hidden" name="notes" form={formId} value="" />
-          <input
+          <Input
             list="unit-options"
             value={unitText}
             onChange={(e) => setUnitText(e.target.value)}
             placeholder="Search unit"
-            className="h-11 w-full rounded-xl border border-zinc-300 px-3 text-sm"
           />
           <datalist id="unit-options">
             {units.map((unit) => {
@@ -122,7 +118,7 @@ export function AddMeterReadingRow({ action, units, readingDate, previousByUnitI
           </datalist>
         </div>
         <div>
-          <input
+          <Input
             form={formId}
             name="reading_end"
             type="number"
@@ -137,13 +133,12 @@ export function AddMeterReadingRow({ action, units, readingDate, previousByUnitI
                 formRef.current?.requestSubmit();
               }
             }}
-            className="h-11 w-full rounded-xl border border-zinc-300 px-3 text-sm"
           />
         </div>
         <div className="text-sm text-zinc-600">{readingValue(previous)}</div>
         <div className="text-sm text-zinc-600">{consumption == null ? "—" : readingValue(consumption)}</div>
         <div>
-          <input
+          <Input
             form={formId}
             name="reading_date"
             type="date"
@@ -155,7 +150,6 @@ export function AddMeterReadingRow({ action, units, readingDate, previousByUnitI
                 formRef.current?.requestSubmit();
               }
             }}
-            className="h-11 w-full rounded-xl border border-zinc-300 px-3 text-sm"
           />
         </div>
         <div className="flex items-center justify-end">
@@ -175,9 +169,9 @@ export function AddMeterReadingRow({ action, units, readingDate, previousByUnitI
           {state.error}
         </p>
       ) : null}
-      {successMessage ? (
+      {visibleSuccessMessage ? (
         <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {successMessage}
+          {visibleSuccessMessage}
         </p>
       ) : null}
     </>

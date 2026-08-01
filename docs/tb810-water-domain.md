@@ -278,6 +278,24 @@ Legacy compatibility aliases may be accepted by the parser adapter during transi
 The current MVP import contract uses the uploaded workbook as temporary scaffolding.
 TB810 adapts to this workflow and keeps the canonical ledger as the source of truth.
 The parser normalizes `DEP-201` → `201` and preserves the remaining unit number as a string.
+Slice 3 now uses progressive monthly synchronization:
+
+- supplied readings are accepted or rejected row by row
+- blank Lectura cells are ignored silently
+- existing selected-month rows remain update candidates
+- completion is measured as unique Units with a processed selected-month reading
+
+The import UI reports accepted counts, rejected counts, ignored blank rows, and projected completion without blocking the full workbook for blank rows.
+
+Slice 4 completes the import workflow:
+
+- accepted rows are persisted into `tb810_meter_readings`
+- rejected rows are ignored
+- the latest upload wins for the selected month
+- manual edits and uploads share the same canonical ledger
+- ledger refresh occurs immediately after commit
+- completion is calculated from persisted canonical data
+- the upload modal now completes the operational workflow
 
 ## 5. Monthly Business Workflow
 
@@ -450,7 +468,7 @@ Do not design or implement MVP2 details in this document.
 - The Monthly Water Ledger and the Unit Water Meter Readings surface both reuse the canonical reading records stored in `tb810_meter_readings`.
 - Unit meter readings are currently entered and edited through the operational UI, with the active reading month derived from the current calendar month.
 - The Unit Water Meter Readings workflow does not expose a Building field in the operator form.
-- The operator supplies Unit, Reading Date, Current Reading, and optional Notes where supported by the schema.
+- The operator supplies Unit, Reading Date, Current Reading, and optional Notes where supported by the schema. Blank Lectura rows are ignored silently during workbook processing.
 - The system supplies the previous reading, previous reading date, month context, consumption calculation, and audit metadata.
 - Current-month unit rows are editable inline on the ledger page; historical rows are read-only.
 - The Unit Meter Readings page is the primary operational ledger.
@@ -464,7 +482,7 @@ Do not design or implement MVP2 details in this document.
 - Previous Reading Date is intentionally omitted from the operational ledger to reduce visual noise.
 - Current-month edits auto-save on blur or Enter.
 - Explicit Save and Cancel buttons were intentionally removed to optimize operational data entry.
-- Excel import is intentionally deferred beyond workbook understanding. The import UI now reads the workbook and returns a structured summary, but no rows are persisted yet.
+- Excel import now persists accepted rows into the canonical ledger after workbook understanding. Blank Lectura cells are ignored silently and the summary reflects the committed database state.
 - Owners receive obligations, but collection belongs to another domain.
 
 ## 12. Open Questions

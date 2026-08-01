@@ -17,6 +17,7 @@ type ParsedRow = {
   sourceRowNumber: number;
   unitNumber: string;
   readingEnd: number | null;
+  readingText: string | null;
 };
 
 export type ParsedMeterReadingRow = ParsedRow;
@@ -84,10 +85,7 @@ function parseReadingValue(value: string | null) {
   if (!trimmed) return null;
   const normalized = trimmed.replace(/,/g, "");
   const parsed = Number(normalized);
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`Unable to read the Unit Meter Reading template.`);
-  }
-  return parsed;
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function columnNameToIndex(name: string) {
@@ -228,6 +226,7 @@ function findWorksheetRows(rows: { rowNumber: number; cells: ParsedCell[] }[]) {
       sourceRowNumber: row.rowNumber,
       unitNumber,
       readingEnd,
+      readingText: rawReading?.trim() ?? null,
     });
   }
 

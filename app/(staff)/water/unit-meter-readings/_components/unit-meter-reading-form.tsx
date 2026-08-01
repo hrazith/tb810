@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 
+import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
 import type { UnitMeterReadingDefaults, UnitOption } from "@/server/water/unit-meter-readings";
 
@@ -73,26 +74,25 @@ export function UnitMeterReadingForm({
       <input type="hidden" name="reading_id" value={initialValues?.reading_id ?? ""} />
       <input type="hidden" name="status" value={initialValues?.status ?? "recorded"} />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 ">
         <label className="block space-y-2 md:col-span-2">
           <span className="text-sm font-medium text-zinc-900">Reading Month</span>
-          <input
+          <Input
             value={currentMonthLabel}
             readOnly
-            className="h-11 w-full rounded-xl border border-zinc-300 bg-zinc-50 px-3 text-sm text-zinc-700"
+            className="bg-zinc-50 text-zinc-700"
           />
         </label>
 
         <label className="block space-y-2 md:col-span-2">
           <span className="text-sm font-medium text-zinc-900">Unit</span>
-          <input
+          <Input
             list="unit-options"
             name="unit_id"
             value={unitId}
             onChange={(e) => setUnitId(e.target.value)}
             placeholder="Search by unit number"
             readOnly={readOnly}
-            className="h-11 w-full rounded-xl border border-zinc-300 px-3 text-sm"
           />
           <datalist id="unit-options">
             {units.map((unit) => (
@@ -106,19 +106,18 @@ export function UnitMeterReadingForm({
 
         <label className="block space-y-2">
           <span className="text-sm font-medium text-zinc-900">Reading Date</span>
-          <input
+          <Input
             name="reading_date"
             type="date"
             value={readingDate}
             onChange={(e) => setReadingDate(e.target.value)}
             readOnly={readOnly}
-            className="h-11 w-full rounded-xl border border-zinc-300 px-3 text-sm"
           />
         </label>
 
         <label className="block space-y-2">
           <span className="text-sm font-medium text-zinc-900">Current Reading</span>
-          <input
+          <Input
             name="reading_end"
             type="number"
             min="0"
@@ -127,25 +126,24 @@ export function UnitMeterReadingForm({
             value={currentReading}
             onChange={(e) => setCurrentReading(e.target.value)}
             readOnly={readOnly}
-            className="h-11 w-full rounded-xl border border-zinc-300 px-3 text-sm"
           />
         </label>
 
         <label className="block space-y-2">
           <span className="text-sm font-medium text-zinc-900">Previous Reading</span>
-          <input
+          <Input
             value={formatReading(previousReading)}
             readOnly
-            className="h-11 w-full rounded-xl border border-zinc-300 bg-zinc-50 px-3 text-sm text-zinc-700"
+            className="bg-zinc-50 text-zinc-700"
           />
         </label>
 
         <label className="block space-y-2">
           <span className="text-sm font-medium text-zinc-900">Previous Reading Date</span>
-          <input
+          <Input
             value={previousReadingDate ?? "—"}
             readOnly
-            className="h-11 w-full rounded-xl border border-zinc-300 bg-zinc-50 px-3 text-sm text-zinc-700"
+            className="bg-zinc-50 text-zinc-700"
           />
         </label>
       </div>

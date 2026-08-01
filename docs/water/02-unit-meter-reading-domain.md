@@ -132,7 +132,7 @@ Compatibility aliases accepted only by the parser adapter:
 - `Unit` → `Unidad`
 - `Reading` → `Lectura`
 
-The parser normalizes `DEP-201` → `201`, preserves unit numbers as strings, and treats blank readings as null during this parsing slice.
+The parser normalizes `DEP-201` → `201`, preserves unit numbers as strings, and treats blank readings as null during this parsing slice. Blank Lectura cells are ignored silently by the progressive sync validator so only supplied readings are processed. In Slice 4, accepted rows are persisted into the canonical ledger and the upload summary reflects the committed database state.
 
 The workbook contract does not include Building, Unit ID, month, date, or utility type fields. Those are derived by TB810 from route context and canonical master data.
 

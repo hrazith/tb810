@@ -5,9 +5,16 @@ import { redirect } from "next/navigation";
 
 import type { WaterBillFormState } from "@/server/water";
 import { parseMeterReadingTemplateWorkbook } from "@/server/import/excel/meter-reading-template";
+import { persistMeterReadingImport } from "@/server/import/water/meter-reading-import-persistence";
+import {
+  validateMeterReadingImport,
+  type MeterReadingImportSyncResult,
+} from "@/server/import/water/meter-reading-import-validator";
 import {
   createUnitMeterReading,
   deleteUnitMeterReading,
+  getUnitOptions,
+  listUnitMeterReadings,
   updateUnitMeterReading,
 } from "@/server/water/unit-meter-readings";
 
@@ -21,7 +28,13 @@ type ImportFormState = {
   success?: string;
   error?: string;
   summary?: Awaited<ReturnType<typeof parseMeterReadingTemplateWorkbook>>;
+  validation?: MeterReadingImportSyncResult;
 };
+
+function monthLabel(monthKey: string) {
+  const parsed = new Date(`${monthKey}-01T00:00:00Z`);
+  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(parsed);
+}
 
 function toInput(formData: FormData) {
   return {
@@ -117,6 +130,7 @@ export async function deleteUnitMeterReadingAction(
 }
 
 export async function uploadCompletedTemplateAction(
+  monthKey: string,
   _prev: ImportFormState,
   formData: FormData,
 ): Promise<ImportFormState> {
@@ -127,9 +141,48 @@ export async function uploadCompletedTemplateAction(
 
   try {
     const summary = await parseMeterReadingTemplateWorkbook(template);
+    const validation = await validateMeterReadingImport(monthKey, summary.selectedWorksheet.parsedRows);
+    const writeResult = await persistMeterReadingImport(monthKey, validation.acceptedRows);
+    if (writeResult.error) {
+      return { error: writeResult.error };
+    }
+    if (!writeResult.data) {
+      return { error: "Import persistence returned no result." };
+    }
+
+    revalidatePath(`/water/unit-meter-readings/${monthKey}`);
+    
+    const [persistedRows, unitOptions] = await Promise.all([
+      listUnitMeterReadings({ month: monthKey }),
+      getUnitOptions(),
+    ]);
+
+    if (persistedRows.error) {
+      return { error: persistedRows.error };
+    }
+    if (unitOptions.error) {
+      return { error: unitOptions.error };
+    }
+
+    const completedUnitCountAfter = persistedRows.data.length;
+    const expectedUnitCount = unitOptions.data.length;
+    const completionPercentage = expectedUnitCount === 0 ? 0 : Math.round((completedUnitCountAfter / expectedUnitCount) * 100);
+
+    const finalValidation: MeterReadingImportSyncResult = {
+      ...validation,
+      newRowCount: writeResult.data.insertedCount,
+      updatedRowCount: writeResult.data.updatedCount,
+      acceptedRowCount: writeResult.data.processedCount,
+      completedUnitCountAfter,
+      remainingUnitCount: Math.max(expectedUnitCount - completedUnitCountAfter, 0),
+      completionPercentage,
+      expectedUnitCount,
+    };
+
     return {
-      success: "Workbook successfully opened.",
+      success: `${monthLabel(monthKey)} meter readings imported. ${writeResult.data.processedCount} readings accepted. ${writeResult.data.insertedCount} new. ${writeResult.data.updatedCount} updated. ${completedUnitCountAfter} of ${expectedUnitCount} Units complete. ${completionPercentage}% complete.`,
       summary,
+      validation: finalValidation,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Workbook unreadable.";

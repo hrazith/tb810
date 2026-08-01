@@ -1,4 +1,5 @@
 import { Panel } from "@/components/ui/panel";
+import { Input } from "@/components/ui/input";
 import {
   getActiveReadingMonth,
   getUnitOptions,
@@ -53,14 +54,14 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted }: Prop
         </div>
         <div className="flex items-center gap-3">
           <form action={`/water/unit-meter-readings/${month}`} method="get" className="flex items-center gap-3">
-            <input
+            <Input
               name="q"
               defaultValue={query ?? ""}
               placeholder="Search readings"
-              className="h-11 min-w-56 rounded-xl border border-zinc-300 px-3 text-sm"
+              className="min-w-56"
             />
           </form>
-          {isActiveMonth ? <UploadCompletedTemplateButton /> : null}
+          {isActiveMonth ? <UploadCompletedTemplateButton month={month} /> : null}
         </div>
       </div>
 

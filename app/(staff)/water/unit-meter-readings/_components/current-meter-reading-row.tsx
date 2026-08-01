@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { LEDGER_GRID_CLASS } from "./ledger-layout";
 
 type FormState = {
@@ -75,7 +76,7 @@ export function CurrentMeterReadingRow({ row, action, deleteAction, readOnly = f
               {readingValue(row.reading_end)}
             </div>
           ) : (
-            <input
+            <Input
               form={formId}
               name="reading_end"
               type="number"
@@ -91,7 +92,6 @@ export function CurrentMeterReadingRow({ row, action, deleteAction, readOnly = f
                   formRef.current?.requestSubmit();
                 }
               }}
-              className="h-11 w-full rounded-xl border border-zinc-300 px-3 text-sm"
             />
           )}
         </div>
@@ -115,7 +115,7 @@ export function CurrentMeterReadingRow({ row, action, deleteAction, readOnly = f
                 <input type="hidden" name="status" value={row.status} />
                 <input type="hidden" name="notes" value={row.notes ?? ""} />
               </form>
-              <input
+              <Input
                 form={formId}
                 name="reading_date"
                 type="date"
@@ -128,7 +128,6 @@ export function CurrentMeterReadingRow({ row, action, deleteAction, readOnly = f
                     formRef.current?.requestSubmit();
                   }
                 }}
-                className="h-11 w-full rounded-xl border border-zinc-300 px-3 text-sm"
               />
               {pending ? <p className="mt-2 text-xs text-zinc-500">Saving...</p> : null}
               {state.error ? <p className="mt-2 text-xs text-red-600">{state.error}</p> : null}
