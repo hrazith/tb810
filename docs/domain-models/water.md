@@ -114,6 +114,8 @@ The live Unit Water Meter Readings workflow currently behaves like an operationa
 The Month selector is contextual and immediately refreshes the ledger when changed.
 The current implementation intentionally removes the older unit/status filter form.
 
+The historical Sedapal supplier ledger has also been imported into `public.tb810_utility_bills`, so the canonical historical Water dataset now includes both meter readings and utility bills.
+
 ## Purpose
 
 The Common Water Ledger represents the monthly supplier Sedapal invoice and the master building water meter reading.

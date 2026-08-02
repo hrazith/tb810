@@ -96,6 +96,8 @@ Historical meter readings from `2023-09` through `2026-06` have now been importe
 
 Historical Billing Periods now exist for every canonical month from `2023-09` through `2026-08`, so downstream water and finance imports can resolve the month container without creating it.
 
+Historical Sedapal utility bills have now been imported into `public.tb810_utility_bills`. The canonical supplier ledger is complete for the historical operational range and preserves the legacy source facts in provenance.
+
 The legacy `2024-04-05` reading for Unit 1402 is preserved exactly as a historical negative-consumption anomaly in provenance for auditability.
 
 ### Water-to-Obligation Timing
