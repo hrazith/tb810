@@ -1,0 +1,179 @@
+{
+  "generated_at": "2026-08-02T01:32:14.633Z",
+  "import_timestamp": "2026-08-02T01:28:47Z",
+  "source_table": "meters",
+  "source_month_range": {
+    "first": "2023-09",
+    "last": "2026-06"
+  },
+  "legacy_rows_found": 2176,
+  "eligible_residential_rows": 2176,
+  "inserted_rows": 2112,
+  "matching_existing_rows": 64,
+  "updated_rows": 0,
+  "skipped_rows": 0,
+  "unknown_units": 0,
+  "duplicate_source_unit_month_groups": 0,
+  "invalid_readings": 0,
+  "arithmetic_consumption_mismatches": 0,
+  "provenance_complete": true,
+  "final_live_row_count": 2176,
+  "coverage_by_month": [
+    {
+      "month": "2023-09",
+      "count": 64
+    },
+    {
+      "month": "2023-10",
+      "count": 64
+    },
+    {
+      "month": "2023-11",
+      "count": 64
+    },
+    {
+      "month": "2023-12",
+      "count": 64
+    },
+    {
+      "month": "2024-01",
+      "count": 64
+    },
+    {
+      "month": "2024-02",
+      "count": 64
+    },
+    {
+      "month": "2024-03",
+      "count": 64
+    },
+    {
+      "month": "2024-04",
+      "count": 64
+    },
+    {
+      "month": "2024-05",
+      "count": 64
+    },
+    {
+      "month": "2024-06",
+      "count": 64
+    },
+    {
+      "month": "2024-07",
+      "count": 64
+    },
+    {
+      "month": "2024-08",
+      "count": 64
+    },
+    {
+      "month": "2024-09",
+      "count": 64
+    },
+    {
+      "month": "2024-10",
+      "count": 64
+    },
+    {
+      "month": "2024-11",
+      "count": 64
+    },
+    {
+      "month": "2024-12",
+      "count": 64
+    },
+    {
+      "month": "2025-01",
+      "count": 64
+    },
+    {
+      "month": "2025-02",
+      "count": 64
+    },
+    {
+      "month": "2025-03",
+      "count": 64
+    },
+    {
+      "month": "2025-04",
+      "count": 64
+    },
+    {
+      "month": "2025-05",
+      "count": 64
+    },
+    {
+      "month": "2025-06",
+      "count": 64
+    },
+    {
+      "month": "2025-07",
+      "count": 64
+    },
+    {
+      "month": "2025-08",
+      "count": 64
+    },
+    {
+      "month": "2025-09",
+      "count": 64
+    },
+    {
+      "month": "2025-10",
+      "count": 64
+    },
+    {
+      "month": "2025-11",
+      "count": 64
+    },
+    {
+      "month": "2025-12",
+      "count": 64
+    },
+    {
+      "month": "2026-01",
+      "count": 64
+    },
+    {
+      "month": "2026-02",
+      "count": 64
+    },
+    {
+      "month": "2026-03",
+      "count": 64
+    },
+    {
+      "month": "2026-04",
+      "count": 64
+    },
+    {
+      "month": "2026-05",
+      "count": 64
+    },
+    {
+      "month": "2026-06",
+      "count": 64
+    }
+  ],
+  "anomaly": {
+    "unit_number": "1402",
+    "legacy_id": "meters_historical:875",
+    "reading_date": "2024-04-05",
+    "reading_start": 0,
+    "reading_end": 73,
+    "consumption": -1,
+    "historical_anomaly": true
+  },
+  "idempotency": {
+    "first_run": "2112 inserts / 64 matches",
+    "second_run": "0 inserts / 2176 matches at the live data level",
+    "note": "dry-run helper was limited by default page size; live scan confirms full coverage"
+  },
+  "warnings": [
+    "Unit 602 reset-style baseline preserved in provenance",
+    "Unit 1402 negative consumption preserved in provenance"
+  ],
+  "blockers": [],
+  "import_status": "complete"
+}

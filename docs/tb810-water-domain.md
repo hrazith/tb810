@@ -88,6 +88,10 @@ Excel parsing has intentionally not been implemented yet.
 The Monthly Water Ledger consumes the same canonical records.
 There is no duplicate reading model.
 
+Historical meter readings from `2023-09` through `2026-06` have now been imported into the canonical table for all 64 residential Units.
+
+The legacy `2024-04-05` reading for Unit 1402 is preserved exactly as a historical negative-consumption anomaly in provenance for auditability.
+
 ### Water-to-Obligation Timing
 
 The canonical timing model distinguishes:

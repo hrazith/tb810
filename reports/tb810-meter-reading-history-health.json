@@ -1,0 +1,291 @@
+{
+  "generated_at": "2026-08-02T01:32:14.632Z",
+  "import_timestamp": "2026-08-02T01:28:47Z",
+  "source_range": {
+    "first": "2023-09",
+    "last": "2026-06"
+  },
+  "total_rows": 2176,
+  "total_months": 34,
+  "expected_units_per_month": 64,
+  "coverage_by_month": [
+    {
+      "month": "2023-09",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2023-10",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2023-11",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2023-12",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2024-01",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2024-02",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2024-03",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2024-04",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2024-05",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2024-06",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2024-07",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2024-08",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2024-09",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2024-10",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2024-11",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2024-12",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2025-01",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2025-02",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2025-03",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2025-04",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2025-05",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2025-06",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2025-07",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2025-08",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2025-09",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2025-10",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2025-11",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2025-12",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2026-01",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2026-02",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2026-03",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2026-04",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2026-05",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    },
+    {
+      "month": "2026-06",
+      "rows": 64,
+      "expected": 64,
+      "complete": true
+    }
+  ],
+  "complete_months": [
+    "2023-09",
+    "2023-10",
+    "2023-11",
+    "2023-12",
+    "2024-01",
+    "2024-02",
+    "2024-03",
+    "2024-04",
+    "2024-05",
+    "2024-06",
+    "2024-07",
+    "2024-08",
+    "2024-09",
+    "2024-10",
+    "2024-11",
+    "2024-12",
+    "2025-01",
+    "2025-02",
+    "2025-03",
+    "2025-04",
+    "2025-05",
+    "2025-06",
+    "2025-07",
+    "2025-08",
+    "2025-09",
+    "2025-10",
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+  ],
+  "incomplete_months": [],
+  "unit_201_continuity": {
+    "unit_number": "201",
+    "rows": 33,
+    "missing_months": [],
+    "continuity_breaks": [],
+    "reset_events": []
+  },
+  "reset_events": [
+    {
+      "unit_number": "602",
+      "reading_date": "2023-10-04",
+      "type": "baseline_reset",
+      "note": "legacy source drop below prior reading, preserved in provenance"
+    },
+    {
+      "unit_number": "1402",
+      "reading_date": "2024-04-05",
+      "type": "negative_consumption_anomaly",
+      "note": "legacy source records -1.00, preserved in provenance"
+    }
+  ],
+  "duplicates": 0,
+  "arithmetic_mismatches": 0,
+  "provenance_complete": true,
+  "existing_canonical_match_summary": {
+    "pre_import_existing_rows": 64,
+    "post_import_rows": 2176,
+    "exact_matches": 64,
+    "safe_metadata_enhancement": 0,
+    "conflict": 0,
+    "manual_non_legacy_row": 0
+  },
+  "import_readiness": "complete",
+  "blockers": [],
+  "warnings": [
+    "Full remote import completed."
+  ]
+}
