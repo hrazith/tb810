@@ -4,6 +4,14 @@ The authoritative finance architecture is frozen in [`docs/architecture/finance-
 
 The Billing Period domain is architecturally frozen. Downstream activity details remain in their respective domains.
 
+## Current Live State
+
+The live TB810 project now contains the canonical historical Billing Period sequence from `2023-09` through `2026-08`.
+
+Historical periods are canonical monthly financial containers. They exist independently of Water, utility bills, obligations, invoices, and payments.
+
+The historical backfill is platform-level data, not a legacy import artifact. Future financial imports should simply resolve the relevant Billing Period instead of creating one.
+
 ## Purpose
 
 A Billing Period is the operational context for one calendar month.
@@ -25,6 +33,9 @@ It is the orchestration context that:
 - determines the responsible Owner for each Unit Account
 - generates one invoice per Unit Account
 - records completion state for the monthly billing run
+
+Monthly Obligations and Water use the Billing Period as their shared monthly timing container.
+Billing Period does not itself create obligations; it provides the month boundary on which downstream domains converge.
 
 The Billing Period does not own permanent balances, ownership history, payment history, budget plan definition, meter identity, or Owner identity. It consumes or references those domains.
 
