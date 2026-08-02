@@ -61,6 +61,10 @@ Field behavior:
 
 Month is now the single context control for the ledger.
 
+The Unit Meter Reading month selector now derives available months from the canonical database RPC instead of client-side deduplication over meter-reading rows.
+
+This is a business query, not an application-side calculation, and it avoids PostgREST pagination limits as the historical dataset grows.
+
 The UI currently uses:
 
 - a month heading;

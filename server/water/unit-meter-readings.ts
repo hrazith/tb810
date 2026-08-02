@@ -139,24 +139,18 @@ export async function listUnitMeterReadingMonths(): Promise<QueryResult<UnitMete
   if (!buildingResult.data) return { data: [], error: null };
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("tb810_meter_readings")
-    .select("reading_date")
-    .eq("building_id", buildingResult.data.id)
-    .order("reading_date", { ascending: false });
+  const { data, error } = await (supabase as any).rpc("tb810_list_meter_reading_months", {
+    p_building_id: buildingResult.data.id,
+  });
   if (error) return { data: [], error: error.message };
 
-  const seen = new Set<string>();
-  const months = [];
-  for (const row of data ?? []) {
-    const key = monthKeyFromDate(row.reading_date);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    months.push({ key, label: monthLabelFromKey(key) });
-  }
+  const months = ((data ?? []) as Array<{ reading_month: string | null }>)
+    .map((row) => (row.reading_month ? row.reading_month.slice(0, 7) : null))
+    .filter((key): key is string => Boolean(key))
+    .map((key) => ({ key, label: monthLabelFromKey(key) }));
 
   const active = getActiveReadingMonth();
-  if (!seen.has(active.key)) {
+  if (!months.some((month) => month.key === active.key)) {
     months.unshift({ key: active.key, label: active.label });
   }
 
