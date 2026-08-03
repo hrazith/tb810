@@ -10,11 +10,14 @@ import {
 } from "@/server/budget-plans";
 import { getAugust2026MeteredWaterChargeForUnit } from "@/server/water";
 import { getUnitOwnershipSnapshot } from "@/server/ownerships";
-import { getUnitById } from "@/server/units";
+import {
+  getUnitById,
+  getUnitByNumberForCurrentBuilding,
+} from "@/server/units";
 
 type PageProps = {
   params: Promise<{
-    unitId: string;
+    unitNumber: string;
   }>;
 };
 
@@ -42,7 +45,18 @@ function statusLabel(status: string) {
 }
 
 export default async function UnitDetailPage({ params }: PageProps) {
-  const { unitId } = await params;
+  const { unitNumber } = await params;
+  const lookup = await getUnitByNumberForCurrentBuilding(unitNumber);
+
+  if (lookup.error) {
+    throw new Error(lookup.error);
+  }
+
+  if (!lookup.data) {
+    notFound();
+  }
+
+  const unitId = lookup.data.id;
   const result = await getUnitById(unitId);
 
   if (result.error) {
@@ -109,13 +123,13 @@ export default async function UnitDetailPage({ params }: PageProps) {
 
           <div className="flex flex-wrap gap-3">
             <Link
-              href={`/units/${unit.id}/edit`}
+              href={`/units/${unit.unit_number}/edit`}
               className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800"
             >
               Edit
             </Link>
             <Button asChild variant="secondary" shape="default">
-              <Link href={`/units/${unit.id}/transfer-ownership`}>
+              <Link href={`/units/${unit.unit_number}/transfer-ownership`}>
                 <UserSwitchIcon size={16} aria-hidden="true" />
                 {ownershipSnapshot?.currentOwnership
                   ? "Transfer ownership"
@@ -196,7 +210,7 @@ export default async function UnitDetailPage({ params }: PageProps) {
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-zinc-950">Ownership</h2>
           <Link
-            href={`/units/${unit.id}/transfer-ownership`}
+            href={`/units/${unit.unit_number}/transfer-ownership`}
             className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
           >
             {ownershipSnapshot?.currentOwnership

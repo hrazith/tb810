@@ -55,11 +55,11 @@ export function UnitsTable({ units }: Props) {
             tabIndex={0}
             role="link"
             aria-label={`View ${unit.unit_number}`}
-            onClick={() => router.push(`/units/${unit.id}`)}
+            onClick={() => router.push(`/units/${unit.unit_number}`)}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                router.push(`/units/${unit.id}`);
+                router.push(`/units/${unit.unit_number}`);
               }
             }}
             className="cursor-pointer hover:bg-zinc-50 focus-visible:bg-zinc-50 focus-visible:outline-none"

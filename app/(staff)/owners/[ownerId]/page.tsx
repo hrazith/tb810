@@ -114,7 +114,7 @@ export default async function OwnerDetailPage({ params }: PageProps) {
                       </p>
                     </div>
                     <Link
-                      href={`/units/${item.unit_id}`}
+                      href={`/units/${item.unit_number}`}
                       className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
                     >
                       View unit
@@ -152,7 +152,7 @@ export default async function OwnerDetailPage({ params }: PageProps) {
                       </p>
                     </div>
                     <Link
-                      href={`/units/${item.unit_id}`}
+                      href={`/units/${item.unit_number}`}
                       className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
                     >
                       View unit
@@ -189,7 +189,7 @@ export default async function OwnerDetailPage({ params }: PageProps) {
                       </p>
                     </div>
                     <Link
-                      href={`/units/${item.unit_id}`}
+                      href={`/units/${item.unit_number}`}
                       className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
                     >
                       View unit

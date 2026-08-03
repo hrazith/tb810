@@ -221,6 +221,59 @@ export async function getUnitById(unitId: string): Promise<QueryResult<UnitDetai
   };
 }
 
+export async function getUnitByNumberForCurrentBuilding(
+  unitNumber: string,
+): Promise<QueryResult<UnitDetail | null>> {
+  const supabase = await createClient();
+  const buildingResult = await getCurrentBuilding();
+
+  if (buildingResult.error) {
+    return { data: null, error: buildingResult.error };
+  }
+
+  const building = buildingResult.data;
+  if (!building) {
+    return { data: null, error: null };
+  }
+
+  const { data, error } = await supabase
+    .from("tb810_units")
+    .select(UNIT_SELECT)
+    .eq("building_id", building.id)
+    .eq("unit_number", unitNumber)
+    .maybeSingle();
+
+  if (error) return { data: null, error: error.message };
+  if (!data) return { data: null, error: null };
+
+  const [{ data: unitType, error: unitTypeError }, { data: buildingRecord, error: buildingError }] = await Promise.all([
+    supabase
+      .from("tb810_unit_types")
+      .select("id, code, name, sort_order")
+      .eq("id", data.unit_type_id)
+      .maybeSingle(),
+    supabase
+      .from("tb810_buildings")
+      .select("id, name")
+      .eq("id", data.building_id)
+      .maybeSingle(),
+  ]);
+
+  if (unitTypeError) return { data: null, error: unitTypeError.message };
+  if (buildingError) return { data: null, error: buildingError.message };
+  if (!unitType || !buildingRecord) return { data: null, error: null };
+
+  return {
+    data: {
+      ...data,
+      unit_type_name: unitType.name,
+      unit_type_code: unitType.code,
+      building_name: buildingRecord.name,
+    },
+    error: null,
+  };
+}
+
 export async function updateUnit(
   unitId: string,
   input: UnitInput,

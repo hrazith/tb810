@@ -68,10 +68,11 @@ export function UnitsControls({
   return (
     <div className="flex w-full flex-col gap-3 xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end xl:ml-auto">
       <Input
+        type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Search by unit number, floor, or type"
-        className="xl:w-[22rem]"
+        className="xl:w-[24rem]"
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();

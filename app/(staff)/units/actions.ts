@@ -67,7 +67,7 @@ export async function updateUnitAction(
   const result = await updateUnit(unitId, validation.data);
   if (result.error) return toFormStateError(result.error, values);
 
-  redirect(`/units/${unitId}`);
+  redirect(`/units/${validation.data.unit_number}`);
 }
 
 export async function createUnitAction(
@@ -87,5 +87,5 @@ export async function createUnitAction(
   const result = await createUnit(validation.data);
   if (result.error) return toFormStateError(result.error, values);
 
-  redirect(`/units/${result.data.id}`);
+  redirect(`/units/${result.data.unit_number}`);
 }

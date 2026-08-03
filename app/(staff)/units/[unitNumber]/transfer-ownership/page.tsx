@@ -5,18 +5,30 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { listOwners } from "@/server/owners";
 import { getTransferDefaults } from "@/server/ownerships";
+import { getUnitByNumberForCurrentBuilding } from "@/server/units";
 
 import { transferOwnershipAction } from "./actions";
 import { TransferOwnershipForm } from "./_components/transfer-ownership-form";
 
 type PageProps = {
   params: Promise<{
-    unitId: string;
+    unitNumber: string;
   }>;
 };
 
 export default async function TransferOwnershipPage({ params }: PageProps) {
-  const { unitId } = await params;
+  const { unitNumber } = await params;
+  const lookup = await getUnitByNumberForCurrentBuilding(unitNumber);
+
+  if (lookup.error) {
+    throw new Error(lookup.error);
+  }
+
+  if (!lookup.data) {
+    notFound();
+  }
+
+  const unitId = lookup.data.id;
   const [defaultsResult, ownersResult] = await Promise.all([
     getTransferDefaults(unitId),
     listOwners({ status: "active" }),
@@ -53,7 +65,7 @@ export default async function TransferOwnershipPage({ params }: PageProps) {
           Account, debt, and invoice history remain unchanged.
         </p>
         <Button asChild variant="secondary" size="sm">
-          <Link href={`/units/${unitId}`}>Back to unit</Link>
+          <Link href={`/units/${unitNumber}`}>Back to unit</Link>
         </Button>
       </Panel>
 
@@ -61,9 +73,8 @@ export default async function TransferOwnershipPage({ params }: PageProps) {
         defaults={{ ...defaults, owners: ownersResult.data }}
         action={transferOwnershipAction.bind(null, unitId)}
         submitLabel={submitLabel}
-        cancelHref={`/units/${unitId}`}
+        cancelHref={`/units/${unitNumber}`}
       />
     </section>
   );
 }
-

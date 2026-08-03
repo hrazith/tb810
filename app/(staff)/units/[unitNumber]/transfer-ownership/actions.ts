@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { transferOwnership } from "@/server/ownerships";
+import { getUnitById } from "@/server/units";
 import type {
   OwnershipTransferFormInput,
   OwnershipTransferInput,
@@ -67,7 +68,15 @@ export async function transferOwnershipAction(
       return { error: result.error, values };
     }
 
-    redirect(`/units/${unitId}`);
+    const unit = await getUnitById(unitId);
+    if (unit.error) {
+      throw new Error(unit.error);
+    }
+    if (!unit.data) {
+      redirect("/units");
+    }
+
+    redirect(`/units/${unit.data.unit_number}`);
   } catch (error) {
     console.error("Ownership transfer action exception", {
       unitId,

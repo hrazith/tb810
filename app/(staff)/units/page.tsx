@@ -88,43 +88,33 @@ export default async function UnitsPage({ searchParams }: PageProps) {
           No units found.
         </Panel>
       ) : view === "table" ? (
-          <div className="mt-8 flow-root">
-            <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-              <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-                <UnitsTable units={unitsResult.data} />
-              </div>
+        <div className="mt-8 flow-root">
+          <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+            <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+              <UnitsTable units={unitsResult.data} />
             </div>
           </div>
-        ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        </div>
+      ) : (
+        <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
           {unitsResult.data.map((unit) => (
             <Link
               key={unit.id}
-              href={`/units/${unit.id}`}
-              className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:-translate-y-px hover:border-zinc-950 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
+              href={`/units/${unit.unit_number}`}
+              className="group rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
             >
-              <div className="space-y-4">
+              <div className="flex h-full min-h-[8rem] flex-col justify-between">
                 <div className="space-y-1">
-                  <span className="block text-lg font-semibold text-zinc-950 underline decoration-transparent transition group-hover:decoration-zinc-950">
+                  <span className="block text-xl font-semibold tracking-tight text-zinc-950 underline decoration-transparent transition group-hover:decoration-zinc-950">
                     {unit.unit_number}
                   </span>
                 </div>
-                <div className="grid gap-2 text-sm text-zinc-600">
-                  <p>
-                    <span className="font-medium text-zinc-900">Owner:</span>{" "}
-                    {unit.current_owner_name ?? "Unassigned"}
-                  </p>
-                  <p>
-                    <span className="font-medium text-zinc-900">Type:</span>{" "}
-                    {unit.unit_type_name}
-                  </p>
-                  <p>
-                    <span className="font-medium text-zinc-900">Floor:</span>{" "}
-                    {unit.floor ?? "—"}
-                  </p>
-                  <p>
-                    <span className="font-medium text-zinc-900">Participation:</span>{" "}
+                <div className="space-y-4">
+                  <p className="text-3xl leading-none font-light tracking-tight text-zinc-600">
                     {formatParticipation(unit.participation_percentage)}
+                  </p>
+                  <p className="text-md text-zinc-600">
+                    {unit.current_owner_name ?? "Unassigned"}
                   </p>
                 </div>
               </div>

@@ -2,17 +2,30 @@ import { notFound } from "next/navigation";
 
 import { UnitForm } from "../../_components/unit-form";
 import { updateUnitAction } from "../../actions";
-import { getUnitFormDefaults } from "@/server/units";
+import {
+  getUnitByNumberForCurrentBuilding,
+  getUnitFormDefaults,
+} from "@/server/units";
 
 type PageProps = {
   params: Promise<{
-    unitId: string;
+    unitNumber: string;
   }>;
 };
 
 export default async function EditUnitPage({ params }: PageProps) {
-  const { unitId } = await params;
-  const defaults = await getUnitFormDefaults(unitId);
+  const { unitNumber } = await params;
+  const lookup = await getUnitByNumberForCurrentBuilding(unitNumber);
+
+  if (lookup.error) {
+    throw new Error(lookup.error);
+  }
+
+  if (!lookup.data) {
+    notFound();
+  }
+
+  const defaults = await getUnitFormDefaults(lookup.data.id);
 
   if (defaults.error) {
     throw new Error(defaults.error);
@@ -35,7 +48,7 @@ export default async function EditUnitPage({ params }: PageProps) {
 
       <UnitForm
         defaults={defaults.data}
-        action={updateUnitAction.bind(null, unitId)}
+        action={updateUnitAction.bind(null, lookup.data.id)}
         submitLabel="Save changes"
       />
     </section>
