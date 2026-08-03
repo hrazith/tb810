@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDevTools } from "@/components/dev-tools";
 import { LEDGER_GRID_CLASS } from "./ledger-layout";
 
 type FormState = {
@@ -19,6 +20,8 @@ type Props = {
   units: UnitOption[];
   readingDate: string;
   previousByUnitId: Record<string, { previous_reading: number | null; previous_reading_date: string | null }>;
+  historicalEditingAvailable?: boolean;
+  isHistoricalMonth?: boolean;
 };
 
 const initialState: FormState = {};
@@ -33,7 +36,15 @@ function toNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function AddMeterReadingRow({ action, units, readingDate, previousByUnitId }: Props) {
+export function AddMeterReadingRow({
+  action,
+  units,
+  readingDate,
+  previousByUnitId,
+  historicalEditingAvailable = false,
+  isHistoricalMonth = false,
+}: Props) {
+  const { historicalEditingEnabled } = useDevTools();
   const [state, formAction, pending] = useActionState(action, initialState);
   const [unitText, setUnitText] = useState("");
   const [currentReading, setCurrentReading] = useState("");
@@ -53,6 +64,9 @@ export function AddMeterReadingRow({ action, units, readingDate, previousByUnitI
     previous == null || currentReading === "" || toNumber(currentReading) == null
       ? null
       : toNumber(currentReading)! - previous;
+  const canEditHistoricalReadings =
+    historicalEditingAvailable && historicalEditingEnabled && isHistoricalMonth;
+  const visible = !isHistoricalMonth || canEditHistoricalReadings;
 
   useEffect(() => {
     if (pending) {
@@ -81,6 +95,8 @@ export function AddMeterReadingRow({ action, units, readingDate, previousByUnitI
 
   const visibleSuccessMessage = state.error ? null : successMessage;
 
+  if (!visible) return null;
+
   return (
     <>
         <form
@@ -100,6 +116,7 @@ export function AddMeterReadingRow({ action, units, readingDate, previousByUnitI
           <input type="hidden" name="reading_date" form={formId} value={date} />
           <input type="hidden" name="status" form={formId} value="recorded" />
           <input type="hidden" name="notes" form={formId} value="" />
+          <input type="hidden" name="dev_historical_edit_enabled" form={formId} value={canEditHistoricalReadings ? "true" : "false"} />
           <Input
             list="unit-options"
             value={unitText}

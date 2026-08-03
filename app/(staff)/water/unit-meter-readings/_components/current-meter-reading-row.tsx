@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDevTools } from "@/components/dev-tools";
 import { LEDGER_GRID_CLASS } from "./ledger-layout";
 
 type FormState = {
@@ -26,6 +27,8 @@ type Props = {
   action: (prevState: FormState, formData: FormData) => Promise<FormState>;
   deleteAction: (prevState: FormState, formData: FormData) => Promise<FormState>;
   readOnly?: boolean;
+  historicalEditingAvailable?: boolean;
+  isHistoricalMonth?: boolean;
 };
 
 const initialState: FormState = {};
@@ -35,7 +38,15 @@ function readingValue(value: number | null | undefined) {
   return value.toFixed(3).replace(/\.?0+$/, "");
 }
 
-export function CurrentMeterReadingRow({ row, action, deleteAction, readOnly = false }: Props) {
+export function CurrentMeterReadingRow({
+  row,
+  action,
+  deleteAction,
+  readOnly = false,
+  historicalEditingAvailable = false,
+  isHistoricalMonth = false,
+}: Props) {
+  const { historicalEditingEnabled } = useDevTools();
   const [state, formAction, pending] = useActionState(action, initialState);
   const [deleteState, deleteFormAction, deletePending] = useActionState(deleteAction, initialState);
   const [currentReading, setCurrentReading] = useState(readingValue(row.reading_end));
@@ -44,6 +55,9 @@ export function CurrentMeterReadingRow({ row, action, deleteAction, readOnly = f
   const formRef = useRef<HTMLFormElement | null>(null);
   const formId = `unit-meter-reading-${row.id}`;
   const deleteFormId = `unit-meter-reading-delete-${row.id}`;
+  const canEditHistoricalReadings =
+    historicalEditingAvailable && historicalEditingEnabled && isHistoricalMonth;
+  const editable = !readOnly || canEditHistoricalReadings;
 
   useEffect(() => {
     if (!state.values) return;
@@ -71,50 +85,48 @@ export function CurrentMeterReadingRow({ row, action, deleteAction, readOnly = f
       <div className={`${LEDGER_GRID_CLASS} border-b border-zinc-100 px-4 py-4`}>
         <div className="text-sm font-medium text-zinc-950">{row.unit_number}</div>
         <div>
-          {readOnly ? (
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-              {readingValue(row.reading_end)}
-            </div>
-          ) : (
-            <Input
-              form={formId}
-              name="reading_end"
-              type="number"
-              min="0"
-              step="0.001"
-              inputMode="decimal"
-              value={currentReading}
-              onChange={(e) => setCurrentReading(e.target.value)}
-              onBlur={submitIfChanged}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  formRef.current?.requestSubmit();
-                }
-              }}
-            />
-          )}
-        </div>
-        <div className="text-sm text-zinc-600">{previous == null ? "—" : readingValue(previous)}</div>
-        <div className="text-sm text-zinc-600">{consumption == null ? "—" : readingValue(consumption)}</div>
-        <div>
-          {readOnly ? (
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-              {new Date(`${row.reading_date}T00:00:00Z`).toLocaleDateString("en-US", {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-                timeZone: "UTC",
-              })}
-            </div>
-          ) : (
+          {editable ? (
             <>
               <form ref={formRef} id={formId} action={formAction} className="hidden">
                 <input type="hidden" name="reading_id" value={row.id} />
                 <input type="hidden" name="unit_id" value={row.unit_id} />
                 <input type="hidden" name="status" value={row.status} />
                 <input type="hidden" name="notes" value={row.notes ?? ""} />
+                <input
+                  type="hidden"
+                  name="dev_historical_edit_enabled"
+                  value={canEditHistoricalReadings ? "true" : "false"}
+                />
               </form>
+              <Input
+                form={formId}
+                name="reading_end"
+                type="number"
+                min="0"
+                step="0.001"
+                inputMode="decimal"
+                value={currentReading}
+                onChange={(e) => setCurrentReading(e.target.value)}
+                onBlur={submitIfChanged}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    formRef.current?.requestSubmit();
+                  }
+                }}
+              />
+            </>
+          ) : (
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+              {readingValue(row.reading_end)}
+            </div>
+          )}
+        </div>
+        <div className="text-sm text-zinc-600">{previous == null ? "—" : readingValue(previous)}</div>
+        <div className="text-sm text-zinc-600">{consumption == null ? "—" : readingValue(consumption)}</div>
+        <div>
+          {editable ? (
+            <>
               <Input
                 form={formId}
                 name="reading_date"
@@ -132,13 +144,27 @@ export function CurrentMeterReadingRow({ row, action, deleteAction, readOnly = f
               {pending ? <p className="mt-2 text-xs text-zinc-500">Saving...</p> : null}
               {state.error ? <p className="mt-2 text-xs text-red-600">{state.error}</p> : null}
             </>
+          ) : (
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+              {new Date(`${row.reading_date}T00:00:00Z`).toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+                timeZone: "UTC",
+              })}
+            </div>
           )}
         </div>
         <div className="flex items-start justify-end">
-          {readOnly ? null : (
+          {editable ? (
             <>
               <form id={deleteFormId} action={deleteFormAction} className="hidden">
                 <input type="hidden" name="reading_id" value={row.id} />
+                <input
+                  type="hidden"
+                  name="dev_historical_edit_enabled"
+                  value={canEditHistoricalReadings ? "true" : "false"}
+                />
               </form>
               <Button
                 type="submit"
@@ -166,10 +192,10 @@ export function CurrentMeterReadingRow({ row, action, deleteAction, readOnly = f
                 Delete
               </Button>
             </>
-          )}
+          ) : null}
         </div>
       </div>
-      {!readOnly && deleteState.error ? (
+      {editable && deleteState.error ? (
         <p className="px-4 py-2 text-sm text-red-600">{deleteState.error}</p>
       ) : null}
     </>

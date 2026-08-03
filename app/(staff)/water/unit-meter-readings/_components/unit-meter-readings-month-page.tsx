@@ -15,6 +15,7 @@ import {
 import { AddMeterReadingRow } from "./add-meter-reading-row";
 import { CurrentMeterReadingRow } from "./current-meter-reading-row";
 import { UploadCompletedTemplateButton } from "./upload-completed-template-button";
+import { HistoricalEditingBanner } from "./historical-editing-banner";
 import { LEDGER_GRID_CLASS } from "./ledger-layout";
 import { MonthLedgerSelector } from "./month-ledger-selector";
 
@@ -22,9 +23,10 @@ type Props = {
   month: string;
   query?: string;
   deleted?: string;
+  historicalEditingAvailable: boolean;
 };
 
-export async function UnitMeterReadingsMonthPage({ month, query, deleted }: Props) {
+export async function UnitMeterReadingsMonthPage({ month, query, deleted, historicalEditingAvailable }: Props) {
   const activeMonth = getActiveReadingMonth();
   const [result, units] = await Promise.all([
     listUnitMeterReadings({ query, month }),
@@ -36,6 +38,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted }: Prop
     : monthsResult.data;
 
   const isActiveMonth = month === activeMonth.key;
+  const canShowHistoricalEditing = historicalEditingAvailable && !isActiveMonth;
   const previousByUnitId = Object.fromEntries(
     result.data.map((row) => [
       row.unit_id,
@@ -69,6 +72,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted }: Prop
 
       {result.error ? <Panel className="border-red-200 bg-red-50 text-sm text-red-700">{result.error}</Panel> : null}
       {deleted ? <Panel className="border-emerald-200 bg-emerald-50 text-sm text-emerald-700">{deleted}</Panel> : null}
+      <HistoricalEditingBanner historicalEditingAvailable={historicalEditingAvailable} isHistoricalMonth={!isActiveMonth} />
 
       <Panel className="space-y-4">
         <h2 className="text-lg font-semibold text-zinc-950">Operational Ledger</h2>
@@ -88,6 +92,17 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted }: Prop
                 units={units.data}
                 readingDate={activeMonth.start}
                 previousByUnitId={previousByUnitId}
+                historicalEditingAvailable={historicalEditingAvailable}
+                isHistoricalMonth={false}
+              />
+            ) : canShowHistoricalEditing ? (
+              <AddMeterReadingRow
+                action={createInlineUnitMeterReadingAction}
+                units={units.data}
+                readingDate={month ? `${month}-01` : activeMonth.start}
+                previousByUnitId={previousByUnitId}
+                historicalEditingAvailable={historicalEditingAvailable}
+                isHistoricalMonth
               />
             ) : null}
             {result.data.map((row) => (
@@ -97,6 +112,8 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted }: Prop
                 action={updateInlineUnitMeterReadingAction}
                 deleteAction={deleteUnitMeterReadingAction}
                 readOnly={!isActiveMonth}
+                historicalEditingAvailable={historicalEditingAvailable}
+                isHistoricalMonth={!isActiveMonth}
               />
             ))}
             {!result.data.length ? (

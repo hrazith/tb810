@@ -16,6 +16,7 @@ import {
   getUnitOptions,
   listUnitMeterReadings,
   updateUnitMeterReading,
+  canEditHistoricalReadingsServer,
 } from "@/server/water/unit-meter-readings";
 
 type MeterReadingFormState = {
@@ -47,11 +48,18 @@ function toInput(formData: FormData) {
   };
 }
 
+function historicalEditIntent(formData: FormData) {
+  return String(formData.get("dev_historical_edit_enabled") ?? "") === "true";
+}
+
 export async function createUnitMeterReadingAction(
   _prev: MeterReadingFormState,
   formData: FormData,
 ): Promise<MeterReadingFormState> {
-  const result = await createUnitMeterReading(toInput(formData));
+  const result = await createUnitMeterReading(
+    toInput(formData),
+    canEditHistoricalReadingsServer(historicalEditIntent(formData)),
+  );
   if (result.error) {
     return { error: result.error, values: Object.fromEntries(formData.entries().map(([k, v]) => [k, String(v)])) };
   }
@@ -63,7 +71,10 @@ export async function createInlineUnitMeterReadingAction(
   _prev: MeterReadingFormState,
   formData: FormData,
 ): Promise<MeterReadingFormState> {
-  const result = await createUnitMeterReading(toInput(formData));
+  const result = await createUnitMeterReading(
+    toInput(formData),
+    canEditHistoricalReadingsServer(historicalEditIntent(formData)),
+  );
   if (result.error) {
     return {
       error: result.error,
@@ -87,7 +98,11 @@ export async function updateUnitMeterReadingAction(
   formData: FormData,
 ): Promise<MeterReadingFormState> {
   const readingId = String(formData.get("reading_id") ?? "");
-  const result = await updateUnitMeterReading(readingId, toInput(formData));
+  const result = await updateUnitMeterReading(
+    readingId,
+    toInput(formData),
+    canEditHistoricalReadingsServer(historicalEditIntent(formData)),
+  );
   if (result.error) {
     return { error: result.error, values: Object.fromEntries(formData.entries().map(([k, v]) => [k, String(v)])) };
   }
@@ -100,7 +115,11 @@ export async function updateInlineUnitMeterReadingAction(
   formData: FormData,
 ): Promise<MeterReadingFormState> {
   const readingId = String(formData.get("reading_id") ?? "");
-  const result = await updateUnitMeterReading(readingId, toInput(formData));
+  const result = await updateUnitMeterReading(
+    readingId,
+    toInput(formData),
+    canEditHistoricalReadingsServer(historicalEditIntent(formData)),
+  );
   if (result.error) {
     return {
       error: result.error,
@@ -119,7 +138,10 @@ export async function deleteUnitMeterReadingAction(
   formData: FormData,
 ): Promise<MeterReadingFormState> {
   const readingId = String(formData.get("reading_id") ?? "");
-  const result = await deleteUnitMeterReading(readingId);
+  const result = await deleteUnitMeterReading(
+    readingId,
+    canEditHistoricalReadingsServer(historicalEditIntent(formData)),
+  );
   if (result.error) {
     return { error: result.error };
   }

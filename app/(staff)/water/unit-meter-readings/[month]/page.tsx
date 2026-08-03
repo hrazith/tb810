@@ -20,11 +20,20 @@ export default async function UnitMeterReadingsMonthRoute({ params, searchParams
   const paramsResult = (await searchParams) ?? {};
   const activeMonth = getActiveReadingMonth();
   const selectedMonth = parseWaterMonthKey(month);
+  const historicalEditingAvailable =
+    process.env.NODE_ENV === "development" &&
+    process.env.TB810_ALLOW_HISTORICAL_READING_EDITS === "true";
 
   if (!selectedMonth) {
     redirect(`/water/unit-meter-readings/${activeMonth.key}`);
   }
 
-  return <UnitMeterReadingsMonthPage month={selectedMonth} query={paramsResult.q} deleted={paramsResult.deleted} />;
+  return (
+    <UnitMeterReadingsMonthPage
+      month={selectedMonth}
+      query={paramsResult.q}
+      deleted={paramsResult.deleted}
+      historicalEditingAvailable={historicalEditingAvailable}
+    />
+  );
 }
-

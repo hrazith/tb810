@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 
+import { useDevTools } from "@/components/dev-tools";
 import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
 import type { UnitMeterReadingDefaults, UnitOption } from "@/server/water/unit-meter-readings";
@@ -19,6 +20,8 @@ type Props = {
   initialValues?: Partial<Record<string, string>>;
   readingDefaults?: UnitMeterReadingDefaults | null;
   readOnly?: boolean;
+  historicalEditingAvailable?: boolean;
+  isHistoricalMonth?: boolean;
 };
 
 const initialState: FormState = {};
@@ -40,7 +43,10 @@ export function UnitMeterReadingForm({
   initialValues,
   readingDefaults,
   readOnly = false,
+  historicalEditingAvailable = false,
+  isHistoricalMonth = false,
 }: Props) {
+  const { historicalEditingEnabled } = useDevTools();
   const [state, formAction, pending] = useActionState(action, initialState);
   const values = state.values ?? initialValues ?? {};
   const [unitId, setUnitId] = useState(values.unit_id ?? units[0]?.id ?? "");
@@ -60,6 +66,9 @@ export function UnitMeterReadingForm({
 
   const previousReading = readingDefaults?.previousReading ?? null;
   const previousReadingDate = readingDefaults?.previousReadingDate ?? null;
+  const canEditHistoricalReadings =
+    historicalEditingAvailable && historicalEditingEnabled && isHistoricalMonth;
+  const editable = !readOnly || canEditHistoricalReadings;
   const consumption = useMemo(() => {
     const previous = previousReading;
     const current = toNumber(currentReading);
@@ -73,6 +82,8 @@ export function UnitMeterReadingForm({
     <Panel as="form" action={formAction} className="space-y-6">
       <input type="hidden" name="reading_id" value={initialValues?.reading_id ?? ""} />
       <input type="hidden" name="status" value={initialValues?.status ?? "recorded"} />
+
+      <input type="hidden" name="dev_historical_edit_enabled" value={canEditHistoricalReadings ? "true" : "false"} />
 
       <div className="grid gap-4 md:grid-cols-2 ">
         <label className="block space-y-2 md:col-span-2">
@@ -92,7 +103,7 @@ export function UnitMeterReadingForm({
             value={unitId}
             onChange={(e) => setUnitId(e.target.value)}
             placeholder="Search by unit number"
-            readOnly={readOnly}
+            readOnly={!editable}
           />
           <datalist id="unit-options">
             {units.map((unit) => (
@@ -111,7 +122,7 @@ export function UnitMeterReadingForm({
             type="date"
             value={readingDate}
             onChange={(e) => setReadingDate(e.target.value)}
-            readOnly={readOnly}
+            readOnly={!editable}
           />
         </label>
 
@@ -125,7 +136,7 @@ export function UnitMeterReadingForm({
             inputMode="decimal"
             value={currentReading}
             onChange={(e) => setCurrentReading(e.target.value)}
-            readOnly={readOnly}
+            readOnly={!editable}
           />
         </label>
 

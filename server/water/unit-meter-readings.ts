@@ -65,6 +65,16 @@ export type UnitMeterReadingDefaults = {
   previousReadingDate: string | null;
 };
 
+export function canEditHistoricalReadingsServer(
+  intent: boolean,
+) {
+  return (
+    process.env.NODE_ENV === "development" &&
+    process.env.TB810_ALLOW_HISTORICAL_READING_EDITS === "true" &&
+    intent
+  );
+}
+
 export type UnitMeterReadingDeleteResult = {
   reading: UnitMeterReadingRecord;
   readingMonthKey: string;
@@ -377,13 +387,15 @@ async function validateReading(
   utilityTypeId: string,
   input: UnitMeterReadingInput,
   unitNumber: string,
+  allowHistoricalEditing: boolean,
   excludeReadingId?: string,
 ) {
   const active = getActiveReadingMonth();
   const readingDate = normalizeDate(input.reading_date);
   if (!readingDate) return { error: "Reading date is required and must be valid." };
   const readingMonthKey = monthKeyFromDate(readingDate);
-  if (readingMonthKey !== active.key) {
+  if (!readingMonthKey) return { error: "Reading date is required and must be valid." };
+  if (readingMonthKey !== active.key && !allowHistoricalEditing) {
     return { error: "Reading date must belong to the active reading month." };
   }
 
@@ -439,7 +451,10 @@ async function validateReading(
   } as const;
 }
 
-export async function createUnitMeterReading(input: UnitMeterReadingInput) {
+export async function createUnitMeterReading(
+  input: UnitMeterReadingInput,
+  allowHistoricalEditing = false,
+) {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: null as never, error: buildingResult.error };
   if (!buildingResult.data) return { data: null as never, error: "Current building not found." };
@@ -453,7 +468,14 @@ export async function createUnitMeterReading(input: UnitMeterReadingInput) {
   if (unitResult.error) return { data: null as never, error: unitResult.error };
   if (!unitResult.data) return { data: null as never, error: "Invalid unit." };
 
-  const validated = await validateReading(supabase, buildingResult.data.id, utilityType.data.id, input, unitResult.data.unit_number);
+  const validated = await validateReading(
+    supabase,
+    buildingResult.data.id,
+    utilityType.data.id,
+    input,
+    unitResult.data.unit_number,
+    allowHistoricalEditing,
+  );
   if (validated.error) return { data: null as never, error: validated.error };
   const safe = validated.data!;
 
@@ -478,7 +500,11 @@ export async function createUnitMeterReading(input: UnitMeterReadingInput) {
   return { data, error: null };
 }
 
-export async function updateUnitMeterReading(readingId: string, input: UnitMeterReadingInput) {
+export async function updateUnitMeterReading(
+  readingId: string,
+  input: UnitMeterReadingInput,
+  allowHistoricalEditing = false,
+) {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: null as never, error: buildingResult.error };
   if (!buildingResult.data) return { data: null as never, error: "Current building not found." };
@@ -498,6 +524,7 @@ export async function updateUnitMeterReading(readingId: string, input: UnitMeter
     utilityType.data.id,
     input,
     unitResult.data.unit_number,
+    allowHistoricalEditing,
     readingId,
   );
   if (validated.error) return { data: null as never, error: validated.error };
@@ -523,7 +550,10 @@ export async function updateUnitMeterReading(readingId: string, input: UnitMeter
   return { data, error: null };
 }
 
-export async function deleteUnitMeterReading(readingId: string): Promise<QueryResult<UnitMeterReadingDeleteResult>> {
+export async function deleteUnitMeterReading(
+  readingId: string,
+  allowHistoricalEditing = false,
+): Promise<QueryResult<UnitMeterReadingDeleteResult>> {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: null as never, error: buildingResult.error };
   if (!buildingResult.data) return { data: null as never, error: "Current building not found." };
@@ -563,7 +593,7 @@ export async function deleteUnitMeterReading(readingId: string): Promise<QueryRe
   }
 
   const active = getActiveReadingMonth();
-  if (monthKeyFromDate(reading.reading_date) !== active.key) {
+  if (monthKeyFromDate(reading.reading_date) !== active.key && !allowHistoricalEditing) {
     return { data: null as never, error: "Only current-month meter readings can be deleted." };
   }
 
