@@ -8,6 +8,7 @@ import {
   getLatestBudgetPlanForCurrentBuilding,
   getUnitFixedMonthlyAssessment,
 } from "@/server/budget-plans";
+import { getAugust2026MeteredWaterChargeForUnit } from "@/server/water";
 import { getUnitOwnershipSnapshot } from "@/server/ownerships";
 import { getUnitById } from "@/server/units";
 
@@ -73,6 +74,7 @@ export default async function UnitDetailPage({ params }: PageProps) {
   }
 
   const ownershipSnapshot = ownershipResult.data;
+  const meteredWaterState = await getAugust2026MeteredWaterChargeForUnit(unitId);
 
   return (
     <section className="space-y-6">
@@ -298,6 +300,66 @@ export default async function UnitDetailPage({ params }: PageProps) {
             )}
           </div>
         </div>
+      </Panel>
+
+      <Panel as="section" className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-950">Metered Water Charge</h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Read-only August 2026 preview based on the July 2026 meter reading and Sedapal bill.
+          </p>
+        </div>
+
+        {meteredWaterState.status === "available" ? (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Billing Month
+                </p>
+                <p className="text-base font-semibold text-zinc-950">
+                  August 2026
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Source Reading Month
+                </p>
+                <p className="text-base font-semibold text-zinc-950">
+                  {meteredWaterState.data.sourceReadingMonthLabel}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Unit Consumption
+                </p>
+                <p className="text-base font-semibold text-zinc-950">
+                  {meteredWaterState.data.unitConsumptionText} m³
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Period Unit Rate
+                </p>
+                <p className="text-base font-semibold text-zinc-950">
+                  {meteredWaterState.data.periodRateText} PEN/m³
+                </p>
+              </div>
+              <div className="space-y-1 sm:col-span-2 xl:col-span-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Final Charge
+                </p>
+                <p className="text-base font-semibold text-zinc-950">
+                  {formatCurrency(meteredWaterState.data.amount, "PEN")}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : meteredWaterState.status === "not-applicable" ? (
+          <p className="text-sm text-zinc-600">{meteredWaterState.message}</p>
+        ) : (
+          <p className="text-sm text-zinc-600">{meteredWaterState.message}</p>
+        )}
       </Panel>
 
       <Panel as="section">
