@@ -56,6 +56,7 @@ export function UnitMeterReadingForm({
   const [currentReading, setCurrentReading] = useState(values.reading_end ?? "");
   const [notes, setNotes] = useState(values.notes ?? "");
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!state.values) return;
     setUnitId(state.values.unit_id ?? unitId);
@@ -63,6 +64,7 @@ export function UnitMeterReadingForm({
     setCurrentReading(state.values.reading_end ?? currentReading);
     setNotes(state.values.notes ?? notes);
   }, [currentReading, notes, readingDate, state.values, unitId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const previousReading = readingDefaults?.previousReading ?? null;
   const previousReadingDate = readingDefaults?.previousReadingDate ?? null;

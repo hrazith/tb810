@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { brandConfig, gothamSans } from "@/brand";
-import { DevToolsToolbar } from "@/components/dev-tools";
+import { DevToolsProvider, DevToolsToolbar } from "@/components/dev-tools";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -32,8 +32,10 @@ export default function RootLayout({
         data-dev-page-breaks={devPageBreaks ? "1" : undefined}
         data-dev-historical-editing-available={historicalEditingAvailable ? "1" : undefined}
       >
-        {children}
-        <DevToolsToolbar />
+        <DevToolsProvider>
+          {children}
+          <DevToolsToolbar />
+        </DevToolsProvider>
       </body>
     </html>
   );

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { CaretDown } from "@phosphor-icons/react/dist/ssr";
 
 import { brandConfig, SignOut } from "@/brand";
 
@@ -29,12 +30,34 @@ export function Header({ userEmail, signOutAction }: HeaderProps) {
             <Link href="/units" className="inline-flex items-center gap-2 transition hover:text-zinc-950">
               Units
             </Link>
-            <Link
-              href="/water"
-              className="inline-flex items-center gap-2 transition hover:text-zinc-950"
-            >
-              Water
-            </Link>
+            <div className="group relative">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 transition hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
+                aria-haspopup="menu"
+                aria-expanded="false"
+              >
+                Water
+                <CaretDown size={14} weight="bold" />
+              </button>
+
+              <div className="pointer-events-none absolute left-0 top-full z-30 pt-3 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                <div className="min-w-60 rounded-2xl border border-zinc-200 bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.08)]">
+                  <Link
+                    href="/water/sedapal"
+                    className="flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950"
+                  >
+                    Sedapal bill
+                  </Link>
+                  <Link
+                    href="/water/unit-meter-readings"
+                    className="flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950"
+                  >
+                    Unit meter readings
+                  </Link>
+                </div>
+              </div>
+            </div>
           </nav>
         </div>
 

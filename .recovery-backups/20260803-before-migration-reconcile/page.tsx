@@ -8,16 +8,16 @@ import {
   getLatestBudgetPlanForCurrentBuilding,
   getUnitFixedMonthlyAssessment,
 } from "@/server/budget-plans";
-import { getAugust2026MeteredWaterChargeForUnit } from "@/server/water";
-import { getUnitOwnershipSnapshot } from "@/server/ownerships";
 import {
-  getUnitById,
-  getUnitByNumberForCurrentBuilding,
-} from "@/server/units";
+  getBillingPeriodIdForMonth,
+  getMonthlyObligationForUnitAccount,
+} from "@/server/monthly-obligations";
+import { getUnitOwnershipSnapshot } from "@/server/ownerships";
+import { getUnitById } from "@/server/units";
 
 type PageProps = {
   params: Promise<{
-    unitNumber: string;
+    unitId: string;
   }>;
 };
 
@@ -45,18 +45,7 @@ function statusLabel(status: string) {
 }
 
 export default async function UnitDetailPage({ params }: PageProps) {
-  const { unitNumber } = await params;
-  const lookup = await getUnitByNumberForCurrentBuilding(unitNumber);
-
-  if (lookup.error) {
-    throw new Error(lookup.error);
-  }
-
-  if (!lookup.data) {
-    notFound();
-  }
-
-  const unitId = lookup.data.id;
+  const { unitId } = await params;
   const result = await getUnitById(unitId);
 
   if (result.error) {
@@ -76,11 +65,6 @@ export default async function UnitDetailPage({ params }: PageProps) {
 
   const budgetPlan = budgetPlanResult.data;
   const planYear = budgetPlan?.plan_year ?? 2027;
-  const obligationLabel = `Unit Obligation ${new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date())}`;
   const assessmentState = await getUnitFixedMonthlyAssessment({
     unitId,
     planYear,
@@ -93,7 +77,27 @@ export default async function UnitDetailPage({ params }: PageProps) {
   }
 
   const ownershipSnapshot = ownershipResult.data;
-  const meteredWaterState = await getAugust2026MeteredWaterChargeForUnit(unitId);
+  const obligationMonthYear = 2026;
+  const obligationMonth = 8;
+  const obligationBillingPeriodIdResult = await getBillingPeriodIdForMonth(
+    obligationMonthYear,
+    obligationMonth,
+  );
+  if (obligationBillingPeriodIdResult.error) {
+    throw new Error(obligationBillingPeriodIdResult.error);
+  }
+
+  const monthlyObligation =
+    ownershipSnapshot?.unitAccount && obligationBillingPeriodIdResult.data
+      ? await getMonthlyObligationForUnitAccount(
+          ownershipSnapshot.unitAccount.id,
+          obligationBillingPeriodIdResult.data,
+        )
+      : { data: null, error: null };
+
+  if (monthlyObligation.error) {
+    throw new Error(monthlyObligation.error);
+  }
 
   return (
     <section className="space-y-6">
@@ -128,13 +132,13 @@ export default async function UnitDetailPage({ params }: PageProps) {
 
           <div className="flex flex-wrap gap-3">
             <Link
-              href={`/units/${unit.unit_number}/edit`}
+              href={`/units/${unit.id}/edit`}
               className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800"
             >
               Edit
             </Link>
             <Button asChild variant="secondary" shape="default">
-              <Link href={`/units/${unit.unit_number}/transfer-ownership`}>
+              <Link href={`/units/${unit.id}/transfer-ownership`}>
                 <UserSwitchIcon size={16} aria-hidden="true" />
                 {ownershipSnapshot?.currentOwnership
                   ? "Transfer ownership"
@@ -145,125 +149,77 @@ export default async function UnitDetailPage({ params }: PageProps) {
         </div>
       </Panel>
 
-     
-      <Panel as="section" className="space-y-6">
+      <Panel as="section" className="space-y-4">
         <div>
-          <h2 className="text-xl font-semibold text-zinc-950">{obligationLabel}</h2>
-          <p className="mt-1 text-lg text-zinc-600">
-            Monthly assessment and metered water charge for the current billing context.
+          <h2 className="text-lg font-semibold text-zinc-950">
+            Monthly Assessment
+          </h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Fixed Monthly Assessment for the latest Budget Plan.
           </p>
         </div>
 
-        <div className="space-y-6 ">
-          <h3 className="text-base font-semibold text-zinc-950">
-                  Fixed Monthly Assessment
-                </h3>
-          {assessmentState.status === "ready" ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <div></div>
-             
-              <div className="space-y-1">
-                <p className="text-xs font-medium  uppercase tracking-wide text-zinc-500">
-                  Assessment Percentage
-                </p>
-                <p className="text-base font-normal text-zinc-950">
-                  {formatParticipation(assessmentState.data.assessmentPercentage)}
-                </p>
-              </div>
-              
-              
-              <div className="space-y-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Monthly Operating Budget
-                </p>
-                <p className="text-base font-normal text-zinc-950 ">
-                  {formatCurrency(
-                    assessmentState.data.monthlyOperatingBudget,
-                    assessmentState.data.currency,
-                  )}
-                </p>
-              </div>
-               <div className="space-y-1 ">
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Assessment
-                </p>
-                <p className="text-base font-semibold text-zinc-950">
-                  {formatCurrency(
-                    assessmentState.data.fixedMonthlyAssessment,
-                    assessmentState.data.currency,
-                  )}
-                </p>
-              </div>
+        {assessmentState.status === "ready" ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Fixed Monthly Assessment
+              </p>
+              <p className="text-base font-semibold text-zinc-950">
+                {formatCurrency(
+                  assessmentState.data.fixedMonthlyAssessment,
+                  assessmentState.data.currency,
+                )}
+              </p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-zinc-600">{assessmentState.message}</p>
-              {assessmentState.reason === "budget-plan-missing" ? (
-                <Link
-                  href={`/finance/budget-plans/${assessmentState.planYear ?? planYear}`}
-                  className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
-                >
-                  Open Budget Plan
-                </Link>
-              ) : null}
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Assessment Percentage
+              </p>
+              <p className="text-base font-semibold text-zinc-950">
+                {formatParticipation(assessmentState.data.assessmentPercentage)}
+              </p>
             </div>
-          )}
-
-          <div className="border-t border-zinc-200 pt-6 ">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-base font-semibold text-zinc-950">
-                  Metered Water Charge
-                </h3>
-                <p className="mt-1 text-sm text-zinc-600">
-                  Preview based on the July 2026 meter reading and Sedapal bill.
-                </p>
-              </div>
-
-              {meteredWaterState.status === "available" ? (
-                <div className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <div></div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                        Unit Consumption
-                      </p>
-                      <p className="text-base font-normal text-zinc-950">
-                        {meteredWaterState.data.unitConsumptionText} m³
-                      </p>
-                    </div>
-                    <div className="space-y-1 ">
-                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                        Period Unit Rate
-                      </p>
-                      <p className="text-base font-normal text-zinc-950">
-                        {meteredWaterState.data.periodRateText} PEN/m³
-                      </p>
-                    </div>
-                    <div className="space-y-1 ">
-                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                        Final Charge
-                      </p>
-                      <p className="text-base font-semibold text-zinc-950">
-                        {formatCurrency(meteredWaterState.data.amount, "PEN")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : meteredWaterState.status === "not-applicable" ? (
-                <p className="text-sm text-zinc-600">{meteredWaterState.message}</p>
-              ) : (
-                <p className="text-sm text-zinc-600">{meteredWaterState.message}</p>
-              )}
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Budget Plan
+              </p>
+              <p className="text-base font-semibold text-zinc-950">
+                {assessmentState.data.planYear}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Monthly Operating Budget
+              </p>
+              <p className="text-base font-semibold text-zinc-950">
+                {formatCurrency(
+                  assessmentState.data.monthlyOperatingBudget,
+                  assessmentState.data.currency,
+                )}
+              </p>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-zinc-600">{assessmentState.message}</p>
+            {assessmentState.reason === "budget-plan-missing" ? (
+              <Link
+                href={`/finance/budget-plans/${assessmentState.planYear ?? planYear}`}
+                className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
+              >
+                Open Budget Plan
+              </Link>
+            ) : null}
+          </div>
+        )}
       </Panel>
-       <Panel as="section" className="space-y-6 ">
+
+      <Panel as="section" className="space-y-6">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-zinc-950">Ownership</h2>
           <Link
-            href={`/units/${unit.unit_number}/transfer-ownership`}
+            href={`/units/${unit.id}/transfer-ownership`}
             className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
           >
             {ownershipSnapshot?.currentOwnership
@@ -369,6 +325,95 @@ export default async function UnitDetailPage({ params }: PageProps) {
         </div>
       </Panel>
 
+      <Panel as="section" className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-950">
+            August 2026 Monthly Obligation
+          </h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Persisted obligation snapshot for the permanent unit account.
+          </p>
+        </div>
+
+        {monthlyObligation.data ? (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Status
+                </p>
+                <p className="text-base font-semibold text-zinc-950">
+                  {monthlyObligation.data.status}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Known Total
+                </p>
+                <p className="text-base font-semibold text-zinc-950">
+                  {formatCurrency(
+                    monthlyObligation.data.known_total_amount,
+                    monthlyObligation.data.currency,
+                  )}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Generated
+                </p>
+                <p className="text-base font-semibold text-zinc-950">
+                  {monthlyObligation.data.generated_at ?? "Not generated"}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Snapshot Effective
+                </p>
+                <p className="text-base font-semibold text-zinc-950">
+                  {monthlyObligation.data.snapshot_effective_at}
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-zinc-200">
+              <table className="min-w-full divide-y divide-zinc-200 text-sm">
+                <thead className="bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  <tr>
+                    <th className="px-4 py-3">Component</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Amount</th>
+                    <th className="px-4 py-3">Source</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 bg-white">
+                  {monthlyObligation.data.components.map((component) => (
+                    <tr key={component.id}>
+                      <td className="px-4 py-3 text-zinc-900">
+                        {component.component_type}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600">
+                        {component.component_status}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600">
+                        {component.amount
+                          ? formatCurrency(component.amount, component.currency)
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600">
+                        {component.source_type ?? component.missing_reason ?? "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-zinc-600">
+            No persisted August 2026 monthly obligation was found yet.
+          </p>
+        )}
+      </Panel>
 
       <Panel as="section">
         <h2 className="text-lg font-semibold text-zinc-950">Notes</h2>

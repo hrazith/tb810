@@ -185,7 +185,7 @@ export function WaterLedgerWorkspace({ bills, previousReading }: Props) {
     <section className="space-y-6">
       <div className="grid gap-4 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center">
         <h1 className="whitespace-nowrap text-2xl font-semibold tracking-tight text-zinc-950">
-          Common Water Ledger
+          Sedapal Water Ledger
         </h1>
         <div className="flex w-full flex-col gap-3 xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end xl:ml-auto">
           <input

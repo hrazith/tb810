@@ -59,6 +59,7 @@ export function CurrentMeterReadingRow({
     historicalEditingAvailable && historicalEditingEnabled && isHistoricalMonth;
   const editable = !readOnly || canEditHistoricalReadings;
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!state.values) return;
     const nextReading = state.values.reading_end ?? readingValue(row.reading_end);
@@ -67,6 +68,7 @@ export function CurrentMeterReadingRow({
     setReadingDate(nextDate);
     lastCommittedRef.current = { currentReading: nextReading, readingDate: nextDate };
   }, [row.reading_date, row.reading_end, state.values]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function submitIfChanged() {
     const committed = lastCommittedRef.current;

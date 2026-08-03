@@ -36,3 +36,89 @@ samp {
 .test {
   border:2px dotted red;
 }
+
+body[data-dev-outline="1"] * {
+  outline: 1px dotted red;
+  outline-offset: 1px;
+}
+
+body[data-dev-grid="1"]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background-image:
+    linear-gradient(to right, rgba(255, 0, 0, 0.15) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 0, 0, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mix-blend-mode: multiply;
+}
+
+body[data-dev-spacing="1"] .debug-spacing-tooltip {
+  opacity: 1;
+}
+
+body[data-dev-page-breaks="1"]::before {
+  content: "Page breaks";
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 9999;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.92);
+  color: #fff;
+  padding: 4px 10px;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+body[data-dev-page-breaks="1"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent calc(10in - 1px),
+    rgba(220, 38, 38, 0.95) calc(10in - 1px),
+    rgba(220, 38, 38, 0.95) 10in
+  );
+  background-size: 100% 10in;
+  background-repeat: repeat-y;
+  box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.2);
+}
+
+@media print {
+  .debug-toolbar,
+  .debug-spacing-tooltip {
+    display: none !important;
+  }
+
+  body[data-dev-page-breaks="1"]::before,
+  body[data-dev-page-breaks="1"]::after {
+    display: none;
+  }
+}
+
+.debug-spacing-tooltip {
+  position: fixed;
+  z-index: 10001;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(12px, 12px);
+  font-size: 10px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 6px 8px;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
