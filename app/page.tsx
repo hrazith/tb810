@@ -3,19 +3,15 @@ import { redirect } from "next/navigation";
 
 import { Header } from "@/components/header";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentReadingMonthCompleteness } from "@/server/water/unit-meter-readings";
 
 const shortcuts = [
-
   {
     href: "/water/sedapal",
     title: "Sedapal Water Bill",
     description: "You have not started yet.",
   },
-  {
-    href: "/water/unit-meter-readings",
-    title: "Unit Water Readings",
-    description: "Enter metered reding for individual units",
-  },
+ 
 ] as const;
 
 async function signOut() {
@@ -35,6 +31,16 @@ export default async function Home() {
     redirect("/login");
   }
 
+  const [buildingManagerResult, superAdminResult, completenessResult] = await Promise.all([
+    supabase.rpc("has_tb810_role", { role_key: "building_manager" }),
+    supabase.rpc("has_tb810_role", { role_key: "super_admin" }),
+    getCurrentReadingMonthCompleteness(),
+  ]);
+
+  const canRenderMeterReadings = Boolean(
+    buildingManagerResult.data || superAdminResult.data,
+  );
+
   return (
     <main className="min-h-screen bg-zinc-50">
       <Header userEmail={user.email ?? ""} signOutAction={signOut} />
@@ -53,9 +59,6 @@ export default async function Home() {
           
 
           <div className="space-y-4">
-            <p className="text-2xl font-semibold tracking-tight text-zinc-950">
-              July 2026
-            </p>
             <div className="grid gap-3 sm:grid-cols-2">
               {shortcuts.map((shortcut) => (
                 <Link
@@ -63,7 +66,7 @@ export default async function Home() {
                   href={shortcut.href}
                   className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 transition hover:border-zinc-950 hover:bg-white"
                 >
-                  <p className="text-sm font-semibold text-zinc-950">
+                  <p className="text-lg font-semibold text-zinc-950">
                     {shortcut.title}
                   </p>
                   <p className="mt-1 text-sm leading-6 text-zinc-600">
@@ -72,6 +75,53 @@ export default async function Home() {
                 </Link>
               ))}
             </div>
+
+            {canRenderMeterReadings ? (
+              <Link
+                href={
+                  completenessResult.data
+                    ? `/water/unit-meter-readings/${completenessResult.data.monthKey}`
+                    : "/water/unit-meter-readings"
+                }
+                className="mt-6 block rounded-2xl border border-zinc-200 bg-zinc-50 p-4 transition hover:border-zinc-950 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 sm:p-5"
+              >
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-lg  font-semibold   text-zinc-950">
+                      Unit Water Readings
+                    </p>
+                  </div>
+
+                  {completenessResult.error ? (
+                    <p className="text-sm text-zinc-600">{completenessResult.error}</p>
+                  ) : completenessResult.data ? (
+                    completenessResult.data.totalExpectedCount > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-sm text-zinc-700">
+                          {completenessResult.data.completedCount} of{" "}
+                          {completenessResult.data.totalExpectedCount} completed
+                        </p>
+                        <div
+                          className="h-2 w-full overflow-hidden rounded-full bg-zinc-200"
+                          aria-hidden="true"
+                        >
+                          <div
+                            className="h-full rounded-full bg-zinc-950 transition-all"
+                            style={{
+                              width: `${Math.min(100, completenessResult.data.percentage)}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-zinc-600">
+                        No expected units are available for the current reading month.
+                      </p>
+                    )
+                  ) : null}
+                </div>
+              </Link>
+            ) : null}
           </div>
 
           

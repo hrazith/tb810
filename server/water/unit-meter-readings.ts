@@ -92,6 +92,15 @@ export type UnitMeterReadingMonthOption = {
   label: string;
 };
 
+export type MeterReadingCompletenessSummary = {
+  monthKey: string;
+  monthLabel: string;
+  completedCount: number;
+  totalExpectedCount: number;
+  percentage: number;
+  incompleteCount: number | null;
+};
+
 const READING_SELECT =
   "id, building_id, unit_id, utility_type_id, reading_date, reading_start, reading_end, consumption, unit_of_measure, status, notes, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, entered_by, entered_at, created_at, updated_at" as const;
 
@@ -125,6 +134,12 @@ function nextMonthStartFromKey(monthKey: string) {
   if (!parsed) return null;
   const next = new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth() + 1, 1));
   return next.toISOString().slice(0, 10);
+}
+
+function previousMonthKeyFromDate(date: Date) {
+  const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+  utc.setUTCMonth(utc.getUTCMonth() - 1);
+  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function monthLabelFromKey(monthKey: string) {
@@ -246,6 +261,31 @@ async function getCurrentMonthReadingForUnit(
   return { data, error: null };
 }
 
+async function getCurrentMonthReadingsForBuilding(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  buildingId: string,
+  utilityTypeId: string,
+  monthKey: string,
+) {
+  const monthStart = monthStartFromKey(monthKey);
+  const nextMonthStart = nextMonthStartFromKey(monthKey);
+  if (!nextMonthStart) {
+    return { data: [], error: "Invalid reading month." };
+  }
+
+  const { data, error } = await supabase
+    .from("tb810_meter_readings")
+    .select("unit_id, reading_end, reading_date, created_at")
+    .eq("building_id", buildingId)
+    .eq("utility_type_id", utilityTypeId)
+    .gte("reading_date", monthStart)
+    .lt("reading_date", nextMonthStart)
+    .order("created_at", { ascending: false });
+
+  if (error) return { data: [], error: error.message };
+  return { data: data ?? [], error: null };
+}
+
 export async function getReadingDefaults(readingDate?: string): Promise<QueryResult<UnitMeterReadingDefaults | null>> {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: null, error: buildingResult.error };
@@ -273,6 +313,65 @@ export async function getReadingDefaults(readingDate?: string): Promise<QueryRes
       readingMonthKey: active.key,
       previousReading: prior.data?.reading_end ?? null,
       previousReadingDate: prior.data?.reading_date ?? null,
+    },
+    error: null,
+  };
+}
+
+export async function getCurrentReadingMonthCompleteness(targetMonthKey?: string): Promise<
+  QueryResult<MeterReadingCompletenessSummary | null>
+> {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: null, error: buildingResult.error };
+  if (!buildingResult.data) return { data: null, error: null };
+
+  const supabase = await createClient();
+  const utilityType = await getUtilityTypeId(supabase);
+  if (utilityType.error) return { data: null, error: utilityType.error };
+  if (!utilityType.data) return { data: null, error: "Common Water utility type is missing." };
+
+  const targetMonth = targetMonthKey ?? previousMonthKeyFromDate(new Date());
+  const monthLabel = monthLabelFromKey(targetMonth);
+  const [unitsResult, readingsResult] = await Promise.all([
+    getCondoUnits(),
+    getCurrentMonthReadingsForBuilding(supabase, buildingResult.data.id, utilityType.data.id, targetMonth),
+  ]);
+
+  if (unitsResult.error) return { data: null, error: unitsResult.error };
+  if (readingsResult.error) return { data: null, error: readingsResult.error };
+
+  const totalExpectedCount = unitsResult.data.length;
+  if (totalExpectedCount === 0) {
+    return {
+      data: {
+        monthKey: targetMonth,
+        monthLabel,
+        completedCount: 0,
+        totalExpectedCount: 0,
+        percentage: 0,
+        incompleteCount: null,
+      },
+      error: null,
+    };
+  }
+
+  const completedUnitIds = new Set(
+    (readingsResult.data ?? [])
+      .filter((reading) => reading.reading_end !== null)
+      .map((reading) => reading.unit_id),
+  );
+
+  const completedCount = unitsResult.data.filter((unit) => completedUnitIds.has(unit.id)).length;
+  const incompleteCount = totalExpectedCount - completedCount;
+
+  return {
+    data: {
+      monthKey: targetMonth,
+      monthLabel,
+      completedCount,
+      totalExpectedCount,
+      percentage: totalExpectedCount > 0 ? (completedCount / totalExpectedCount) * 100 : 0,
+      incompleteCount,
     },
     error: null,
   };

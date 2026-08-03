@@ -47,6 +47,7 @@ export type August2026MeteredWaterChargeState =
         periodRateText: string;
         unitConsumptionText: string;
         sourceReadingMonthLabel: string;
+        billingMonthLabel: string;
       };
     }
   | {
@@ -99,6 +100,33 @@ function parseMilliUnits(value: number | string | null | undefined) {
   const parsed = parseDecimal(String(value));
   if (!parsed) return null;
   return (parsed.integer * BigInt(1000)) / parsed.scale;
+}
+
+function formatMonthLabel(monthKey: string) {
+  const parsed = new Date(`${monthKey}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(parsed);
+}
+
+function getNextMonthLabel(monthKey: string) {
+  const parsed = new Date(`${monthKey}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  parsed.setUTCMonth(parsed.getUTCMonth() + 1);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(parsed);
 }
 
 async function getUtilityTypeId(
@@ -711,7 +739,12 @@ export async function getAugust2026MeteredWaterChargeForUnit(
   }
 
   const sourceReadingMonth = "2026-07-01";
-  const sourceReadingMonthLabel = "July 2026";
+  const sourceReadingMonthLabel = formatMonthLabel(sourceReadingMonth);
+  const billingMonthLabel = getNextMonthLabel(sourceReadingMonth);
+
+  if (!sourceReadingMonthLabel || !billingMonthLabel) {
+    return { status: "unavailable", message: "Water lookup data is incomplete." };
+  }
 
   const meterReadingQuery = supabase.from("tb810_meter_readings") as unknown as MeterReadingLookupQuery;
   const { data: readings, error: readingError } = await meterReadingQuery
@@ -786,6 +819,7 @@ export async function getAugust2026MeteredWaterChargeForUnit(
       periodRateText: formatDecimal(rateMicros, 6),
       unitConsumptionText: formatDecimal(unitConsumptionMilli, 3),
       sourceReadingMonthLabel,
+      billingMonthLabel,
     },
   };
 }

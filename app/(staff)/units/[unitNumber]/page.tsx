@@ -97,7 +97,7 @@ export default async function UnitDetailPage({ params }: PageProps) {
 
   return (
     <section className="space-y-6">
-      <Panel as="div">
+    
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
@@ -143,7 +143,7 @@ export default async function UnitDetailPage({ params }: PageProps) {
             </Button>
           </div>
         </div>
-      </Panel>
+     
 
      
       <Panel as="section" className="space-y-6">
@@ -216,7 +216,14 @@ export default async function UnitDetailPage({ params }: PageProps) {
                   Metered Water Charge
                 </h3>
                 <p className="mt-1 text-sm text-zinc-600">
-                  Preview based on the July 2026 meter reading and Sedapal bill.
+                  Preview based on the{" "}
+                  {meteredWaterState.status === "available"
+                    ? meteredWaterState.data.sourceReadingMonthLabel
+                    : "selected"}{" "}
+                  meter reading and{" "}
+                  {meteredWaterState.status === "available"
+                    ? meteredWaterState.data.billingMonthLabel
+                    : "billing"} bill.
                 </p>
               </div>
 
@@ -255,6 +262,19 @@ export default async function UnitDetailPage({ params }: PageProps) {
               ) : (
                 <p className="text-sm text-zinc-600">{meteredWaterState.message}</p>
               )}
+            </div>
+          </div>
+
+          <div className="border-t border-zinc-200 pt-6 ">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-semibold text-zinc-950">
+                  Common Water Charge
+                </h3>
+              </div>
+              <p className="text-sm text-zinc-600">
+                Cannot be calculated yet because unit meter readings are incomplete.
+              </p>
             </div>
           </div>
         </div>
