@@ -8,7 +8,10 @@ import {
   getLatestBudgetPlanForCurrentBuilding,
   getUnitFixedMonthlyAssessment,
 } from "@/server/budget-plans";
-import { getAugust2026MeteredWaterChargeForUnit } from "@/server/water";
+import {
+  getAugust2026MeteredWaterChargeForUnit,
+  getCommonWaterChargePreviewForUnit,
+} from "@/server/water";
 import { getUnitOwnershipSnapshot } from "@/server/ownerships";
 import {
   getUnitById,
@@ -94,6 +97,7 @@ export default async function UnitDetailPage({ params }: PageProps) {
 
   const ownershipSnapshot = ownershipResult.data;
   const meteredWaterState = await getAugust2026MeteredWaterChargeForUnit(unitId);
+  const commonWaterState = await getCommonWaterChargePreviewForUnit(unitId);
 
   return (
     <section className="space-y-6">
@@ -271,10 +275,44 @@ export default async function UnitDetailPage({ params }: PageProps) {
                 <h3 className="text-base font-semibold text-zinc-950">
                   Common Water Charge
                 </h3>
+                <p className="mt-1 text-sm text-zinc-600">
+                  {commonWaterState.status === "available"
+                    ? `Based on ${commonWaterState.data.billingMonthLabel} and ${commonWaterState.data.sourceReadingMonthLabel}.`
+                    : commonWaterState.message}
+                </p>
               </div>
-              <p className="text-sm text-zinc-600">
-                Cannot be calculated yet because unit meter readings are incomplete.
-              </p>
+
+              {commonWaterState.status === "available" ? (
+                <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div></div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                        Common Water Pool
+                      </p>
+                      <p className="text-base font-normal text-zinc-950">
+                        {formatCurrency(commonWaterState.data.commonWaterPool, "PEN")}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                        Residential Units
+                      </p>
+                      <p className="text-base font-normal text-zinc-950">
+                        {commonWaterState.data.expectedCount}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                        Final Common Water Charge
+                      </p>
+                      <p className="text-base font-semibold text-zinc-950">
+                        {formatCurrency(commonWaterState.data.unitCommonWaterCharge, "PEN")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
