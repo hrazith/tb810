@@ -75,6 +75,37 @@ export type CommonWaterChargePreviewState =
       message: string;
     };
 
+export type SedapalBillCycleState =
+  | {
+      status: "complete";
+    }
+  | {
+      status: "in-progress";
+    }
+  | {
+      status: "missing" | "unavailable";
+      message: string;
+    };
+
+type August2026UnitWaterCycleContext = {
+  buildingId: string;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  unit: {
+    id: string;
+    unit_type_id: string;
+    has_meter: boolean;
+  };
+  unitTypeCode: string;
+  commonWaterTypeId: string;
+  completeness: NonNullable<Awaited<ReturnType<typeof getCurrentReadingMonthCompleteness>>["data"]>;
+  sourceReadingMonth: string;
+  sourceReadingMonthLabel: string;
+  billingMonthLabel: string;
+  eligibleUnitIds: string[];
+  readingsByUnit: Map<string, Array<{ reading_end: number | null; consumption: number | null; created_at: string }>>;
+  bill: Awaited<ReturnType<typeof getCommonWaterBillForCycleMonth>>["data"];
+};
+
 const WATER_BILL_SELECT =
   "id, building_id, utility_type_id, billing_period_id, supplier_id, bill_date, amount, description, attachment_document_id, status, notes, previous_reading, current_reading, total_consumption, unit_cost, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at" as const;
 const METER_READING_SELECT =
@@ -258,7 +289,7 @@ async function getCommonWaterBillForCycleMonth(
     return { data: null, error: "Reading month is invalid." };
   }
 
-  const billingMonth = new Date(Date.UTC(sourceMonth.getUTCFullYear(), sourceMonth.getUTCMonth() + 1, 1));
+  const billingMonth = new Date(Date.UTC(sourceMonth.getUTCFullYear(), sourceMonth.getUTCMonth() - 1, 1));
   const { data: billingPeriod, error: billingPeriodError } = await supabase
     .from("tb810_billing_periods")
     .select(BILLING_PERIOD_SELECT)
@@ -293,6 +324,158 @@ async function getCommonWaterBillForCycleMonth(
   }
 
   return { data: bills[0] ?? null, error: null };
+}
+
+async function getAugust2026UnitWaterCycleContext(
+  unitId: string,
+): Promise<
+  | { data: August2026UnitWaterCycleContext; error: null }
+  | { data: null; error: string }
+> {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: null, error: buildingResult.error };
+  if (!buildingResult.data) {
+    return { data: null, error: "Current building not found." };
+  }
+
+  const supabase = await createClient();
+  const [unitResult, commonWaterTypeResult, completenessResult] = await Promise.all([
+    supabase
+      .from("tb810_units")
+      .select(UNIT_SELECT)
+      .eq("building_id", buildingResult.data.id)
+      .eq("id", unitId)
+      .maybeSingle(),
+    getUtilityTypeId(supabase, "common_water"),
+    getCurrentReadingMonthCompleteness("2026-07"),
+  ]);
+
+  if (unitResult.error) return { data: null, error: unitResult.error.message };
+  if (commonWaterTypeResult.error) return { data: null, error: commonWaterTypeResult.error };
+  if (completenessResult.error) return { data: null, error: completenessResult.error };
+  if (!unitResult.data) return { data: null, error: "Unit not found." };
+  if (!commonWaterTypeResult.data) {
+    return { data: null, error: "Water lookup data is incomplete." };
+  }
+  if (!completenessResult.data) {
+    return { data: null, error: "Water lookup data is incomplete." };
+  }
+
+  const { data: unitType, error: unitTypeError } = await supabase
+    .from("tb810_unit_types")
+    .select(UNIT_TYPE_SELECT)
+    .eq("id", unitResult.data.unit_type_id)
+    .maybeSingle();
+  if (unitTypeError) return { data: null, error: unitTypeError.message };
+  if (!unitType) return { data: null, error: "Unit type is missing." };
+  if (unitType.code !== "condo") {
+    return { data: null, error: "Common Water is not applicable for this Unit." };
+  }
+
+  const [unitRowsResult, billResult, readingsResult] = await Promise.all([
+    supabase
+      .from("tb810_units")
+      .select("id")
+      .eq("building_id", buildingResult.data.id)
+      .eq("unit_type_id", unitType.id),
+    getCommonWaterBillForCycleMonth(
+      supabase,
+      buildingResult.data.id,
+      commonWaterTypeResult.data.id,
+      completenessResult.data.monthKey,
+    ),
+    supabase
+      .from("tb810_meter_readings")
+      .select("unit_id, reading_end, consumption, reading_date, created_at")
+      .eq("building_id", buildingResult.data.id)
+      .eq("utility_type_id", commonWaterTypeResult.data.id)
+      .eq("reading_month", monthKeyToDate(completenessResult.data.monthKey)),
+  ]);
+
+  if (unitRowsResult.error) return { data: null, error: unitRowsResult.error.message };
+  if (billResult.error) return { data: null, error: billResult.error };
+  if (readingsResult.error) return { data: null, error: readingsResult.error.message };
+
+  const eligibleUnitIds = (unitRowsResult.data ?? []).map((row) => row.id);
+  const readingsByUnit = new Map<string, Array<{ reading_end: number | null; consumption: number | null; created_at: string }>>();
+  for (const row of readingsResult.data ?? []) {
+    const rows = readingsByUnit.get(row.unit_id) ?? [];
+    rows.push(row);
+    readingsByUnit.set(row.unit_id, rows);
+  }
+
+  return {
+    data: {
+      buildingId: buildingResult.data.id,
+      supabase,
+      unit: {
+        id: unitResult.data.id,
+        unit_type_id: unitResult.data.unit_type_id,
+        has_meter: unitResult.data.has_meter,
+      },
+      unitTypeCode: unitType.code,
+      commonWaterTypeId: commonWaterTypeResult.data.id,
+      completeness: completenessResult.data,
+      sourceReadingMonth: completenessResult.data.monthKey,
+      sourceReadingMonthLabel: completenessResult.data.monthLabel,
+      billingMonthLabel: getNextMonthLabel(completenessResult.data.monthKey) ?? "August 2026",
+      eligibleUnitIds,
+      readingsByUnit,
+      bill: billResult.data,
+    },
+    error: null,
+  };
+}
+
+async function getSedapalBillCycleStateForCurrentReadingMonth(): Promise<SedapalBillCycleState> {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { status: "unavailable", message: buildingResult.error };
+  if (!buildingResult.data) {
+    return { status: "unavailable", message: "Current building not found." };
+  }
+
+  const supabase = await createClient();
+  const [{ data: utilityType, error: utilityTypeError }, completenessResult] = await Promise.all([
+    getUtilityTypeId(supabase, "common_water"),
+    getCurrentReadingMonthCompleteness(),
+  ]);
+
+  if (utilityTypeError) return { status: "unavailable", message: utilityTypeError };
+  if (!utilityType) return { status: "unavailable", message: "Water lookup data is incomplete." };
+  if (completenessResult.error) return { status: "unavailable", message: completenessResult.error };
+  if (!completenessResult.data) {
+    return { status: "unavailable", message: "Water lookup data is incomplete." };
+  }
+
+  const billResult = await getCommonWaterBillForCycleMonth(
+    supabase,
+    buildingResult.data.id,
+    utilityType.id,
+    completenessResult.data.monthKey,
+  );
+
+  if (billResult.error) {
+    if (billResult.error === "Sedapal water bill has not been entered yet.") {
+      return { status: "missing", message: billResult.error };
+    }
+    if (billResult.error === "Sedapal water bill is ambiguous.") {
+      return { status: "unavailable", message: billResult.error };
+    }
+    return { status: "unavailable", message: billResult.error };
+  }
+
+  const bill = billResult.data;
+  if (!bill) {
+    return { status: "missing", message: "Sedapal water bill has not been entered yet." };
+  }
+
+  const amountCents = parseMoneyCents(bill.amount);
+  const totalConsumptionMilli = parseMilliUnits(bill.total_consumption);
+  if (amountCents === null || totalConsumptionMilli === null || totalConsumptionMilli <= BigInt(0)) {
+    return { status: "in-progress" };
+  }
+
+  return { status: "complete" };
 }
 
 async function getLatestCommonWaterBill(
@@ -937,74 +1120,22 @@ export async function updateCommonWaterBill(
 export async function getAugust2026MeteredWaterChargeForUnit(
   unitId: string,
 ): Promise<August2026MeteredWaterChargeState> {
-  const buildingResult = await getCurrentBuilding();
-  if (buildingResult.error) return { status: "unavailable", message: buildingResult.error };
-  if (!buildingResult.data) {
-    return { status: "unavailable", message: "Current building not found." };
-  }
-
-  const supabase = await createClient();
-  const [
-    { data: unit, error: unitError },
-    { data: commonWaterType, error: commonWaterTypeError },
-  ] = await Promise.all([
-    supabase
-      .from("tb810_units")
-      .select(UNIT_SELECT)
-      .eq("building_id", buildingResult.data.id)
-      .eq("id", unitId)
-      .maybeSingle(),
-    getUtilityTypeId(supabase, "common_water"),
-  ]);
-
-  let unitTypeCode: string | null = null;
-  if (unit) {
-    const { data: unitType, error: unitTypeError } = await supabase
-      .from("tb810_unit_types")
-      .select(UNIT_TYPE_SELECT)
-      .eq("id", unit.unit_type_id)
-      .maybeSingle();
-    if (unitTypeError) return { status: "unavailable", message: unitTypeError.message };
-    unitTypeCode = unitType?.code ?? null;
-  }
-
-  if (unitError) return { status: "unavailable", message: unitError.message };
-  if (commonWaterTypeError) return { status: "unavailable", message: commonWaterTypeError };
-  if (!unit) return { status: "unavailable", message: "Unit not found." };
-  if (unitTypeCode !== "condo" || !unit.has_meter) {
+  const contextResult = await getAugust2026UnitWaterCycleContext(unitId);
+  if (contextResult.error) return { status: "unavailable", message: contextResult.error };
+  const context = contextResult.data;
+  if (!context) return { status: "unavailable", message: "Water lookup data is incomplete." };
+  if (context.unitTypeCode !== "condo" || !context.unit.has_meter) {
     return { status: "not-applicable", message: "Metered water is not applicable for this Unit." };
   }
-  if (!commonWaterType) {
-    return { status: "unavailable", message: "Water lookup data is incomplete." };
-  }
-
-  const sourceReadingMonth = "2026-07-01";
-  const sourceReadingMonthLabel = formatMonthLabel(sourceReadingMonth);
-  const billingMonthLabel = getNextMonthLabel(sourceReadingMonth);
-
-  if (!sourceReadingMonthLabel || !billingMonthLabel) {
-    return { status: "unavailable", message: "Water lookup data is incomplete." };
-  }
-
-  const meterReadingQuery = supabase.from("tb810_meter_readings") as unknown as MeterReadingLookupQuery;
-  const { data: readings, error: readingError } = await meterReadingQuery
-    .select(METER_READING_SELECT)
-    .eq("building_id", buildingResult.data.id)
-    .eq("unit_id", unitId)
-    .eq("utility_type_id", commonWaterType.id)
-    .eq("reading_month", sourceReadingMonth)
-    .order("created_at", { ascending: false })
-    .limit(2);
-
-  if (readingError) return { status: "unavailable", message: readingError };
-  if ((readings ?? []).length === 0) {
+  const readings = context.readingsByUnit.get(unitId) ?? [];
+  if (readings.length === 0) {
     return { status: "unavailable", message: "No July 2026 meter reading recorded." };
   }
-  if ((readings ?? []).length > 1) {
+  if (readings.length > 1) {
     return { status: "unavailable", message: "July 2026 meter reading is ambiguous." };
   }
 
-  const reading = readings?.[0] ?? null;
+  const reading = readings[0] ?? null;
   if (!reading) {
     return { status: "unavailable", message: "No July 2026 meter reading recorded." };
   }
@@ -1012,14 +1143,7 @@ export async function getAugust2026MeteredWaterChargeForUnit(
     return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
   }
 
-  const billResult = await getCommonWaterBillForCycleMonth(
-    supabase,
-    buildingResult.data.id,
-    commonWaterType.id,
-    sourceReadingMonth.slice(0, 7),
-  );
-  if (billResult.error) return { status: "unavailable", message: billResult.error };
-  const bill = billResult.data;
+  const bill = context.bill;
   if (!bill) {
     return { status: "unavailable", message: "Sedapal water bill has not been entered yet." };
   }
@@ -1048,8 +1172,8 @@ export async function getAugust2026MeteredWaterChargeForUnit(
       amount: formatDecimal(chargeCents, 2),
       periodRateText: formatDecimal(rateMicros, 6),
       unitConsumptionText: formatDecimal(unitConsumptionMilli, 3),
-      sourceReadingMonthLabel,
-      billingMonthLabel,
+      sourceReadingMonthLabel: context.sourceReadingMonthLabel,
+      billingMonthLabel: context.billingMonthLabel,
     },
   };
 }
@@ -1057,7 +1181,229 @@ export async function getAugust2026MeteredWaterChargeForUnit(
 export async function getCommonWaterChargePreviewForUnit(
   unitId: string,
 ): Promise<CommonWaterChargePreviewState> {
-  return getCommonWaterChargeForUnitPreview(unitId);
+  const contextResult = await getAugust2026UnitWaterCycleContext(unitId);
+  if (contextResult.error) return { status: "unavailable", message: contextResult.error };
+  const context = contextResult.data;
+  if (!context) return { status: "unavailable", message: "Water lookup data is incomplete." };
+
+  if (context.unitTypeCode !== "condo") {
+    return { status: "not-applicable", message: "Common Water is not applicable for this Unit." };
+  }
+
+  if (context.completeness.totalExpectedCount === 0) {
+    return { status: "unavailable", message: "No expected residential units are available." };
+  }
+
+  if (context.completeness.completedCount !== context.completeness.totalExpectedCount) {
+    return { status: "unavailable", message: "Cannot be calculated because unit meter readings are incomplete." };
+  }
+
+  const eligibleUnitIds = context.eligibleUnitIds;
+  if (eligibleUnitIds.length === 0) {
+    return { status: "unavailable", message: "No eligible residential units are available." };
+  }
+
+  const bill = context.bill;
+  if (!bill) {
+    return { status: "unavailable", message: "Sedapal water bill has not been entered yet." };
+  }
+
+  const amountCents = parseMoneyCents(bill.amount);
+  const totalConsumptionMilli = parseMilliUnits(bill.total_consumption);
+  if (amountCents === null) {
+    return { status: "unavailable", message: "Sedapal bill amount is invalid." };
+  }
+  if (totalConsumptionMilli === null || totalConsumptionMilli <= BigInt(0)) {
+    return { status: "unavailable", message: "Sedapal bill total consumption is invalid." };
+  }
+
+  let summedMeteredChargeCents = BigInt(0);
+  for (const unitId of eligibleUnitIds) {
+    const rows = context.readingsByUnit.get(unitId) ?? [];
+    if (rows.length === 0) {
+      return { status: "unavailable", message: "Cannot be calculated because unit meter readings are incomplete." };
+    }
+    if (rows.length > 1) {
+      return { status: "unavailable", message: "July 2026 meter reading is ambiguous." };
+    }
+    const consumptionMilli = parseMilliUnits(rows[0].consumption);
+    if (consumptionMilli === null) {
+      return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
+    }
+    const chargeCents =
+      (amountCents * consumptionMilli + totalConsumptionMilli / BigInt(2)) / totalConsumptionMilli;
+    summedMeteredChargeCents += chargeCents;
+  }
+
+  if (summedMeteredChargeCents > amountCents) {
+    return { status: "unavailable", message: "Common Water pool would be negative." };
+  }
+
+  const commonWaterPoolCents = amountCents - summedMeteredChargeCents;
+  const unitCommonWaterChargeCents = roundToNearestInteger(commonWaterPoolCents, BigInt(64));
+
+  return {
+    status: "available",
+    data: {
+      billingMonthLabel: context.billingMonthLabel,
+      sourceReadingMonthLabel: context.sourceReadingMonthLabel,
+      completedCount: context.completeness.completedCount,
+      expectedCount: context.completeness.totalExpectedCount,
+      supplierAmount: formatDecimal(amountCents, 2),
+      summedMeteredCharges: formatDecimal(summedMeteredChargeCents, 2),
+      commonWaterPool: formatDecimal(commonWaterPoolCents, 2),
+      unitCommonWaterCharge: formatDecimal(unitCommonWaterChargeCents, 2),
+    },
+  };
+}
+
+export async function getAugust2026WaterChargePreviewsForUnit(unitId: string): Promise<{
+  meteredWater: August2026MeteredWaterChargeState;
+  commonWater: CommonWaterChargePreviewState;
+}> {
+  const contextResult = await getAugust2026UnitWaterCycleContext(unitId);
+  if (contextResult.error || !contextResult.data) {
+    const message = contextResult.error ?? "Water lookup data is incomplete.";
+    return {
+      meteredWater: { status: "unavailable", message },
+      commonWater: { status: "unavailable", message },
+    };
+  }
+
+  const context = contextResult.data;
+  const meteredWater = await (async (): Promise<August2026MeteredWaterChargeState> => {
+    if (context.unitTypeCode !== "condo" || !context.unit.has_meter) {
+      return { status: "not-applicable", message: "Metered water is not applicable for this Unit." };
+    }
+
+    const readings = context.readingsByUnit.get(unitId) ?? [];
+    if (readings.length === 0) {
+      return { status: "unavailable", message: "No July 2026 meter reading recorded." };
+    }
+    if (readings.length > 1) {
+      return { status: "unavailable", message: "July 2026 meter reading is ambiguous." };
+    }
+
+    const reading = readings[0] ?? null;
+    if (!reading) {
+      return { status: "unavailable", message: "No July 2026 meter reading recorded." };
+    }
+    if (reading.consumption === null) {
+      return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
+    }
+
+    const bill = context.bill;
+    if (!bill) {
+      return { status: "unavailable", message: "Sedapal water bill has not been entered yet." };
+    }
+
+    const amountCents = parseMoneyCents(bill.amount);
+    const unitConsumptionMilli = parseMilliUnits(reading.consumption);
+    const masterConsumptionMilli = parseMilliUnits(bill.total_consumption);
+
+    if (amountCents === null || unitConsumptionMilli === null) {
+      return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
+    }
+    if (masterConsumptionMilli === null || masterConsumptionMilli <= BigInt(0)) {
+      return { status: "unavailable", message: "July 2026 water rate cannot be calculated." };
+    }
+
+    const chargeCents =
+      (amountCents * unitConsumptionMilli + masterConsumptionMilli / BigInt(2)) /
+      masterConsumptionMilli;
+    const rateMicros =
+      (amountCents * BigInt(1000000) + masterConsumptionMilli / BigInt(2)) /
+      masterConsumptionMilli;
+
+    return {
+      status: "available",
+      data: {
+        amount: formatDecimal(chargeCents, 2),
+        periodRateText: formatDecimal(rateMicros, 6),
+        unitConsumptionText: formatDecimal(unitConsumptionMilli, 3),
+        sourceReadingMonthLabel: context.sourceReadingMonthLabel,
+        billingMonthLabel: context.billingMonthLabel,
+      },
+    };
+  })();
+
+  const commonWater = await (async (): Promise<CommonWaterChargePreviewState> => {
+    if (context.unitTypeCode !== "condo") {
+      return { status: "not-applicable", message: "Common Water is not applicable for this Unit." };
+    }
+
+    if (context.completeness.totalExpectedCount === 0) {
+      return { status: "unavailable", message: "No expected residential units are available." };
+    }
+
+    if (context.completeness.completedCount !== context.completeness.totalExpectedCount) {
+      return { status: "unavailable", message: "Cannot be calculated because unit meter readings are incomplete." };
+    }
+
+    const eligibleUnitIds = context.eligibleUnitIds;
+    if (eligibleUnitIds.length === 0) {
+      return { status: "unavailable", message: "No eligible residential units are available." };
+    }
+
+    const bill = context.bill;
+    if (!bill) {
+      return { status: "unavailable", message: "Sedapal water bill has not been entered yet." };
+    }
+
+    const amountCents = parseMoneyCents(bill.amount);
+    const totalConsumptionMilli = parseMilliUnits(bill.total_consumption);
+    if (amountCents === null) {
+      return { status: "unavailable", message: "Sedapal bill amount is invalid." };
+    }
+    if (totalConsumptionMilli === null || totalConsumptionMilli <= BigInt(0)) {
+      return { status: "unavailable", message: "Sedapal bill total consumption is invalid." };
+    }
+
+    let summedMeteredChargeCents = BigInt(0);
+    for (const unitId of eligibleUnitIds) {
+      const rows = context.readingsByUnit.get(unitId) ?? [];
+      if (rows.length === 0) {
+        return { status: "unavailable", message: "Cannot be calculated because unit meter readings are incomplete." };
+      }
+      if (rows.length > 1) {
+        return { status: "unavailable", message: "July 2026 meter reading is ambiguous." };
+      }
+      const consumptionMilli = parseMilliUnits(rows[0].consumption);
+      if (consumptionMilli === null) {
+        return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
+      }
+      const chargeCents =
+        (amountCents * consumptionMilli + totalConsumptionMilli / BigInt(2)) / totalConsumptionMilli;
+      summedMeteredChargeCents += chargeCents;
+    }
+
+    if (summedMeteredChargeCents > amountCents) {
+      return { status: "unavailable", message: "Common Water pool would be negative." };
+    }
+
+    const commonWaterPoolCents = amountCents - summedMeteredChargeCents;
+    const unitCommonWaterChargeCents = roundToNearestInteger(commonWaterPoolCents, BigInt(64));
+
+    return {
+      status: "available",
+      data: {
+        billingMonthLabel: context.billingMonthLabel,
+        sourceReadingMonthLabel: context.sourceReadingMonthLabel,
+        completedCount: context.completeness.completedCount,
+        expectedCount: context.completeness.totalExpectedCount,
+        supplierAmount: formatDecimal(amountCents, 2),
+        summedMeteredCharges: formatDecimal(summedMeteredChargeCents, 2),
+        commonWaterPool: formatDecimal(commonWaterPoolCents, 2),
+        unitCommonWaterCharge: formatDecimal(unitCommonWaterChargeCents, 2),
+      },
+    };
+  })();
+
+  return { meteredWater, commonWater };
+}
+
+export async function getSedapalBillCycleState(): Promise<SedapalBillCycleState> {
+  return getSedapalBillCycleStateForCurrentReadingMonth();
 }
 
 export type {
