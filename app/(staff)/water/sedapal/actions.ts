@@ -66,6 +66,8 @@ export async function createCommonWaterBillAction(
     return { error: result.error, values };
   }
 
+  revalidatePath("/");
+  revalidatePath("/units", "layout");
   revalidatePath("/water/sedapal");
   return {
     success: "Reading saved.",
@@ -94,5 +96,8 @@ export async function updateCommonWaterBillAction(
     return { error: result.error, values };
   }
 
+  revalidatePath("/");
+  revalidatePath("/units", "layout");
+  revalidatePath("/water/sedapal");
   redirect(`/water/sedapal/${result.data.id}`);
 }

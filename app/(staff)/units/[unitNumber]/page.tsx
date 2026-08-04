@@ -9,8 +9,7 @@ import {
   getUnitFixedMonthlyAssessment,
 } from "@/server/budget-plans";
 import {
-  getAugust2026MeteredWaterChargeForUnit,
-  getCommonWaterChargePreviewForUnit,
+  getAugust2026WaterChargePreviewsForUnit,
 } from "@/server/water";
 import { getUnitOwnershipSnapshot } from "@/server/ownerships";
 import {
@@ -71,7 +70,11 @@ export default async function UnitDetailPage({ params }: PageProps) {
   }
 
   const unit = result.data;
-  const budgetPlanResult = await getLatestBudgetPlanForCurrentBuilding();
+  const [budgetPlanResult, ownershipResult, waterPreviews] = await Promise.all([
+    getLatestBudgetPlanForCurrentBuilding(),
+    getUnitOwnershipSnapshot(unitId),
+    getAugust2026WaterChargePreviewsForUnit(unitId),
+  ]);
 
   if (budgetPlanResult.error) {
     throw new Error(budgetPlanResult.error);
@@ -89,15 +92,13 @@ export default async function UnitDetailPage({ params }: PageProps) {
     planYear,
   });
 
-  const ownershipResult = await getUnitOwnershipSnapshot(unitId);
-
   if (ownershipResult.error) {
     throw new Error(ownershipResult.error);
   }
 
   const ownershipSnapshot = ownershipResult.data;
-  const meteredWaterState = await getAugust2026MeteredWaterChargeForUnit(unitId);
-  const commonWaterState = await getCommonWaterChargePreviewForUnit(unitId);
+  const meteredWaterState = waterPreviews.meteredWater;
+  const commonWaterState = waterPreviews.commonWater;
 
   return (
     <section className="space-y-6">
@@ -152,13 +153,11 @@ export default async function UnitDetailPage({ params }: PageProps) {
      
       <Panel as="section" className="space-y-6">
         <div>
-          <h2 className="text-xl font-semibold text-zinc-950">{obligationLabel}</h2>
-          <p className="mt-1 text-lg text-zinc-600">
-            Monthly assessment and metered water charge for the current billing context.
-          </p>
+          <h2 className="text-2xl font-semibold text-zinc-950">{obligationLabel}</h2>
+          
         </div>
 
-        <div className="space-y-6 ">
+        <div className="space-y-6 mt-12 ">
           <h3 className="text-base font-semibold text-zinc-950">
                   Fixed Monthly Assessment
                 </h3>

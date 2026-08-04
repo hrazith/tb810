@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { Header } from "@/components/header";
 import { createClient } from "@/lib/supabase/server";
+import { getSedapalBillCycleState } from "@/server/water";
 import { getCurrentReadingMonthCompleteness } from "@/server/water/unit-meter-readings";
 
 const shortcuts = [
@@ -11,7 +12,6 @@ const shortcuts = [
     title: "Sedapal Water Bill",
     description: "You have not started yet.",
   },
- 
 ] as const;
 
 async function signOut() {
@@ -36,6 +36,7 @@ export default async function Home() {
     supabase.rpc("has_tb810_role", { role_key: "super_admin" }),
     getCurrentReadingMonthCompleteness(),
   ]);
+  const sedapalBillState = await getSedapalBillCycleState();
 
   const canRenderMeterReadings = Boolean(
     buildingManagerResult.data || superAdminResult.data,
@@ -70,7 +71,18 @@ export default async function Home() {
                     {shortcut.title}
                   </p>
                   <p className="mt-1 text-sm leading-6 text-zinc-600">
-                    {shortcut.description}
+                    {sedapalBillState.status === "complete"
+                      ? "Sedapal bill entered"
+                      : sedapalBillState.status === "in-progress"
+                        ? "Bill entered — details incomplete"
+                        : shortcut.description}
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-zinc-950">
+                    {sedapalBillState.status === "complete"
+                      ? "Complete"
+                      : sedapalBillState.status === "in-progress"
+                        ? "In progress"
+                        : ""}
                   </p>
                 </Link>
               ))}
