@@ -54,7 +54,7 @@ Owner-facing views are presentation models.
 - Ownership - historical owner-to-unit relationship and billing responsibility boundary
 - Budget Plan - annual configuration that establishes the Monthly Assessment Pool
 - Billing Period - operational month created by the passage of time
-- Monthly Financial Obligations - first-class persistent record of what each Unit owes for a Billing Period
+- Monthly Obligation - first-class persistent record of what each Unit owes for a Billing Period
 
 ## Accepted Architectural Decisions
 
@@ -63,7 +63,7 @@ Owner-facing views are presentation models.
 - Ownership is historical and should never overwrite previous ownership relationships.
 - Billing Period is identified by Building, Year, and Month.
 - Billing Period is an operational context rather than a workflow.
-- Monthly Financial Obligations become a first-class persistent business domain.
+- Monthly Obligation becomes a first-class persistent business domain.
 - Every financial obligation belongs to a Unit.
 - Owner statements consolidate obligations but do not own them.
 - Other Charges remain attached to the Unit to which they belong.
@@ -107,7 +107,7 @@ Billing Period
 
 ↓
 
-Monthly Financial Obligations
+Monthly Obligation
 
 ↓
 

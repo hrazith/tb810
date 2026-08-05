@@ -192,7 +192,7 @@ Calculations are deterministic financial consequences derived by Asset-Edge, suc
 
 Accounting is historical financial record created from finalized calculation outputs, such as:
 
-- Monthly Financial Obligations
+- Finalized Monthly Obligation
 - Payments
 - Payment allocations
 - Unit balances

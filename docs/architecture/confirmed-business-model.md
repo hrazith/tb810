@@ -211,7 +211,7 @@ Product Language:
 Domain Language:
 
 - Billing Period
-- Monthly Financial Obligations
+- Monthly Obligation
 - Unit Account
 
 These internal concepts should not necessarily appear in the UI.
@@ -244,7 +244,7 @@ Calculations are deterministic financial consequences derived by Asset-Edge, suc
 
 Accounting is the historical record created from finalized calculation outputs, such as:
 
-- Monthly Financial Obligations
+- Monthly Obligation
 - Payments
 - Payment allocations
 - Unit balances
@@ -281,7 +281,7 @@ Budget Plan is configuration, not accounting.
 Fixed Monthly Assessment is always derived.
 It is a live planning value, not a historical financial record.
 It is recalculated from the current Budget Plan and Unit participation percentage.
-Historical monthly charges are represented by Monthly Financial Obligations, which snapshot the Fixed Monthly Assessment at the time obligations are generated.
+Historical monthly charges are represented by Finalized Monthly Obligation records, which snapshot the Fixed Monthly Assessment at the time obligations are generated.
 
 Invoices persist the calculated amounts that were billed.
 
@@ -304,9 +304,9 @@ It does not belong to:
 - Unit ownership
 - the Unit record
 - payments
-- Monthly Financial Obligations
+- Monthly Obligation
 
-The Water domain produces calculated Unit water charges that are later snapshotted into Monthly Financial Obligations.
+The Water domain produces calculated Unit water charges that are later snapshotted into Finalized Monthly Obligation records.
 
 The current TB810 workflow is staff-operated:
 

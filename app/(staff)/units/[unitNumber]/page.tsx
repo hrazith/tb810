@@ -4,18 +4,9 @@ import { UserSwitchIcon } from "@phosphor-icons/react/dist/ssr";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import {
-  getLatestBudgetPlanForCurrentBuilding,
-  getUnitFixedMonthlyAssessment,
-} from "@/server/budget-plans";
-import {
-  getAugust2026WaterChargePreviewsForUnit,
-} from "@/server/water";
 import { getUnitOwnershipSnapshot } from "@/server/ownerships";
-import {
-  getUnitById,
-  getUnitByNumberForCurrentBuilding,
-} from "@/server/units";
+import { getUnitMonthlyObligation } from "@/server/obligations";
+import { getUnitById, getUnitByNumberForCurrentBuilding } from "@/server/units";
 
 type PageProps = {
   params: Promise<{
@@ -31,7 +22,7 @@ function formatParticipation(value: number) {
   return `${value.toFixed(4).replace(/\.?0+$/, "")}%`;
 }
 
-function formatCurrency(value: string, currency: string) {
+function formatCurrency(value: string, currency = "PEN") {
   return new Intl.NumberFormat("es-PE", {
     style: "currency",
     currency,
@@ -50,282 +41,144 @@ export default async function UnitDetailPage({ params }: PageProps) {
   const { unitNumber } = await params;
   const lookup = await getUnitByNumberForCurrentBuilding(unitNumber);
 
-  if (lookup.error) {
-    throw new Error(lookup.error);
-  }
-
-  if (!lookup.data) {
-    notFound();
-  }
+  if (lookup.error) throw new Error(lookup.error);
+  if (!lookup.data) notFound();
 
   const unitId = lookup.data.id;
   const result = await getUnitById(unitId);
 
-  if (result.error) {
-    throw new Error(result.error);
-  }
-
-  if (!result.data) {
-    notFound();
-  }
+  if (result.error) throw new Error(result.error);
+  if (!result.data) notFound();
 
   const unit = result.data;
-  const [budgetPlanResult, ownershipResult, waterPreviews] = await Promise.all([
-    getLatestBudgetPlanForCurrentBuilding(),
+  const [ownershipResult, obligationResult] = await Promise.all([
     getUnitOwnershipSnapshot(unitId),
-    getAugust2026WaterChargePreviewsForUnit(unitId),
+    getUnitMonthlyObligation({ unitId, obligationMonth: "2026-08" }),
   ]);
 
-  if (budgetPlanResult.error) {
-    throw new Error(budgetPlanResult.error);
-  }
-
-  const budgetPlan = budgetPlanResult.data;
-  const planYear = budgetPlan?.plan_year ?? 2027;
-  const obligationLabel = `Unit Obligation ${new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date())}`;
-  const assessmentState = await getUnitFixedMonthlyAssessment({
-    unitId,
-    planYear,
-  });
-
-  if (ownershipResult.error) {
-    throw new Error(ownershipResult.error);
-  }
+  if (ownershipResult.error) throw new Error(ownershipResult.error);
+  if (obligationResult.error) throw new Error(obligationResult.error);
 
   const ownershipSnapshot = ownershipResult.data;
-  const meteredWaterState = waterPreviews.meteredWater;
-  const commonWaterState = waterPreviews.commonWater;
+  const obligation = obligationResult.data;
+  const unitObligation = obligation;
 
   return (
     <section className="space-y-6">
-    
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-2">
-            <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-              Unit
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">Unit</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">{unit.unit_number}</h1>
+          <div className="space-y-1 text-sm text-zinc-600">
+            <p>Type: {unit.unit_type_name}</p>
+            <p>Building: {unit.building_name}</p>
+            <p>Floor: {unit.floor ?? "—"}</p>
+            <p>Registered area: {formatArea(unit.registered_area_m2)}</p>
+            <p>Participation percentage: {formatParticipation(unit.participation_percentage)}</p>
+            <p>Has individual meter: {unit.has_meter ? "Yes" : "No"}</p>
+            <p>
+              Unit account: {ownershipSnapshot?.unitAccount?.account_number ?? "Unavailable"}
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">
-              {unit.unit_number}
-            </h1>
-            <div className="space-y-1 text-sm text-zinc-600">
-              <p>Type: {unit.unit_type_name}</p>
-              <p>Building: {unit.building_name}</p>
-              <p>Floor: {unit.floor ?? "—"}</p>
-              <p>Registered area: {formatArea(unit.registered_area_m2)}</p>
-              <p>Participation percentage: {formatParticipation(unit.participation_percentage)}</p>
-              <p>Has individual meter: {unit.has_meter ? "Yes" : "No"}</p>
-              <p>
-                Unit account:{" "}
-                {ownershipSnapshot?.unitAccount?.account_number ?? "Unavailable"}
-              </p>
-              <p>
-                Current balance:{" "}
-                {ownershipSnapshot?.unitAccount
-                  ? ownershipSnapshot.unitAccount.current_balance.toFixed(2)
-                  : "—"}
-              </p>
-            </div>
+            <p>
+              Current balance:{" "}
+              {ownershipSnapshot?.unitAccount
+                ? ownershipSnapshot.unitAccount.current_balance.toFixed(2)
+                : "—"}
+            </p>
           </div>
+        </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href={`/units/${unit.unit_number}/edit`}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800"
-            >
-              Edit
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href={`/units/${unit.unit_number}/edit`}
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800"
+          >
+            Edit
+          </Link>
+          <Button asChild variant="secondary" shape="default">
+            <Link href={`/units/${unit.unit_number}/transfer-ownership`}>
+              <UserSwitchIcon size={16} aria-hidden="true" />
+              {ownershipSnapshot?.currentOwnership ? "Transfer ownership" : "Assign owner"}
             </Link>
-            <Button asChild variant="secondary" shape="default">
-              <Link href={`/units/${unit.unit_number}/transfer-ownership`}>
-                <UserSwitchIcon size={16} aria-hidden="true" />
-                {ownershipSnapshot?.currentOwnership
-                  ? "Transfer ownership"
-                  : "Assign owner"}
-              </Link>
-            </Button>
-          </div>
+          </Button>
         </div>
-     
+      </div>
 
-     
       <Panel as="section" className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-semibold text-zinc-950">{obligationLabel}</h2>
-          
+        <div className="space-y-1">
+          <h2 className="text-2xl font-semibold text-zinc-950">
+            Monthly Obligation {obligation.obligationMonth}
+          </h2>
+          <p className="text-sm text-zinc-600">
+            Read-only obligation state from getMonthlyObligation().
+          </p>
         </div>
 
-        <div className="space-y-6 mt-12 ">
-          <h3 className="text-base font-semibold text-zinc-950">
-                  Fixed Monthly Assessment
-                </h3>
-          {assessmentState.status === "ready" ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <div></div>
-             
-              <div className="space-y-1">
-                <p className="text-xs font-medium  uppercase tracking-wide text-zinc-500">
-                  Assessment Percentage
-                </p>
-                <p className="text-base font-normal text-zinc-950">
-                  {formatParticipation(assessmentState.data.assessmentPercentage)}
-                </p>
-              </div>
-              
-              
-              <div className="space-y-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Monthly Operating Budget
-                </p>
-                <p className="text-base font-normal text-zinc-950 ">
-                  {formatCurrency(
-                    assessmentState.data.monthlyOperatingBudget,
-                    assessmentState.data.currency,
-                  )}
-                </p>
-              </div>
-               <div className="space-y-1 ">
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Assessment
-                </p>
-                <p className="text-base font-semibold text-zinc-950">
-                  {formatCurrency(
-                    assessmentState.data.fixedMonthlyAssessment,
-                    assessmentState.data.currency,
-                  )}
-                </p>
-              </div>
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Known Total</p>
+              <p className="text-base font-semibold text-zinc-950">
+                {formatCurrency(unitObligation.knownTotal, "PEN")}
+              </p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-zinc-600">{assessmentState.message}</p>
-              {assessmentState.reason === "budget-plan-missing" ? (
-                <Link
-                  href={`/finance/budget-plans/${assessmentState.planYear ?? planYear}`}
-                  className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
-                >
-                  Open Budget Plan
-                </Link>
-              ) : null}
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Readiness</p>
+              <p className="text-base font-normal text-zinc-950">{unitObligation.readiness}</p>
             </div>
-          )}
-
-          <div className="border-t border-zinc-200 pt-6 ">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-base font-semibold text-zinc-950">
-                  Metered Water Charge
-                </h3>
-                <p className="mt-1 text-sm text-zinc-600">
-                  Preview based on the{" "}
-                  {meteredWaterState.status === "available"
-                    ? meteredWaterState.data.sourceReadingMonthLabel
-                    : "selected"}{" "}
-                  meter reading and{" "}
-                  {meteredWaterState.status === "available"
-                    ? meteredWaterState.data.billingMonthLabel
-                    : "billing"} bill.
-                </p>
-              </div>
-
-              {meteredWaterState.status === "available" ? (
-                <div className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <div></div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                        Unit Consumption
-                      </p>
-                      <p className="text-base font-normal text-zinc-950">
-                        {meteredWaterState.data.unitConsumptionText} m³
-                      </p>
-                    </div>
-                    <div className="space-y-1 ">
-                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                        Period Unit Rate
-                      </p>
-                      <p className="text-base font-normal text-zinc-950">
-                        {meteredWaterState.data.periodRateText} PEN/m³
-                      </p>
-                    </div>
-                    <div className="space-y-1 ">
-                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                        Final Charge
-                      </p>
-                      <p className="text-base font-semibold text-zinc-950">
-                        {formatCurrency(meteredWaterState.data.amount, "PEN")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : meteredWaterState.status === "not-applicable" ? (
-                <p className="text-sm text-zinc-600">{meteredWaterState.message}</p>
-              ) : (
-                <p className="text-sm text-zinc-600">{meteredWaterState.message}</p>
-              )}
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Missing Components
+              </p>
+              <p className="text-base font-normal text-zinc-950">
+                {unitObligation.missingComponents.length > 0
+                  ? unitObligation.missingComponents.join(", ")
+                  : "None"}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Blockers</p>
+              <p className="text-base font-normal text-zinc-950">
+                {unitObligation.blockers.length > 0 ? unitObligation.blockers.join(" | ") : "None"}
+              </p>
             </div>
           </div>
 
-          <div className="border-t border-zinc-200 pt-6 ">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-base font-semibold text-zinc-950">
-                  Common Water Charge
-                </h3>
-                <p className="mt-1 text-sm text-zinc-600">
-                  {commonWaterState.status === "available"
-                    ? `Based on ${commonWaterState.data.billingMonthLabel} and ${commonWaterState.data.sourceReadingMonthLabel}.`
-                    : commonWaterState.message}
-                </p>
-              </div>
-
-              {commonWaterState.status === "available" ? (
-                <div className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <div></div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                        Common Water Pool
-                      </p>
-                      <p className="text-base font-normal text-zinc-950">
-                        {formatCurrency(commonWaterState.data.commonWaterPool, "PEN")}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                        Residential Units
-                      </p>
-                      <p className="text-base font-normal text-zinc-950">
-                        {commonWaterState.data.expectedCount}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                        Final Common Water Charge
-                      </p>
-                      <p className="text-base font-semibold text-zinc-950">
-                        {formatCurrency(commonWaterState.data.unitCommonWaterCharge, "PEN")}
-                      </p>
-                    </div>
+          <div className="space-y-4">
+            {unitObligation.units[0]?.components.map((component) => (
+              <div key={component.key} className="rounded-2xl border border-zinc-200 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-950">{component.label}</p>
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">{component.key}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-zinc-950">{component.status}</p>
+                    <p className="text-base font-semibold text-zinc-950">
+                      {component.amount ? formatCurrency(component.amount, component.currency ?? "PEN") : "—"}
+                    </p>
                   </div>
                 </div>
-              ) : null}
-            </div>
+                <div className="mt-3 grid gap-2 text-sm text-zinc-600 sm:grid-cols-2">
+                  <p>Currency: {component.currency ?? "—"}</p>
+                  <p>Source month: {component.sourceMonth ?? "—"}</p>
+                  <p>Blocker: {component.blocker ?? "—"}</p>
+                  <p>Provenance: {component.provenance ?? "—"}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </Panel>
-       <Panel as="section" className="space-y-6 ">
+
+      <Panel as="section" className="space-y-6">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-zinc-950">Ownership</h2>
           <Link
             href={`/units/${unit.unit_number}/transfer-ownership`}
             className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
           >
-            {ownershipSnapshot?.currentOwnership
-              ? "Transfer ownership"
-              : "Assign owner"}
+            {ownershipSnapshot?.currentOwnership ? "Transfer ownership" : "Assign owner"}
           </Link>
         </div>
 
@@ -340,12 +193,10 @@ export default async function UnitDetailPage({ params }: PageProps) {
                   {ownershipSnapshot.currentOwnership.owner.full_name}
                 </p>
                 <p className="text-sm text-zinc-600">
-                  Reference:{" "}
-                  {ownershipSnapshot.currentOwnership.owner.owner_reference}
+                  Reference: {ownershipSnapshot.currentOwnership.owner.owner_reference}
                 </p>
                 <p className="text-sm text-zinc-600">
-                  Responsibility starts:{" "}
-                  {ownershipSnapshot.currentOwnership.start_date}
+                  Responsibility starts: {ownershipSnapshot.currentOwnership.start_date}
                 </p>
                 <Link
                   href={`/owners/${ownershipSnapshot.currentOwnership.owner_id}`}
@@ -364,12 +215,8 @@ export default async function UnitDetailPage({ params }: PageProps) {
                 </h4>
                 {ownershipSnapshot.scheduledOwnerships.map((item) => (
                   <div key={item.id} className="space-y-1">
-                    <p className="text-sm font-medium text-zinc-950">
-                      {item.owner.full_name}
-                    </p>
-                    <p className="text-xs text-zinc-600">
-                      Starts: {item.start_date}
-                    </p>
+                    <p className="text-sm font-medium text-zinc-950">{item.owner.full_name}</p>
+                    <p className="text-xs text-zinc-600">Starts: {item.start_date}</p>
                   </div>
                 ))}
               </div>
@@ -405,12 +252,8 @@ export default async function UnitDetailPage({ params }: PageProps) {
                             </Link>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-zinc-600">
-                          {item.start_date}
-                        </td>
-                        <td className="px-4 py-3 text-zinc-600">
-                          {item.end_date ?? "Current"}
-                        </td>
+                        <td className="px-4 py-3 text-zinc-600">{item.start_date}</td>
+                        <td className="px-4 py-3 text-zinc-600">{item.end_date ?? "Current"}</td>
                         <td className="px-4 py-3 text-zinc-600">
                           {statusLabel(item.ownership_status)}
                         </td>
@@ -426,12 +269,9 @@ export default async function UnitDetailPage({ params }: PageProps) {
         </div>
       </Panel>
 
-
       <Panel as="section">
         <h2 className="text-lg font-semibold text-zinc-950">Notes</h2>
-        <p className="mt-3 text-sm text-zinc-600">
-          {unit.notes ?? "No notes added."}
-        </p>
+        <p className="mt-3 text-sm text-zinc-600">{unit.notes ?? "No notes added."}</p>
       </Panel>
     </section>
   );

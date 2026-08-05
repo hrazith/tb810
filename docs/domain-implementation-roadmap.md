@@ -242,7 +242,7 @@ Billing Periods is the next milestone because it establishes the operational mon
 ### 7. Water
 
 - Purpose: model water meter readings, supplier bills, and deterministic water allocation before accounting snapshots are created.
-- Why here: the Water domain depends on Units and the monthly operational context, but it remains separate from Monthly Financial Obligations and payments.
+- Why here: the Water domain depends on Units and the monthly operational context, but it remains separate from Monthly Obligation records and payments.
 - Key dependency: Units, Budget Plans, Billing Periods, and supplier facts.
 - Definition of done: water meter reading capture, supplier bill capture, deterministic water calculations, attachments, correction handling, and historical snapshot boundaries.
 

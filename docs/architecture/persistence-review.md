@@ -10,14 +10,14 @@ This review compares the current TB810 persistence model against the finalized d
 - Ownership
 - Budget Plan
 - Billing Period
-- Monthly Financial Obligations
+- Monthly Obligation
 
 It is strictly a database architecture exercise. It does not propose migrations or SQL.
 
 ## Overall Observations
 
 - The current schema has solid persistence support for Units, Owners, Ownerships, Unit Accounts, Billing Periods, invoices, and related operational records.
-- The current schema does not yet expose dedicated tables for Organization, Property, Budget Plan, or Monthly Financial Obligations.
+- The current schema does not yet expose dedicated tables for Organization, Property, Budget Plan, or Monthly Obligation.
 - `tb810_buildings` is currently carrying the top-level real-estate context, and in practice it is acting as the persistence home for what TB810 needs today.
 - The main persistence risk is not lack of relational depth inside the existing finance tables. It is that a few concepts now need clearer aggregate boundaries and first-class historical records.
 - The target model can stay small. It does not need a generic enterprise platform shape.
@@ -41,7 +41,7 @@ Organization.
 ### 4. Relationships
 
 - Owns the top-level business context for the property administration system.
-- Provides the boundary above Property, Units, Ownership, Budget Plan, Billing Period, and Monthly Financial Obligations.
+- Provides the boundary above Property, Units, Ownership, Budget Plan, Billing Period, and Monthly Obligation.
 - In the current product, TB810 appears to be operating as a single-organization system with the organization boundary implicit in the app and deployment rather than in a dedicated table.
 
 ### 5. Immutable Data
@@ -99,7 +99,7 @@ Property.
 ### 4. Relationships
 
 - Owns Units.
-- Is the parent context for Ownership, Budget Plan, Billing Period, and Monthly Financial Obligations.
+- Is the parent context for Ownership, Budget Plan, Billing Period, and Monthly Obligation.
 - The current implementation binds Units, Owners, Ownerships, and finance records to `tb810_buildings`.
 
 ### 5. Immutable Data
@@ -484,7 +484,7 @@ That is already the correct uniqueness boundary.
 
 ---
 
-## 7. Monthly Financial Obligations
+## 7. Monthly Obligation
 
 ### 1. Purpose
 
@@ -492,7 +492,7 @@ Persist the immutable monthly charges owed by each Unit for a specific Billing P
 
 ### 2. Aggregate Root
 
-Monthly Financial Obligations.
+Monthly Obligation.
 
 ### 3. Tables
 
@@ -567,7 +567,7 @@ Smallest extension point:
 ### Decision
 
 - Current model: no dedicated obligations table exists.
-- Target model: add one generic Monthly Financial Obligations table with clear source and correction metadata.
+- Target model: add one generic Monthly Obligation table with clear source and correction metadata.
 - Required before UI sprint: `REQUIRED BEFORE FINANCE IMPLEMENTATION`, and `REQUIRED BEFORE UI` if the finance UI will expose monthly charges or previews.
 - Migration/backfill: `REQUIRES CARLOS CLARIFICATION` because historical monthly obligation records will likely need to be reconstructed from legacy evidence if they are to become first-class history.
 
@@ -588,7 +588,7 @@ Examples:
 - Ownership should behave like historical state with append/close semantics.
 - Billing Period should behave like monthly context, not a workflow ledger.
 - Budget Plan should behave like annual configuration with versioned or adopted historical output.
-- Monthly Financial Obligations should behave like immutable history.
+- Monthly Obligation should behave like immutable history.
 
 ### Aggregate Boundary Guidance
 
@@ -598,7 +598,7 @@ Examples:
 - Ownership is the relationship history.
 - Budget Plan is annual configuration.
 - Billing Period is the month container.
-- Monthly Financial Obligations is the monthly historical charge record.
+- Monthly Obligation is the monthly historical charge record.
 
 ### Future Finance Extension Points
 
@@ -607,7 +607,7 @@ The frozen domains stop before Payments, Payment Allocation, Reconciliation, Rep
 Likely future connection points:
 
 - Unit Account for balance and history
-- Monthly Financial Obligations for charge source history
+- Monthly Obligation for charge source history
 - Billing Period for monthly grouping
 - Invoice for communication and issue history
 - Ownership for responsible-owner resolution
@@ -618,7 +618,7 @@ Likely future connection points:
 - Property: if `tb810_buildings` is kept as the property home, no migration is needed now.
 - Budget Plan: existing legacy budget evidence will likely require reconstruction into a proper annual plan and historical versions later.
 - Billing Period: current rows can remain, but their status semantics may need cleanup or compatibility mapping.
-- Monthly Financial Obligations: existing historical amounts will likely need backfill or reconstruction if TB810 wants this domain as durable history before or alongside the finance UI.
+- Monthly Obligation: existing historical amounts will likely need backfill or reconstruction if TB810 wants this domain as durable history before or alongside the finance UI.
 - Unit and Ownership transitional fields can be cleaned later, provided the current model keeps the expected relationships intact.
 
 ---
@@ -690,18 +690,18 @@ Likely future connection points:
 - Conceptual table name: `tb810_billing_periods`
 - Business purpose: operational month created by the passage of time
 - Aggregate/domain owner: Billing Period
-- Key relationships: Building, Budget Plan, Ownership, Monthly Financial Obligations, invoices
+- Key relationships: Building, Budget Plan, Ownership, Monthly Obligation, invoices
 - Immutable historical responsibilities: month identity, month boundaries, historical downstream records
 - Already exists: yes
 - Requires modification: yes, mainly to stop over-reading workflow states as the domain definition
 - New: no
 - Required before the UI sprint: `REQUIRED BEFORE UI`
 
-### Monthly Financial Obligations
+### Monthly Obligation
 
 - Conceptual table name: `tb810_monthly_financial_obligations`
 - Business purpose: immutable monthly charges owed by each Unit for a Billing Period
-- Aggregate/domain owner: Monthly Financial Obligations
+- Aggregate/domain owner: Monthly Obligation
 - Key relationships: Billing Period, Unit, Unit Account, future invoice line generation
 - Immutable historical responsibilities: calculation inputs, obligation amounts, source context, correction history
 - Already exists: no
@@ -716,7 +716,7 @@ Likely future connection points:
 - `tb810_buildings` can remain the persistence home for the current Property/Building concept unless the business proves a real split.
 - Ownership should remain a single historical relationship table with one owner and one unit per row.
 - Billing Period should remain month-based, keyed by building plus calendar month, not a draft/open/closed workflow.
-- Monthly Financial Obligations should be a first-class historical record anchored to Billing Period and Unit Account.
+- Monthly Obligation should be a first-class historical record anchored to Billing Period and Unit Account.
 
 ### Unresolved decisions
 
@@ -730,7 +730,7 @@ Likely future connection points:
 
 - preserve or formalize the current Unit and Ownership boundaries
 - keep `tb810_billing_periods` keyed by building plus calendar month and stop relying on workflow state as the domain identity
-- add the persistence shape for Monthly Financial Obligations if the UI will show monthly charges or billing previews
+- add the persistence shape for Monthly Obligation if the UI will show monthly charges or billing previews
 
 ### Database changes that can safely wait
 

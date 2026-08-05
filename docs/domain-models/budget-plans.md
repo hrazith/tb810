@@ -35,7 +35,7 @@ This is the entry point for the Finance Foundation v1 UI, not the monthly obliga
 The Fixed Monthly Assessment is always derived.
 It is a derived planning value, recalculated from the current Budget Plan and Unit Participation Percentage.
 It is not a historical financial record.
-Historical monthly charges are represented by Monthly Financial Obligations, which snapshot the Fixed Monthly Assessment at the time obligations are generated.
+Historical monthly charges are represented by Finalized Monthly Obligation records, which snapshot the Fixed Monthly Assessment at the time obligations are generated.
 
 Formula:
 
@@ -64,7 +64,7 @@ Budget Plan is a source fact for:
 
 It does not own:
 
-- Monthly Financial Obligations
+- Monthly Obligation
 - Payments
 - payment allocations
 - balances
@@ -74,7 +74,7 @@ The broader finance progression is:
 
 Facts → Calculations → Accounting → Planning
 
-Within that progression, the Budget Plan contributes the planning facts that fuel calculations, while Monthly Financial Obligations preserve the historical accounting snapshot.
+Within that progression, the Budget Plan contributes the planning facts that fuel calculations, while Finalized Monthly Obligation records preserve the historical accounting snapshot.
 
 ## Budget Preview
 
@@ -144,7 +144,7 @@ Document this observation but do not introduce a solution.
 
 ## Next Step
 
-The next finance step is to use the persisted Monthly Operating Budget to generate Monthly Financial Obligations later in the finance flow.
+The next finance step is to use the persisted Monthly Operating Budget to generate Monthly Obligations later in the finance flow.
 
 See also:
 

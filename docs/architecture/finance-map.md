@@ -16,7 +16,7 @@ Finance:
 - Monthly Assessment
 - Water
 - Billing Period
-- Monthly Financial Obligations
+- Monthly Obligation
 - Unit Ledger
 - Owner Statement
 - Invoice / Communication
@@ -45,7 +45,7 @@ The separate financial input and calculation domain that turns meter and supplie
 
 The operational context for one accounting month.
 
-### Monthly Financial Obligations
+### Monthly Obligation
 
 The amount every Unit owes for the Billing Period.
 
