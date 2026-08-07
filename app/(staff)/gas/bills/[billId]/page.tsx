@@ -3,11 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { deleteGasBillAction } from "@/server/gas/actions";
 import { getGasBillById } from "@/server/gas";
-
-import { GasBillForm } from "../../_components/gas-bill-form";
-import { updateGasBillAction } from "@/server/gas/actions";
 
 type PageProps = {
   params: Promise<{
@@ -33,18 +29,19 @@ export default async function GasBillDetailPage({ params }: PageProps) {
           <p>Amount: {bill.amount.toFixed(2)}</p>
           <p>Status: {bill.status === "processed" ? "Processed" : "Draft"}</p>
         </div>
-        <Button asChild variant="secondary" size="sm">
-          <Link href="/gas/bills">Back to bills</Link>
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button asChild variant="secondary" size="sm">
+            <Link href="/gas/bills">Back to bills</Link>
+          </Button>
+          {bill.status === "draft" ? (
+            <Button asChild variant="primary" size="sm">
+              <Link href={`/gas/bills/${bill.id}/edit`}>Edit Bill</Link>
+            </Button>
+          ) : (
+            <p className="text-sm text-zinc-600">Processed bills are read-only.</p>
+          )}
+        </div>
       </Panel>
-
-      <GasBillForm
-        action={updateGasBillAction}
-        deleteAction={deleteGasBillAction}
-        bill={bill}
-        submitLabel="Save Bill"
-      />
-      {bill.status === "processed" ? <p className="text-sm text-zinc-600">Processed bills are immutable.</p> : null}
     </section>
   );
 }

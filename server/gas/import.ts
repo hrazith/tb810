@@ -65,13 +65,30 @@ function normalizeHeader(value: string | null) {
   return value?.replace(/\s+/g, " ").trim().toLowerCase() ?? "";
 }
 
+function hasText(value: string | null | undefined) {
+  return Boolean(value && value.trim());
+}
+
 export type GasImportRow = {
   sourceRowNumber: number;
   kind: "bill" | "reading";
   data: Record<string, string | null>;
 };
 
-export async function parseGasWorkbookWorkbook(file: File) {
+export type GasImportIssue = {
+  sourceRowNumber: number;
+  reason: string;
+};
+
+export type GasImportPreflight = {
+  rows: GasImportRow[];
+  unmatchedRows: GasImportIssue[];
+  invalidRows: GasImportIssue[];
+  duplicateRows: GasImportIssue[];
+  unresolvedUnitNumbers: GasImportIssue[];
+};
+
+export async function parseGasWorkbook(file: File) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const tmpDir = mkdtempSync(join(tmpdir(), "tb810-gas-import-"));
   const tmp = join(tmpDir, file.name);
@@ -91,6 +108,11 @@ export async function parseGasWorkbookWorkbook(file: File) {
   }
   const sharedStrings = sharedStringsXml ? parseSharedStrings(sharedStringsXml) : [];
   const rows: GasImportRow[] = [];
+  const seenRows = new Set<string>();
+  const duplicateRows: GasImportIssue[] = [];
+  const unmatchedRows: GasImportIssue[] = [];
+  const invalidRows: GasImportIssue[] = [];
+  const unresolvedUnitNumbers: GasImportIssue[] = [];
   for (const sheet of sheets) {
     const xml = getEntry(tmp, sheet.path);
     if (!xml) continue;
@@ -110,10 +132,40 @@ export async function parseGasWorkbookWorkbook(file: File) {
         if (header) data[header] = cell.value ?? null;
       }
       const values = Object.values(data).filter(Boolean).join(" ").toLowerCase();
-      if (values.includes("invoice") || values.includes("supplier")) rows.push({ sourceRowNumber: row.rowNumber, kind: "bill", data });
-      else if (values.includes("reading") || values.includes("unidad") || values.includes("unit")) rows.push({ sourceRowNumber: row.rowNumber, kind: "reading", data });
+      const signature = `${sheet.name}:${row.rowNumber}:${values}`;
+      if (seenRows.has(signature)) {
+        duplicateRows.push({ sourceRowNumber: row.rowNumber, reason: `Duplicate workbook row on ${sheet.name}.` });
+        continue;
+      }
+      seenRows.add(signature);
+      if (values.includes("invoice") || values.includes("supplier")) {
+        rows.push({ sourceRowNumber: row.rowNumber, kind: "bill", data });
+      } else if (values.includes("reading") || values.includes("unidad") || values.includes("unit")) {
+        rows.push({ sourceRowNumber: row.rowNumber, kind: "reading", data });
+      } else {
+        unmatchedRows.push({ sourceRowNumber: row.rowNumber, reason: "Row did not match bill or reading import patterns." });
+        continue;
+      }
+
+      if (values.includes("invoice") || values.includes("supplier")) {
+        const supplierName = data["Supplier"] ?? data["Supplier Name"] ?? data["Proveedor"];
+        const invoiceNumber = data["Invoice Number"] ?? data["Invoice"] ?? data["Nro Factura"];
+        const invoiceDate = data["Invoice Date"] ?? data["Date"] ?? data["Fecha"];
+        const amount = data["Amount"] ?? data["Importe"] ?? data["Monto"];
+        if (!hasText(supplierName) || !hasText(invoiceNumber) || !hasText(invoiceDate) || !hasText(amount)) {
+          invalidRows.push({ sourceRowNumber: row.rowNumber, reason: "Bill row is missing required supplier, invoice, date, or amount fields." });
+        }
+      } else {
+        const unitNumber = data["Unit"] ?? data["Unidad"] ?? data["Unit Number"];
+        const readingDate = data["Reading Date"] ?? data["Fecha"] ?? data["Date"];
+        const currentReading = data["Current Reading"] ?? data["Lectura"] ?? data["Reading"];
+        if (!hasText(unitNumber)) unresolvedUnitNumbers.push({ sourceRowNumber: row.rowNumber, reason: "Reading row is missing a Unit number." });
+        if (!hasText(readingDate) || !hasText(currentReading)) {
+          invalidRows.push({ sourceRowNumber: row.rowNumber, reason: "Reading row is missing required reading date or current reading fields." });
+        }
+      }
     }
   }
   rmSync(tmpDir, { recursive: true, force: true });
-  return rows;
+  return { rows, unmatchedRows, invalidRows, duplicateRows, unresolvedUnitNumbers };
 }

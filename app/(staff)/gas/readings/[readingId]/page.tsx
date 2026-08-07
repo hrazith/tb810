@@ -45,7 +45,7 @@ export default async function GasReadingDetailPage({ params }: PageProps) {
         units={unitsResult.data}
         submitLabel="Save Reading"
       />
-      <form action={deleteGasReadingAction as never}>
+      <form action={deleteGasReadingAction}>
         <input type="hidden" name="reading_id" value={result.data.id} />
         <Button type="submit" variant="secondary" size="sm">
           Delete Reading

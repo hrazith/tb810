@@ -37,7 +37,7 @@ export function GasReadingForm({ action, units, reading, submitLabel }: Props) {
   const eligibleUnits = units.filter((unit) => unit.unit_type_code === "condo" && unit.has_gas_service);
 
   return (
-    <Panel as="form" action={formAction as never} className="space-y-6">
+    <Panel as="form" action={formAction} className="space-y-6">
       <input type="hidden" name="reading_id" value={values.reading_id ?? ""} />
       <input type="hidden" name="building_id" value={values.building_id ?? ""} />
       <div className="grid gap-4 md:grid-cols-2">
@@ -55,33 +55,38 @@ export function GasReadingForm({ action, units, reading, submitLabel }: Props) {
               </option>
             ))}
           </select>
+          {fieldError("unit_id", state) ? <p className="text-sm text-red-600">{fieldError("unit_id", state)}</p> : null}
         </label>
         <label className="space-y-2">
           <span className="block text-lg font-medium text-zinc-900">Reading month</span>
           <Input name="reading_month" type="month" defaultValue={values.reading_month ?? ""} />
+          {fieldError("reading_month", state) ? <p className="text-sm text-red-600">{fieldError("reading_month", state)}</p> : null}
         </label>
         <label className="space-y-2">
           <span className="block text-lg font-medium text-zinc-900">Reading date</span>
           <Input name="reading_date" type="date" defaultValue={values.reading_date ?? ""} />
+          {fieldError("reading_date", state) ? <p className="text-sm text-red-600">{fieldError("reading_date", state)}</p> : null}
         </label>
         <label className="space-y-2">
           <span className="block text-lg font-medium text-zinc-900">Previous reading</span>
           <Input name="previous_reading" type="number" step="0.001" min="0" defaultValue={values.previous_reading ?? ""} />
+          {fieldError("previous_reading", state) ? <p className="text-sm text-red-600">{fieldError("previous_reading", state)}</p> : null}
         </label>
         <label className="space-y-2">
           <span className="block text-lg font-medium text-zinc-900">Current reading</span>
           <Input name="current_reading" type="number" step="0.001" min="0" defaultValue={values.current_reading ?? ""} />
+          {fieldError("current_reading", state) ? <p className="text-sm text-red-600">{fieldError("current_reading", state)}</p> : null}
         </label>
       </div>
       <label className="block space-y-2">
         <span className="block text-lg font-medium text-zinc-900">Notes</span>
         <textarea name="notes" rows={4} defaultValue={values.notes ?? ""} className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm" />
+        {fieldError("notes", state) ? <p className="text-sm text-red-600">{fieldError("notes", state)}</p> : null}
       </label>
       {state.error ? <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{state.error}</p> : null}
       <button type="submit" disabled={pending} className="inline-flex h-12 items-center justify-center rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white">
         {pending ? "Saving..." : submitLabel}
       </button>
-      {fieldError("unit_id", state) ? <p className="text-sm text-red-600">{fieldError("unit_id", state)}</p> : null}
     </Panel>
   );
 }

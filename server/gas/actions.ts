@@ -11,6 +11,7 @@ import {
   updateGasBill,
   updateGasReading,
 } from "./index";
+import type { GasImportPreflight } from "./import";
 import { gasBillInputSchema, gasReadingInputSchema } from "./validation";
 
 export type GasFormState = {
@@ -18,6 +19,14 @@ export type GasFormState = {
   error?: string;
   fieldErrors?: Record<string, string>;
   values?: Record<string, string>;
+  review?: GasImportReviewState;
+};
+
+export type GasImportReviewState = GasImportPreflight & {
+  confirmed?: boolean;
+  readyToImport?: boolean;
+  billMatches: number;
+  readingMatches: number;
 };
 
 function mapFieldErrors(issues: z.ZodIssue[]) {
@@ -38,6 +47,10 @@ function toNumber(value: FormDataEntryValue | null) {
   if (!raw) return Number.NaN;
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function toBoolean(value: FormDataEntryValue | null) {
+  return String(value ?? "").trim() === "true";
 }
 
 export async function createGasBillAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
@@ -77,10 +90,9 @@ export async function updateGasBillAction(_prev: GasFormState, formData: FormDat
   return { success: "Bill saved.", values: { bill_id: result.data.id } };
 }
 
-export async function deleteGasBillAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
+export async function deleteGasBillAction(formData: FormData): Promise<void> {
   const result = await deleteGasBill(String(formData.get("bill_id") ?? ""));
-  if (result.error) return { error: result.error };
-  return { success: "Bill deleted." };
+  if (result.error) throw new Error(result.error);
 }
 
 export async function createGasReadingAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
@@ -132,10 +144,9 @@ export async function updateGasReadingAction(_prev: GasFormState, formData: Form
   return { success: "Reading saved.", values: { reading_id: result.data.id } };
 }
 
-export async function deleteGasReadingAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
+export async function deleteGasReadingAction(formData: FormData): Promise<void> {
   const result = await deleteGasReading(String(formData.get("reading_id") ?? ""));
-  if (result.error) return { error: result.error };
-  return { success: "Reading deleted." };
+  if (result.error) throw new Error(result.error);
 }
 
 export async function importGasWorkbookAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
@@ -143,7 +154,14 @@ export async function importGasWorkbookAction(_prev: GasFormState, formData: For
   if (!(file instanceof File)) {
     return { error: "Unable to open workbook." };
   }
-  const result = await importGasWorkbook(file);
-  if (result.error) return { error: result.error };
+  const confirmed = toBoolean(formData.get("confirmed"));
+  const result = await importGasWorkbook(file, confirmed);
+  if (result.error) return { error: result.error, review: result.review };
+  if (!result.imported) {
+    return {
+      review: result.review,
+      success: "Review the workbook summary, then confirm import to write records.",
+    };
+  }
   return { success: `Imported ${result.data.importedBillCount} bills and ${result.data.importedReadingCount} readings from ${file.name}.` };
 }

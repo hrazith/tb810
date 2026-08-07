@@ -13,7 +13,7 @@ export default async function NewGasBillPage() {
   return (
     <GasBillForm
       action={createGasBillAction}
-      bill={{ id: "", building_id: buildingResult.data.id } as never}
+      buildingId={buildingResult.data.id}
       submitLabel="Save Bill"
     />
   );

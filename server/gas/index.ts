@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBuilding, listUnits } from "@/server/units";
-import { parseGasWorkbookWorkbook } from "./import";
+import { parseGasWorkbook, type GasImportPreflight } from "./import";
 
 import type {
   GasBillInput,
@@ -18,6 +18,14 @@ type GasWorkbookImportResult = {
   importedReadingCount: number;
 };
 
+type GasWorkbookImportResponse = QueryResult<GasWorkbookImportResult> & {
+  imported: boolean;
+  review: GasImportPreflight & {
+    billMatches: number;
+    readingMatches: number;
+  };
+};
+
 const GAS_BILL_SELECT =
   "id, building_id, supplier_name, invoice_number, invoice_date, amount, notes, processed_at, legacy_table, legacy_id, legacy_metadata, created_at, updated_at" as const;
 const GAS_READING_SELECT =
@@ -27,7 +35,7 @@ function statusFromBill(row: GasBillRecord) {
   return row.processed_at ? "processed" : "draft";
 }
 
-function normalizeUnitType(unitTypeCode: string) {
+function isCondoUnit(unitTypeCode: string) {
   return unitTypeCode === "condo";
 }
 
@@ -103,7 +111,7 @@ export async function listGasReadings(): Promise<QueryResult<GasReadingSummary[]
   ]);
   if (error) return { data: [], error: error.message };
   if (unitsResult.error) return { data: [], error: unitsResult.error };
-  const unitById = new Map(unitsResult.data.filter((unit) => normalizeUnitType(unit.unit_type_code) && unit.has_gas_service).map((unit) => [unit.id, unit]));
+  const unitById = new Map(unitsResult.data.filter((unit) => isCondoUnit(unit.unit_type_code) && unit.has_gas_service).map((unit) => [unit.id, unit]));
   return {
     data: (readings ?? [])
       .map((row) => {
@@ -180,62 +188,95 @@ function readingMonthFromDate(date: string) {
   return `${date.slice(0, 7)}-01`;
 }
 
-export async function importGasWorkbook(file: File): Promise<QueryResult<GasWorkbookImportResult>> {
-  const rows = await parseGasWorkbookWorkbook(file);
-  if (!rows.length) {
-    return { data: { importedBillCount: 0, importedReadingCount: 0 }, error: null };
-  }
-
+export async function importGasWorkbook(file: File, confirmed = false): Promise<GasWorkbookImportResponse> {
   const supabase = await createClient();
   const building = await getCurrentBuilding();
-  if (building.error) return { data: null as never, error: building.error };
-  if (!building.data) return { data: null as never, error: "Building not found." };
+  if (building.error) return { data: null as never, error: building.error, imported: false, review: { rows: [], unmatchedRows: [], invalidRows: [], duplicateRows: [], unresolvedUnitNumbers: [], billMatches: 0, readingMatches: 0 } };
+  if (!building.data) return { data: null as never, error: "Building not found.", imported: false, review: { rows: [], unmatchedRows: [], invalidRows: [], duplicateRows: [], unresolvedUnitNumbers: [], billMatches: 0, readingMatches: 0 } };
 
   const unitsResult = await listUnits();
-  if (unitsResult.error) return { data: null as never, error: unitsResult.error };
+  if (unitsResult.error) return { data: null as never, error: unitsResult.error, imported: false, review: { rows: [], unmatchedRows: [], invalidRows: [], duplicateRows: [], unresolvedUnitNumbers: [], billMatches: 0, readingMatches: 0 } };
   const condoByNumber = new Map(
     unitsResult.data
       .filter((unit) => unit.unit_type_code === "condo" && unit.has_gas_service)
       .map((unit) => [unit.unit_number, unit]),
   );
 
+  const preflight = await parseGasWorkbook(file);
+  const { rows } = preflight;
+  const billRows = rows.filter((row) => row.kind === "bill");
+  const readingRows = rows.filter((row) => row.kind === "reading");
+  const readingUnresolvedUnitNumbers = readingRows.filter((row) => {
+    const unitNumber = normalizeText(row.data["Unit"] ?? row.data["Unidad"] ?? row.data["Unit Number"]);
+    return !unitNumber || !condoByNumber.has(unitNumber);
+  }).map((row) => ({ sourceRowNumber: row.sourceRowNumber, reason: "Reading row did not resolve to a gas-enabled condo Unit." }));
+  const review = {
+    ...preflight,
+    unmatchedRows: preflight.unmatchedRows,
+    invalidRows: preflight.invalidRows,
+    duplicateRows: preflight.duplicateRows,
+    unresolvedUnitNumbers: [...preflight.unresolvedUnitNumbers, ...readingUnresolvedUnitNumbers],
+    billMatches: billRows.length,
+    readingMatches: readingRows.length,
+  };
+  if (!confirmed) {
+    return { data: { importedBillCount: 0, importedReadingCount: 0 }, error: null, imported: false, review };
+  }
+  if (review.unmatchedRows.length || review.invalidRows.length || review.duplicateRows.length || review.unresolvedUnitNumbers.length) {
+    return {
+      data: null as never,
+      error: "Workbook review failed. Resolve unmatched, invalid, duplicate, or unresolved rows before importing.",
+      imported: false,
+      review,
+    };
+  }
+
+  if (!billRows.length && !readingRows.length) {
+    return { data: { importedBillCount: 0, importedReadingCount: 0 }, error: null, imported: true, review };
+  }
+
   let importedBillCount = 0;
   let importedReadingCount = 0;
 
-  for (const row of rows) {
-    if (row.kind === "bill") {
-      const supplier_name = normalizeText(row.data["Supplier"] ?? row.data["Supplier Name"] ?? row.data["Proveedor"]);
-      const invoice_number = normalizeText(row.data["Invoice Number"] ?? row.data["Invoice"] ?? row.data["Nro Factura"]);
-      const invoice_date = normalizeText(row.data["Invoice Date"] ?? row.data["Date"] ?? row.data["Fecha"]);
-      const amount = Number(normalizeText(row.data["Amount"] ?? row.data["Importe"] ?? row.data["Monto"]));
-      if (!supplier_name || !invoice_number || !invoice_date || !Number.isFinite(amount)) continue;
-      const { error } = await supabase.from("tb810_gas_bills").upsert(
-        {
-          building_id: building.data.id,
-          supplier_name,
-          invoice_number,
-          invoice_date,
-          amount,
-          notes: normalizeText(row.data["Notes"] ?? row.data["Comentarios"]) || null,
-          legacy_table: "gas_spreadsheet",
-          legacy_id: `${row.sourceRowNumber}`,
-          legacy_metadata: { source_row_number: row.sourceRowNumber, worksheet_row: row.data },
-        },
-        { onConflict: "building_id,invoice_number" },
-      );
-      if (error) return { data: null as never, error: error.message };
-      importedBillCount += 1;
-      continue;
+  for (const row of billRows) {
+    const supplier_name = normalizeText(row.data["Supplier"] ?? row.data["Supplier Name"] ?? row.data["Proveedor"]);
+    const invoice_number = normalizeText(row.data["Invoice Number"] ?? row.data["Invoice"] ?? row.data["Nro Factura"]);
+    const invoice_date = normalizeText(row.data["Invoice Date"] ?? row.data["Date"] ?? row.data["Fecha"]);
+    const amount = Number(normalizeText(row.data["Amount"] ?? row.data["Importe"] ?? row.data["Monto"]));
+    if (!supplier_name || !invoice_number || !invoice_date || !Number.isFinite(amount)) {
+      return { data: null as never, error: `Bill row ${row.sourceRowNumber} is invalid after preflight review.`, imported: false, review };
     }
+    const { error } = await supabase.from("tb810_gas_bills").upsert(
+      {
+        building_id: building.data.id,
+        supplier_name,
+        invoice_number,
+        invoice_date,
+        amount,
+        notes: normalizeText(row.data["Notes"] ?? row.data["Comentarios"]) || null,
+        legacy_table: "gas_spreadsheet",
+        legacy_id: `${row.sourceRowNumber}`,
+        legacy_metadata: { source_row_number: row.sourceRowNumber, worksheet_row: row.data },
+      },
+      { onConflict: "building_id,invoice_number" },
+    );
+    if (error) return { data: null as never, error: error.message, imported: false, review };
+    importedBillCount += 1;
+  }
 
+  for (const row of readingRows) {
     const unitNumber = normalizeText(row.data["Unit"] ?? row.data["Unidad"] ?? row.data["Unit Number"]);
     const readingDate = normalizeText(row.data["Reading Date"] ?? row.data["Fecha"] ?? row.data["Date"]);
     const currentReading = Number(normalizeText(row.data["Current Reading"] ?? row.data["Lectura"] ?? row.data["Reading"]));
     const previousReadingRaw = normalizeText(row.data["Previous Reading"] ?? row.data["Lectura anterior"] ?? row.data["Previous"]);
     const previousReading = previousReadingRaw ? Number(previousReadingRaw) : null;
-    if (!unitNumber || !readingDate || !Number.isFinite(currentReading)) continue;
+    if (!unitNumber || !readingDate || !Number.isFinite(currentReading)) {
+      return { data: null as never, error: `Reading row ${row.sourceRowNumber} is invalid after preflight review.`, imported: false, review };
+    }
     const unit = condoByNumber.get(unitNumber);
-    if (!unit) continue;
+    if (!unit) {
+      return { data: null as never, error: `Reading row ${row.sourceRowNumber} did not resolve to a gas-enabled condo Unit.`, imported: false, review };
+    }
     const { error } = await supabase.from("tb810_gas_readings").upsert(
       {
         building_id: building.data.id,
@@ -252,9 +293,9 @@ export async function importGasWorkbook(file: File): Promise<QueryResult<GasWork
       },
       { onConflict: "building_id,unit_id,reading_month" },
     );
-    if (error) return { data: null as never, error: error.message };
+    if (error) return { data: null as never, error: error.message, imported: false, review };
     importedReadingCount += 1;
   }
 
-  return { data: { importedBillCount, importedReadingCount }, error: null };
+  return { data: { importedBillCount, importedReadingCount }, error: null, imported: true, review };
 }
