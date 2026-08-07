@@ -52,20 +52,21 @@ export function UnitForm({ defaults, action, submitLabel }: Props) {
   const [selectedTypeId, setSelectedTypeId] = useState(
     values.unit_type_id ?? defaults.unitTypes[0]?.id ?? "",
   );
-  const [meterValue, setMeterValue] = useState(
-    values.has_meter ? "yes" : "no",
-  );
+  const [hasMeter, setHasMeter] = useState(Boolean(values.has_meter));
+  const [hasGasService, setHasGasService] = useState(Boolean(values.has_gas_service));
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const nextTypeId = values.unit_type_id ?? defaults.unitTypes[0]?.id ?? "";
     setSelectedTypeId(nextTypeId);
-    setMeterValue(values.has_meter ? "yes" : "no");
-  }, [defaults.unitTypes, values.has_meter, values.unit_type_id]);
+    setHasMeter(Boolean(values.has_meter));
+    setHasGasService(Boolean(values.has_gas_service));
+  }, [defaults.unitTypes, values.has_gas_service, values.has_meter, values.unit_type_id]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const meterIsAllowed = meterAllowed(selectedTypeId, defaults.unitTypes);
-  const effectiveMeterValue = meterIsAllowed ? meterValue : "no";
+  const effectiveHasMeter = meterIsAllowed ? hasMeter : false;
+  const effectiveHasGasService = meterIsAllowed ? hasGasService : false;
 
   return (
     <Panel as="form" action={formAction} className="space-y-6">
@@ -105,7 +106,8 @@ export function UnitForm({ defaults, action, submitLabel }: Props) {
                     onChange={() => {
                       setSelectedTypeId(unitType.id);
                       if (unitType.code !== "condo") {
-                        setMeterValue("no");
+                        setHasMeter(false);
+                        setHasGasService(false);
                       }
                     }}
                     className="sr-only"
@@ -194,47 +196,58 @@ export function UnitForm({ defaults, action, submitLabel }: Props) {
 
         <fieldset className="space-y-3">
           <legend className="block text-lg font-medium text-zinc-900">
-            Has individual meter
+            Meter and service
           </legend>
           {!meterIsAllowed ? (
             <p className="text-sm text-zinc-500">
-              Parking and storage units do not use an individual meter.
+              Parking and storage units cannot participate in water or gas service enrollment.
             </p>
           ) : null}
-          <div
-            role="radiogroup"
-            aria-label="Has individual meter"
-            className="grid gap-2 sm:grid-cols-2"
-          >
-            {["no", "yes"].map((option) => {
-              const checked = effectiveMeterValue === option;
-              const disabled = option === "yes" && !meterIsAllowed;
-              return (
-                <label
-                  key={option}
-                  className={`flex min-h-14 cursor-pointer items-center justify-center rounded-xl border px-4 py-3 text-sm font-medium transition focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-offset-white ${
-                    checked
-                      ? "border-zinc-950 bg-zinc-950 text-white"
-                      : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-950 hover:text-zinc-950"
-                  } ${disabled ? "cursor-not-allowed opacity-50 hover:border-zinc-300 hover:text-zinc-700" : ""}`}
-                >
-                  <input
-                    type="radio"
-                    name="has_meter"
-                    value={option}
-                    checked={checked}
-                    onChange={() => setMeterValue(option)}
-                    disabled={disabled}
-                    className="sr-only"
-                  />
-                  {option === "yes" ? "Yes" : "No"}
-                </label>
-              );
-            })}
+          <div className="space-y-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                name="has_meter"
+                checked={effectiveHasMeter}
+                onChange={(event) => setHasMeter(event.target.checked)}
+                disabled={!meterIsAllowed}
+                className="mt-1 h-4 w-4 rounded border-zinc-300 text-zinc-950"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium text-zinc-900">
+                  Individual water meter
+                </span>
+                <span className="block text-sm text-zinc-600">
+                  This Unit participates in individual Water meter readings.
+                </span>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                name="has_gas_service"
+                checked={effectiveHasGasService}
+                onChange={(event) => setHasGasService(event.target.checked)}
+                disabled={!meterIsAllowed}
+                className="mt-1 h-4 w-4 rounded border-zinc-300 text-zinc-950"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium text-zinc-900">Gas service</span>
+                <span className="block text-sm text-zinc-600">
+                  This Unit participates in the building Gas service and has an individual Gas meter.
+                </span>
+              </span>
+            </label>
           </div>
           {fieldError("has_meter", state) ? (
             <p className="text-sm text-red-600">
               {fieldError("has_meter", state)}
+            </p>
+          ) : null}
+          {fieldError("has_gas_service", state) ? (
+            <p className="text-sm text-red-600">
+              {fieldError("has_gas_service", state)}
             </p>
           ) : null}
         </fieldset>

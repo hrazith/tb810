@@ -15,6 +15,7 @@ export type UnitRecord = {
   registered_area_m2: number | null;
   participation_percentage: number;
   has_meter: boolean | null;
+  has_gas_service: boolean | null;
   notes: string | null;
   active: boolean;
   created_at: string;
@@ -55,6 +56,7 @@ export type UnitInput = {
   registered_area_m2?: number | null;
   participation_percentage: number;
   has_meter: boolean;
+  has_gas_service: boolean;
   notes?: string | null;
 };
 

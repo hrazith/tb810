@@ -58,6 +58,28 @@ export function Header({ userEmail, signOutAction }: HeaderProps) {
                 </div>
               </div>
             </div>
+            <div className="group relative">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 transition hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
+                aria-haspopup="menu"
+                aria-expanded="false"
+              >
+                Gas
+                <CaretDown size={14} weight="bold" />
+              </button>
+
+              <div className="pointer-events-none absolute left-0 top-full z-30 pt-3 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                <div className="min-w-60 rounded-2xl border border-zinc-200 bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.08)]">
+                  <Link href="/gas/bills" className="flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+                    Supplier bills
+                  </Link>
+                  <Link href="/gas/readings" className="flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+                    Gas readings
+                  </Link>
+                </div>
+              </div>
+            </div>
           </nav>
         </div>
 

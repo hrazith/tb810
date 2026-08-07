@@ -411,7 +411,7 @@ async function getAugust2026UnitWaterCycleContext(
       unit: {
         id: unitResult.data.id,
         unit_type_id: unitResult.data.unit_type_id,
-        has_meter: unitResult.data.has_meter,
+        has_meter: Boolean(unitResult.data.has_meter),
       },
       unitTypeCode: unitType.code,
       commonWaterTypeId: commonWaterTypeResult.data.id,

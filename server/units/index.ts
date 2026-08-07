@@ -17,7 +17,7 @@ type QueryResult<T> = {
 };
 
 const UNIT_SELECT =
-  "id, building_id, unit_type_id, unit_number, floor, display_order, registered_area_m2, participation_percentage, has_meter, notes, active, created_at, updated_at" as const;
+  "id, building_id, unit_type_id, unit_number, floor, display_order, registered_area_m2, participation_percentage, has_meter, has_gas_service, notes, active, created_at, updated_at" as const;
 
 function normalizeText(value: string | null | undefined) {
   return value?.trim() ?? "";
@@ -34,6 +34,20 @@ function mapUnitType(row: {
 
 function mapBuilding(row: { id: string; name: string }): BuildingRecord {
   return row;
+}
+
+async function getUnitTypeCodeById(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  unitTypeId: string,
+) {
+  const { data, error } = await supabase
+    .from("tb810_unit_types")
+    .select("code")
+    .eq("id", unitTypeId)
+    .maybeSingle();
+
+  if (error) return { data: null, error: error.message };
+  return { data: data?.code ?? null, error: null };
 }
 
 export async function listUnitTypes(): Promise<QueryResult<UnitTypeRecord[]>> {
@@ -279,7 +293,14 @@ export async function updateUnit(
   input: UnitInput,
 ): Promise<QueryResult<UnitRecord>> {
   const supabase = await createClient();
-  const payload = input;
+  const unitTypeResult = await getUnitTypeCodeById(supabase, input.unit_type_id);
+  if (unitTypeResult.error) return { data: null as never, error: unitTypeResult.error };
+  const isCondo = unitTypeResult.data === "condo";
+  const payload = {
+    ...input,
+    has_meter: isCondo ? input.has_meter : false,
+    has_gas_service: isCondo ? input.has_gas_service : false,
+  };
   const { data, error } = await supabase
     .from("tb810_units")
     .update({
@@ -290,6 +311,7 @@ export async function updateUnit(
       registered_area_m2: payload.registered_area_m2,
       participation_percentage: payload.participation_percentage,
       has_meter: payload.has_meter,
+      has_gas_service: payload.has_gas_service,
       notes: payload.notes,
     })
     .eq("id", unitId)
@@ -304,7 +326,14 @@ export async function createUnit(
   input: UnitInput,
 ): Promise<QueryResult<UnitRecord>> {
   const supabase = await createClient();
-  const payload = input;
+  const unitTypeResult = await getUnitTypeCodeById(supabase, input.unit_type_id);
+  if (unitTypeResult.error) return { data: null as never, error: unitTypeResult.error };
+  const isCondo = unitTypeResult.data === "condo";
+  const payload = {
+    ...input,
+    has_meter: isCondo ? input.has_meter : false,
+    has_gas_service: isCondo ? input.has_gas_service : false,
+  };
   const { data: currentMax, error: maxError } = await supabase
     .from("tb810_units")
     .select("display_order")
@@ -326,6 +355,7 @@ export async function createUnit(
       registered_area_m2: payload.registered_area_m2,
       participation_percentage: payload.participation_percentage,
       has_meter: payload.has_meter,
+      has_gas_service: payload.has_gas_service,
       notes: payload.notes,
     })
     .select(UNIT_SELECT)
@@ -366,6 +396,7 @@ export async function getUnitFormDefaults(
         registered_area_m2: unitResult.data.registered_area_m2 ?? undefined,
         participation_percentage: unitResult.data.participation_percentage,
         has_meter: unitResult.data.has_meter ?? false,
+        has_gas_service: unitResult.data.has_gas_service ?? false,
         notes: unitResult.data.notes ?? "",
       }
     : building
@@ -377,6 +408,7 @@ export async function getUnitFormDefaults(
           registered_area_m2: undefined,
           participation_percentage: 0,
           has_meter: false,
+          has_gas_service: false,
           notes: "",
         }
       : {
@@ -387,6 +419,7 @@ export async function getUnitFormDefaults(
           registered_area_m2: undefined,
           participation_percentage: 0,
           has_meter: false,
+          has_gas_service: false,
           notes: "",
         };
 

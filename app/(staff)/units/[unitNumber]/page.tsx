@@ -75,7 +75,8 @@ export default async function UnitDetailPage({ params }: PageProps) {
             <p>Floor: {unit.floor ?? "—"}</p>
             <p>Registered area: {formatArea(unit.registered_area_m2)}</p>
             <p>Participation percentage: {formatParticipation(unit.participation_percentage)}</p>
-            <p>Has individual meter: {unit.has_meter ? "Yes" : "No"}</p>
+            <p>Individual water meter: {unit.has_meter ? "Yes" : "No"}</p>
+            <p>Gas service: {unit.has_gas_service ? "Yes" : "No"}</p>
             <p>
               Unit account: {ownershipSnapshot?.unitAccount?.account_number ?? "Unavailable"}
             </p>

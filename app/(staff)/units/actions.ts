@@ -24,7 +24,8 @@ function toUnitInput(formData: FormData) {
       const parsed = Number(raw);
       return Number.isFinite(parsed) ? parsed : Number.NaN;
     })(),
-    has_meter: String(formData.get("has_meter") ?? "no") === "yes",
+    has_meter: formData.has("has_meter"),
+    has_gas_service: formData.has("has_gas_service"),
     notes: String(formData.get("notes") ?? ""),
   };
 }

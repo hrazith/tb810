@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { LetterCircleP } from "@phosphor-icons/react/dist/ssr";
 
 type UnitRow = {
   id: string;
@@ -10,6 +11,7 @@ type UnitRow = {
   floor: string | null;
   participation_percentage: number;
   has_meter: boolean | null;
+  has_gas_service: boolean | null;
   updated_at: string;
 };
 
@@ -19,6 +21,10 @@ type Props = {
 
 function formatParticipation(value: number) {
   return `${value.toFixed(4).replace(/\.?0+$/, "")}%`;
+}
+
+function isParkingUnit(unitTypeName: string) {
+  return unitTypeName.toLowerCase() === "parking";
 }
 
 export function UnitsTable({ units }: Props) {
@@ -44,7 +50,7 @@ export function UnitsTable({ units }: Props) {
             Participation
           </th>
           <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900">
-            Meter
+            Service
           </th>
         </tr>
       </thead>
@@ -65,7 +71,12 @@ export function UnitsTable({ units }: Props) {
             className="cursor-pointer hover:bg-zinc-50 focus-visible:bg-zinc-50 focus-visible:outline-none"
           >
             <td className="py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap text-zinc-900 sm:pl-0">
-              {unit.unit_number}
+              <span className="inline-flex items-center gap-2">
+                {isParkingUnit(unit.unit_type_name) ? (
+                  <LetterCircleP size={16} weight="bold" aria-hidden="true" />
+                ) : null}
+                <span>{unit.unit_number}</span>
+              </span>
             </td>
             <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
               {unit.current_owner_name ?? "Unassigned"}
@@ -80,7 +91,9 @@ export function UnitsTable({ units }: Props) {
               {formatParticipation(unit.participation_percentage)}
             </td>
             <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
-              {unit.has_meter ? "Yes" : "No"}
+              {unit.has_meter ? "Water: Yes" : "Water: No"}
+              {" / "}
+              {unit.has_gas_service ? "Gas: Yes" : "Gas: No"}
             </td>
           </tr>
         ))}

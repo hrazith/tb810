@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Rows, SquaresFour } from "@phosphor-icons/react/dist/ssr";
+import { LetterCircleP, Rows, SquaresFour } from "@phosphor-icons/react/dist/ssr";
 
 import { Panel } from "@/components/ui/panel";
 import { listUnitTypes, listUnits } from "@/server/units";
@@ -17,6 +17,10 @@ type PageProps = {
 
 function formatParticipation(value: number) {
   return `${value.toFixed(4).replace(/\.?0+$/, "")}%`;
+}
+
+function isParkingUnit(unitTypeName: string | null | undefined) {
+  return unitTypeName?.toLowerCase() === "parking";
 }
 
 export default async function UnitsPage({ searchParams }: PageProps) {
@@ -104,10 +108,18 @@ export default async function UnitsPage({ searchParams }: PageProps) {
               className="group rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
             >
               <div className="flex h-full min-h-[8rem] flex-col justify-between">
-                <div className="space-y-1">
+                <div className="flex items-start justify-between gap-3">
                   <span className="block text-xl font-semibold tracking-tight text-zinc-950 underline decoration-transparent transition group-hover:decoration-zinc-950">
                     {unit.unit_number}
                   </span>
+                  {isParkingUnit(unit.unit_type_name) ? (
+                    <LetterCircleP
+                      size={28}
+                      weight="bold"
+                      aria-hidden="true"
+                      className="shrink-0 text-zinc-600"
+                    />
+                  ) : null}
                 </div>
                 <div className="space-y-4">
                   <p className="text-3xl leading-none font-light tracking-tight text-zinc-600">

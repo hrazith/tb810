@@ -2,25 +2,33 @@
 
 Status: Frozen concept document
 
-Date: August 5, 2026
+Date: August 7, 2026
 
-This document freezes the Monthly Obligation concept before implementation.
-
-It is the canonical architecture reference for the progressively building monthly unit obligation truth.
+This document is the canonical architecture reference for Monthly Obligations.
+It consolidates the frozen decisions that define the month-centric financial workspace for TB810.
 
 ## 1. Purpose
 
-A Monthly Obligation is the current financial truth for one Unit in one obligation month.
+Monthly Obligations is the financial heart of TB810.
 
-It is the monthly financial record that composes all known obligation components for that Unit and month.
+It is the month-centric financial operating workspace for the building.
 
-The Monthly Obligation exists so TB810 can expose a live month-level financial truth before all upstream facts are complete, while still preserving a frozen historical snapshot once the month is finalized.
+Everything upstream contributes financial truth.
+Everything downstream consumes financial truth.
+
+Canonical philosophy:
+
+- Facts upstream.
+- Truth in the middle.
+- Communication downstream.
 
 ## 2. Definitions
 
 ### Monthly Obligation
 
-The current financial truth for one Unit in one obligation month.
+The current financial truth for one Unit Account in one obligation month.
+
+It belongs to the Unit Account, never to the Owner.
 
 It may be incomplete while upstream facts are still arriving.
 
@@ -38,6 +46,8 @@ Obligation Month is not the same thing as Reading Month, Service Month, or Sedap
 
 A named financial contribution that participates in the Monthly Obligation total.
 
+Every component should answer: "Why is this amount here?"
+
 ### Known Total
 
 The sum of all currently available component amounts.
@@ -48,63 +58,43 @@ Known Total may change while the Monthly Obligation is live.
 
 The completeness state of the Monthly Obligation for the month.
 
-Readiness reflects whether the obligation is complete enough for downstream use, including invoice generation.
+Readiness reflects whether the obligation is complete enough for downstream use.
 
 ### Blocker
 
-A missing dependency or unresolved condition that prevents a component from becoming available or prevents the monthly obligation from being finalized.
+A missing dependency or unresolved condition that prevents a component from becoming available.
 
-## 3. Progressive Build-Up Lifecycle
+## 3. Progressive Composition
 
-The Monthly Obligation is intentionally progressive.
+Monthly Obligations progressively assemble themselves as financial truths become available.
 
-At the start of the obligation month, TB810 exposes the obligation using every financial truth already available.
+Current providers:
 
-As additional upstream facts arrive, the obligation accumulates more components.
+- Fixed Assessment
+- Metered Water
+- Common Water
+- Gas
 
-Example progression:
+Future providers:
 
-1. Fixed Monthly Assessment may be available immediately.
-2. Metered Water may appear after the Sedapal bill is entered and the water facts are complete.
-3. Common Water may appear after meter readings and the Sedapal bill are both available.
-4. Gas may appear after its supplier input or allocation facts are available.
-5. Other Charges may appear once approved.
+- Other Charges
+- Reserve Fund
+- Others
 
-The obligation must expose:
+Missing is not zero.
+Missing remains explicitly missing.
 
-- available components
-- missing components
-- known total
-- completeness or readiness state
-- blockers for missing components
-
-Missing must never be treated as zero.
-
-A genuine zero amount must remain distinguishable from a missing component.
+Monthly Obligations always represent the latest known financial truth.
+Do not describe them as previews.
 
 ## 4. Current vs Finalized
 
-### Current
-
-Before finalization, the Monthly Obligation is live.
-
-It reflects current source facts.
-
-Components may appear, disappear, or change as upstream facts are completed or corrected.
-
-The known total may change.
-
-Invoices may remain blocked while required components are missing.
-
-### Finalized
+Before finalization, the Monthly Obligation is live and reflects current source facts.
 
 After finalization, the Monthly Obligation becomes an immutable historical financial snapshot.
 
-Invoice generation uses the finalized obligation.
-
-Later source corrections must not silently rewrite the finalized month.
-
-Corrections require an explicit adjustment, replacement, reversal, or future-period correction path.
+Corrections must not silently rewrite the finalized month.
+Late or incorrect charges should be adjusted in a future Monthly Obligation, typically the following month.
 
 ## 5. Component Contract
 
@@ -117,7 +107,8 @@ Each component in a Monthly Obligation must include:
 - currency
 - source period or month
 - source provenance
-- blocker or unavailable reason when missing
+- explanation
+- blocker reason when missing
 
 Initial component keys:
 
@@ -130,14 +121,12 @@ Future component keys:
 - `gas`
 - `other_charge`
 
-Component status values are conceptually:
+Component status values:
 
 - available
 - missing
 - blocked
-- finalized
-
-The exact storage representation is implementation-specific and is intentionally not defined here.
+- not_applicable
 
 ## 6. Month Relationships
 
@@ -211,7 +200,63 @@ The Monthly Obligation service is the shared read model for:
 
 The Unit page must not independently orchestrate assessment, water, gas, or other-charge calculations once it is tethered to this service.
 
-## 10. Finalization and Invoice Boundary
+## 10. Invoice Timing
+
+The system never decides when invoices should be generated.
+
+There are:
+
+- no readiness rules
+- no required component rules
+- no approval workflow
+- no blocking workflow
+- no automatic generation
+
+Carlos decides.
+The system presents truth.
+
+## 11. Invoice Philosophy
+
+Invoices are communication artifacts.
+
+Invoices:
+
+- snapshot the current Monthly Obligation
+- never calculate
+- never recalculate
+
+Invoices can be generated:
+
+- individually
+- as a batch
+- grouped for an Owner
+
+Owner grouping is packaging only.
+It does not change accounting identity.
+
+## 12. Corrections
+
+Keep corrections simple.
+
+No invoice versioning.
+No cancel/reissue workflow.
+No reopening historical months.
+
+If a charge is discovered late or entered incorrectly it should be adjusted in a future Monthly Obligation, typically the following month.
+
+Historical invoices remain historical communication.
+
+## 13. Workspace Responsibilities
+
+Monthly Obligations allows Carlos to:
+
+- inspect monthly financial truth
+- inspect Unit obligations
+- inspect calculations
+- inspect provenance
+- inspect notes
+
+## 14. Finalization and Invoice Boundary
 
 Finalization is the point at which the progressive Monthly Obligation becomes a frozen historical record.
 
@@ -220,12 +265,10 @@ Invoice generation reads finalized Monthly Obligations only.
 Invoices remain presentation and collection documents.
 
 The Monthly Obligation is the financial truth.
-
 The Invoice is the communication artifact.
-
 The Unit Ledger remains the permanent accounting history.
 
-## 11. Explicit Non-Goals
+## 15. Explicit Non-Goals
 
 This document does not:
 
@@ -240,8 +283,9 @@ This document does not:
 - alter existing budget calculations
 - define the final persistence shape
 
-## 12. Frozen Decisions
+## 16. Frozen Decisions
 
+- Monthly Obligations is the financial heart of TB810.
 - A Monthly Obligation is the current financial truth for one Unit in one obligation month.
 - Monthly Obligation is progressive and may be incomplete.
 - Missing components must not be treated as zero.
@@ -256,4 +300,3 @@ This document does not:
 - Initial component keys are `fixed_assessment`, `metered_water`, and `common_water`.
 - Future component keys are `gas` and `other_charge`.
 - The Monthly Obligation is distinct from invoice presentation and distinct from the Unit Ledger.
-

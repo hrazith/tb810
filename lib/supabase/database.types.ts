@@ -974,6 +974,7 @@ export type Database = {
           reading_date: string
           reading_end: number | null
           reading_start: number | null
+          reading_month: string
           status: string
           unit_id: string
           unit_of_measure: string
@@ -996,6 +997,7 @@ export type Database = {
           reading_date: string
           reading_end?: number | null
           reading_start?: number | null
+          reading_month?: string
           status?: string
           unit_id: string
           unit_of_measure?: string
@@ -1018,6 +1020,7 @@ export type Database = {
           reading_date?: string
           reading_end?: number | null
           reading_start?: number | null
+          reading_month?: string
           status?: string
           unit_id?: string
           unit_of_measure?: string
@@ -1045,6 +1048,128 @@ export type Database = {
             columns: ["utility_type_id"]
             isOneToOne: false
             referencedRelation: "tb810_utility_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tb810_gas_bills: {
+        Row: {
+          amount: number
+          building_id: string
+          created_at: string
+          id: string
+          invoice_date: string
+          invoice_number: string
+          legacy_id: string | null
+          legacy_metadata: Json
+          legacy_table: string | null
+          notes: string | null
+          processed_at: string | null
+          supplier_name: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          building_id: string
+          created_at?: string
+          id?: string
+          invoice_date: string
+          invoice_number: string
+          legacy_id?: string | null
+          legacy_metadata?: Json
+          legacy_table?: string | null
+          notes?: string | null
+          processed_at?: string | null
+          supplier_name: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          building_id?: string
+          created_at?: string
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          legacy_id?: string | null
+          legacy_metadata?: Json
+          legacy_table?: string | null
+          notes?: string | null
+          processed_at?: string | null
+          supplier_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tb810_gas_bills_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "tb810_buildings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tb810_gas_readings: {
+        Row: {
+          building_id: string
+          consumption: number | null
+          created_at: string
+          current_reading: number
+          id: string
+          legacy_id: string | null
+          legacy_metadata: Json
+          legacy_table: string | null
+          notes: string | null
+          previous_reading: number | null
+          reading_date: string
+          reading_month: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          building_id: string
+          consumption?: number | null
+          created_at?: string
+          current_reading: number
+          id?: string
+          legacy_id?: string | null
+          legacy_metadata?: Json
+          legacy_table?: string | null
+          notes?: string | null
+          previous_reading?: number | null
+          reading_date: string
+          reading_month: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          building_id?: string
+          consumption?: number | null
+          created_at?: string
+          current_reading?: number
+          id?: string
+          legacy_id?: string | null
+          legacy_metadata?: Json
+          legacy_table?: string | null
+          notes?: string | null
+          previous_reading?: number | null
+          reading_date?: string
+          reading_month?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tb810_gas_readings_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "tb810_buildings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tb810_gas_readings_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "tb810_units"
             referencedColumns: ["id"]
           },
         ]
@@ -1761,6 +1886,7 @@ export type Database = {
           display_order: number
           floor: string | null
           has_meter: boolean | null
+          has_gas_service: boolean
           id: string
           legacy_id: string | null
           legacy_metadata: Json
@@ -1780,6 +1906,7 @@ export type Database = {
           display_order?: number
           floor?: string | null
           has_meter?: boolean | null
+          has_gas_service?: boolean
           id?: string
           legacy_id?: string | null
           legacy_metadata?: Json
@@ -1799,6 +1926,7 @@ export type Database = {
           display_order?: number
           floor?: string | null
           has_meter?: boolean | null
+          has_gas_service?: boolean
           id?: string
           legacy_id?: string | null
           legacy_metadata?: Json

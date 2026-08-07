@@ -34,6 +34,7 @@ export const unitInputSchema = z.object({
     .min(0, "Participation percentage must be non-negative")
     .max(100, "Participation percentage must not exceed 100"),
   has_meter: z.boolean(),
+  has_gas_service: z.boolean(),
   notes: optionalText.transform((value) => {
     if (!value) return null;
     return value.trim();
