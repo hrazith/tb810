@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBuilding } from "@/server/units";
 import { getCurrentReadingMonthCompleteness } from "@/server/water/unit-meter-readings";
+import { previousMonthKeyFromMonthKey } from "./month-utils";
 
 import type {
   CommonWaterBillInput,
@@ -328,6 +329,7 @@ async function getCommonWaterBillForCycleMonth(
 
 async function getAugust2026UnitWaterCycleContext(
   unitId: string,
+  obligationMonth: string,
 ): Promise<
   | { data: August2026UnitWaterCycleContext; error: null }
   | { data: null; error: string }
@@ -339,15 +341,19 @@ async function getAugust2026UnitWaterCycleContext(
   }
 
   const supabase = await createClient();
+  const sourceReadingMonth = previousMonthKeyFromMonthKey(obligationMonth);
+  if (!sourceReadingMonth) {
+    return { data: null, error: "Obligation month is invalid." };
+  }
   const [unitResult, commonWaterTypeResult, completenessResult] = await Promise.all([
     supabase
       .from("tb810_units")
       .select(UNIT_SELECT)
-      .eq("building_id", buildingResult.data.id)
-      .eq("id", unitId)
-      .maybeSingle(),
+    .eq("building_id", buildingResult.data.id)
+    .eq("id", unitId)
+    .maybeSingle(),
     getUtilityTypeId(supabase, "common_water"),
-    getCurrentReadingMonthCompleteness("2026-07"),
+    getCurrentReadingMonthCompleteness(sourceReadingMonth),
   ]);
 
   if (unitResult.error) return { data: null, error: unitResult.error.message };
@@ -375,28 +381,36 @@ async function getAugust2026UnitWaterCycleContext(
   const [unitRowsResult, billResult, readingsResult] = await Promise.all([
     supabase
       .from("tb810_units")
-      .select("id")
-      .eq("building_id", buildingResult.data.id)
-      .eq("unit_type_id", unitType.id),
+      .select("id, unit_type_id")
+      .eq("building_id", buildingResult.data.id),
     getCommonWaterBillForCycleMonth(
-      supabase,
-      buildingResult.data.id,
-      commonWaterTypeResult.data.id,
-      completenessResult.data.monthKey,
-    ),
+        supabase,
+        buildingResult.data.id,
+        commonWaterTypeResult.data.id,
+        sourceReadingMonth,
+      ),
     supabase
       .from("tb810_meter_readings")
       .select("unit_id, reading_end, consumption, reading_date, created_at")
       .eq("building_id", buildingResult.data.id)
       .eq("utility_type_id", commonWaterTypeResult.data.id)
-      .eq("reading_month", monthKeyToDate(completenessResult.data.monthKey)),
+      .eq("reading_month", monthKeyToDate(sourceReadingMonth)),
   ]);
 
   if (unitRowsResult.error) return { data: null, error: unitRowsResult.error.message };
   if (billResult.error) return { data: null, error: billResult.error };
   if (readingsResult.error) return { data: null, error: readingsResult.error.message };
 
-  const eligibleUnitIds = (unitRowsResult.data ?? []).map((row) => row.id);
+  const unitTypeIds = [...new Set((unitRowsResult.data ?? []).map((row) => row.unit_type_id).filter(Boolean))];
+  const unitTypesResult = await supabase
+    .from("tb810_unit_types")
+    .select("id, code")
+    .in("id", unitTypeIds);
+  if (unitTypesResult.error) return { data: null, error: unitTypesResult.error.message };
+
+  const condoTypeIds = new Set((unitTypesResult.data ?? []).filter((row) => row.code === "condo").map((row) => row.id));
+  const condoUnits = (unitRowsResult.data ?? []).filter((row) => condoTypeIds.has(row.unit_type_id));
+  const eligibleUnitIds = condoUnits.map((row) => row.id);
   const readingsByUnit = new Map<string, Array<{ reading_end: number | null; consumption: number | null; created_at: string }>>();
   for (const row of readingsResult.data ?? []) {
     const rows = readingsByUnit.get(row.unit_id) ?? [];
@@ -416,9 +430,9 @@ async function getAugust2026UnitWaterCycleContext(
       unitTypeCode: unitType.code,
       commonWaterTypeId: commonWaterTypeResult.data.id,
       completeness: completenessResult.data,
-      sourceReadingMonth: completenessResult.data.monthKey,
+      sourceReadingMonth,
       sourceReadingMonthLabel: completenessResult.data.monthLabel,
-      billingMonthLabel: getNextMonthLabel(completenessResult.data.monthKey) ?? "August 2026",
+      billingMonthLabel: getNextMonthLabel(sourceReadingMonth) ?? "Unknown billing month",
       eligibleUnitIds,
       readingsByUnit,
       bill: billResult.data,
@@ -608,11 +622,11 @@ async function getCommonWaterChargeForUnitPreview(
       return { status: "unavailable", message: "Cannot be calculated because unit meter readings are incomplete." };
     }
     if (rows.length > 1) {
-      return { status: "unavailable", message: "July 2026 meter reading is ambiguous." };
+      return { status: "unavailable", message: `${sourceReadingMonthLabel} meter reading is ambiguous.` };
     }
     const reading = rows[0];
     if (reading.consumption === null) {
-      return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
+      return { status: "unavailable", message: `${sourceReadingMonthLabel} meter reading is incomplete.` };
     }
     unitConsumptionById.set(unitId, Number(reading.consumption));
   }
@@ -642,7 +656,7 @@ async function getCommonWaterChargeForUnitPreview(
   for (const unitId of eligibleUnitIds) {
     const consumptionMilli = parseMilliUnits(unitConsumptionById.get(unitId) ?? null);
     if (consumptionMilli === null) {
-      return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
+      return { status: "unavailable", message: `${sourceReadingMonthLabel} meter reading is incomplete.` };
     }
     const chargeCents =
       (amountCents * consumptionMilli + totalConsumptionMilli / BigInt(2)) / totalConsumptionMilli;
@@ -654,7 +668,11 @@ async function getCommonWaterChargeForUnitPreview(
   }
 
   const commonWaterPoolCents = amountCents - summedMeteredChargeCents;
-  const unitCommonWaterChargeCents = roundToNearestInteger(commonWaterPoolCents, BigInt(64));
+  const unitCount = BigInt(eligibleUnitIds.length);
+  if (unitCount <= BigInt(0)) {
+    return { status: "unavailable", message: "No eligible residential units are available." };
+  }
+  const unitCommonWaterChargeCents = roundToNearestInteger(commonWaterPoolCents, unitCount);
 
   return {
     status: "available",
@@ -1120,7 +1138,7 @@ export async function updateCommonWaterBill(
 export async function getAugust2026MeteredWaterChargeForUnit(
   unitId: string,
 ): Promise<August2026MeteredWaterChargeState> {
-  const contextResult = await getAugust2026UnitWaterCycleContext(unitId);
+  const contextResult = await getAugust2026UnitWaterCycleContext(unitId, "2026-08");
   if (contextResult.error) return { status: "unavailable", message: contextResult.error };
   const context = contextResult.data;
   if (!context) return { status: "unavailable", message: "Water lookup data is incomplete." };
@@ -1129,18 +1147,18 @@ export async function getAugust2026MeteredWaterChargeForUnit(
   }
   const readings = context.readingsByUnit.get(unitId) ?? [];
   if (readings.length === 0) {
-    return { status: "unavailable", message: "No July 2026 meter reading recorded." };
+    return { status: "unavailable", message: `No ${context.sourceReadingMonthLabel} meter reading recorded.` };
   }
   if (readings.length > 1) {
-    return { status: "unavailable", message: "July 2026 meter reading is ambiguous." };
+    return { status: "unavailable", message: `${context.sourceReadingMonthLabel} meter reading is ambiguous.` };
   }
 
   const reading = readings[0] ?? null;
   if (!reading) {
-    return { status: "unavailable", message: "No July 2026 meter reading recorded." };
+    return { status: "unavailable", message: `No ${context.sourceReadingMonthLabel} meter reading recorded.` };
   }
   if (reading.consumption === null) {
-    return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
+    return { status: "unavailable", message: `${context.sourceReadingMonthLabel} meter reading is incomplete.` };
   }
 
   const bill = context.bill;
@@ -1153,10 +1171,10 @@ export async function getAugust2026MeteredWaterChargeForUnit(
   const masterConsumptionMilli = parseMilliUnits(bill.total_consumption);
 
   if (amountCents === null || unitConsumptionMilli === null) {
-    return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
+    return { status: "unavailable", message: `${context.sourceReadingMonthLabel} meter reading is incomplete.` };
   }
   if (masterConsumptionMilli === null || masterConsumptionMilli <= BigInt(0)) {
-    return { status: "unavailable", message: "July 2026 water rate cannot be calculated." };
+    return { status: "unavailable", message: `${context.sourceReadingMonthLabel} water rate cannot be calculated.` };
   }
 
   const chargeCents =
@@ -1181,7 +1199,7 @@ export async function getAugust2026MeteredWaterChargeForUnit(
 export async function getCommonWaterChargePreviewForUnit(
   unitId: string,
 ): Promise<CommonWaterChargePreviewState> {
-  const contextResult = await getAugust2026UnitWaterCycleContext(unitId);
+  const contextResult = await getAugust2026UnitWaterCycleContext(unitId, "2026-08");
   if (contextResult.error) return { status: "unavailable", message: contextResult.error };
   const context = contextResult.data;
   if (!context) return { status: "unavailable", message: "Water lookup data is incomplete." };
@@ -1195,7 +1213,10 @@ export async function getCommonWaterChargePreviewForUnit(
   }
 
   if (context.completeness.completedCount !== context.completeness.totalExpectedCount) {
-    return { status: "unavailable", message: "Cannot be calculated because unit meter readings are incomplete." };
+    return {
+      status: "unavailable",
+      message: `Cannot be calculated because ${context.sourceReadingMonthLabel} meter readings are incomplete.`,
+    };
   }
 
   const eligibleUnitIds = context.eligibleUnitIds;
@@ -1221,14 +1242,17 @@ export async function getCommonWaterChargePreviewForUnit(
   for (const unitId of eligibleUnitIds) {
     const rows = context.readingsByUnit.get(unitId) ?? [];
     if (rows.length === 0) {
-      return { status: "unavailable", message: "Cannot be calculated because unit meter readings are incomplete." };
+      return {
+        status: "unavailable",
+        message: `Cannot be calculated because ${context.sourceReadingMonthLabel} meter readings are incomplete.`,
+      };
     }
     if (rows.length > 1) {
-      return { status: "unavailable", message: "July 2026 meter reading is ambiguous." };
+      return { status: "unavailable", message: `${context.sourceReadingMonthLabel} meter reading is ambiguous.` };
     }
     const consumptionMilli = parseMilliUnits(rows[0].consumption);
     if (consumptionMilli === null) {
-      return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
+      return { status: "unavailable", message: `${context.sourceReadingMonthLabel} meter reading is incomplete.` };
     }
     const chargeCents =
       (amountCents * consumptionMilli + totalConsumptionMilli / BigInt(2)) / totalConsumptionMilli;
@@ -1240,7 +1264,11 @@ export async function getCommonWaterChargePreviewForUnit(
   }
 
   const commonWaterPoolCents = amountCents - summedMeteredChargeCents;
-  const unitCommonWaterChargeCents = roundToNearestInteger(commonWaterPoolCents, BigInt(64));
+  const unitCount = BigInt(eligibleUnitIds.length);
+  if (unitCount <= BigInt(0)) {
+    return { status: "unavailable", message: "No eligible residential units are available." };
+  }
+  const unitCommonWaterChargeCents = roundToNearestInteger(commonWaterPoolCents, unitCount);
 
   return {
     status: "available",
@@ -1257,11 +1285,14 @@ export async function getCommonWaterChargePreviewForUnit(
   };
 }
 
-export async function getAugust2026WaterChargePreviewsForUnit(unitId: string): Promise<{
+export async function getWaterChargePreviewsForUnit(
+  unitId: string,
+  obligationMonth: string,
+): Promise<{
   meteredWater: August2026MeteredWaterChargeState;
   commonWater: CommonWaterChargePreviewState;
 }> {
-  const contextResult = await getAugust2026UnitWaterCycleContext(unitId);
+  const contextResult = await getAugust2026UnitWaterCycleContext(unitId, obligationMonth);
   if (contextResult.error || !contextResult.data) {
     const message = contextResult.error ?? "Water lookup data is incomplete.";
     return {
@@ -1278,18 +1309,18 @@ export async function getAugust2026WaterChargePreviewsForUnit(unitId: string): P
 
     const readings = context.readingsByUnit.get(unitId) ?? [];
     if (readings.length === 0) {
-      return { status: "unavailable", message: "No July 2026 meter reading recorded." };
+      return { status: "unavailable", message: `No ${context.sourceReadingMonthLabel} meter reading recorded.` };
     }
     if (readings.length > 1) {
-      return { status: "unavailable", message: "July 2026 meter reading is ambiguous." };
+      return { status: "unavailable", message: `${context.sourceReadingMonthLabel} meter reading is ambiguous.` };
     }
 
     const reading = readings[0] ?? null;
     if (!reading) {
-      return { status: "unavailable", message: "No July 2026 meter reading recorded." };
+      return { status: "unavailable", message: `No ${context.sourceReadingMonthLabel} meter reading recorded.` };
     }
     if (reading.consumption === null) {
-      return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
+      return { status: "unavailable", message: `${context.sourceReadingMonthLabel} meter reading is incomplete.` };
     }
 
     const bill = context.bill;
@@ -1302,10 +1333,10 @@ export async function getAugust2026WaterChargePreviewsForUnit(unitId: string): P
     const masterConsumptionMilli = parseMilliUnits(bill.total_consumption);
 
     if (amountCents === null || unitConsumptionMilli === null) {
-      return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
+      return { status: "unavailable", message: `${context.sourceReadingMonthLabel} meter reading is incomplete.` };
     }
     if (masterConsumptionMilli === null || masterConsumptionMilli <= BigInt(0)) {
-      return { status: "unavailable", message: "July 2026 water rate cannot be calculated." };
+      return { status: "unavailable", message: `${context.sourceReadingMonthLabel} water rate cannot be calculated.` };
     }
 
     const chargeCents =
@@ -1337,7 +1368,10 @@ export async function getAugust2026WaterChargePreviewsForUnit(unitId: string): P
     }
 
     if (context.completeness.completedCount !== context.completeness.totalExpectedCount) {
-      return { status: "unavailable", message: "Cannot be calculated because unit meter readings are incomplete." };
+      return {
+        status: "unavailable",
+        message: `Cannot be calculated because ${context.sourceReadingMonthLabel} meter readings are incomplete.`,
+      };
     }
 
     const eligibleUnitIds = context.eligibleUnitIds;
@@ -1363,14 +1397,17 @@ export async function getAugust2026WaterChargePreviewsForUnit(unitId: string): P
     for (const unitId of eligibleUnitIds) {
       const rows = context.readingsByUnit.get(unitId) ?? [];
       if (rows.length === 0) {
-        return { status: "unavailable", message: "Cannot be calculated because unit meter readings are incomplete." };
+        return {
+          status: "unavailable",
+          message: `Cannot be calculated because ${context.sourceReadingMonthLabel} meter readings are incomplete.`,
+        };
       }
       if (rows.length > 1) {
-        return { status: "unavailable", message: "July 2026 meter reading is ambiguous." };
+        return { status: "unavailable", message: `${context.sourceReadingMonthLabel} meter reading is ambiguous.` };
       }
       const consumptionMilli = parseMilliUnits(rows[0].consumption);
       if (consumptionMilli === null) {
-        return { status: "unavailable", message: "July 2026 meter reading is incomplete." };
+        return { status: "unavailable", message: `${context.sourceReadingMonthLabel} meter reading is incomplete.` };
       }
       const chargeCents =
         (amountCents * consumptionMilli + totalConsumptionMilli / BigInt(2)) / totalConsumptionMilli;
@@ -1382,7 +1419,11 @@ export async function getAugust2026WaterChargePreviewsForUnit(unitId: string): P
     }
 
     const commonWaterPoolCents = amountCents - summedMeteredChargeCents;
-    const unitCommonWaterChargeCents = roundToNearestInteger(commonWaterPoolCents, BigInt(64));
+    const unitCount = BigInt(eligibleUnitIds.length);
+    if (unitCount <= BigInt(0)) {
+      return { status: "unavailable", message: "No eligible residential units are available." };
+    }
+    const unitCommonWaterChargeCents = roundToNearestInteger(commonWaterPoolCents, unitCount);
 
     return {
       status: "available",
@@ -1400,6 +1441,10 @@ export async function getAugust2026WaterChargePreviewsForUnit(unitId: string): P
   })();
 
   return { meteredWater, commonWater };
+}
+
+export async function getAugust2026WaterChargePreviewsForUnit(unitId: string) {
+  return getWaterChargePreviewsForUnit(unitId, "2026-08");
 }
 
 export async function getSedapalBillCycleState(): Promise<SedapalBillCycleState> {

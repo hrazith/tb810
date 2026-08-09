@@ -1,7 +1,7 @@
 import { getUnitFixedMonthlyAssessment } from "../budget-plans";
 import { getCurrentBuilding, getUnitById, listUnits } from "../units";
 import { getGasChargePreviewsForUnit } from "../gas";
-import { getAugust2026WaterChargePreviewsForUnit } from "../water";
+import { getWaterChargePreviewsForUnit } from "../water";
 import { composeMonthlyObligation, type ProviderMap } from "./core";
 
 function createMonthlyObligationProviders(): ProviderMap {
@@ -38,7 +38,7 @@ function createMonthlyObligationProviders(): ProviderMap {
         return { status: "not_applicable", provenance: "server/water/monthly-ledger", sourceMonth: context.obligationMonth };
       }
 
-      const result = await getAugust2026WaterChargePreviewsForUnit(unit.unitId);
+      const result = await getWaterChargePreviewsForUnit(unit.unitId, context.obligationMonth);
       if (result.meteredWater.status === "available") {
         return {
           status: "available",
@@ -63,7 +63,7 @@ function createMonthlyObligationProviders(): ProviderMap {
         return { status: "not_applicable", provenance: "server/water/monthly-ledger", sourceMonth: context.obligationMonth };
       }
 
-      const result = await getAugust2026WaterChargePreviewsForUnit(unit.unitId);
+      const result = await getWaterChargePreviewsForUnit(unit.unitId, context.obligationMonth);
       if (result.commonWater.status === "available") {
         return {
           status: "available",

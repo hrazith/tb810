@@ -203,7 +203,7 @@ export default async function UnitDetailPage({ params }: PageProps) {
                   </div>
                 ) : (
                   <>
-                    <div className="flex  flex-wrap items-start justify-between gap-4 ">
+                    <div className="flex  flex-wrap items-start justify-between gap-4  ">
                       <div>
                         <p className="text-sm font-semibold text-zinc-950">{component.label}</p>
                         <p className="text-xs uppercase tracking-wide text-zinc-500">
@@ -211,8 +211,8 @@ export default async function UnitDetailPage({ params }: PageProps) {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium text-zinc-950">{component.status}</p>
-                        <p className="text-base font-semibold text-zinc-950">
+                       
+                        <p className="text-base font-semibold text-zinc-950 ">
                           {component.amount
                             ? formatCurrency(component.amount, component.currency ?? "PEN")
                             : "—"}
