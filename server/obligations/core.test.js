@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const createJiti = require("jiti");
@@ -46,6 +47,11 @@ function makeProviders(overrides = {}) {
       sourceMonth: "2026-08",
       provenance: "water",
     }),
+    gas: async () => ({
+      status: "not_applicable",
+      provenance: "gas",
+      sourceMonth: "2026-08",
+    }),
     ...overrides,
   };
 }
@@ -57,7 +63,7 @@ test("complete obligation composes all available components", async () => {
   assert.equal(result.readiness, "ready");
   assert.deepEqual(result.missingComponents, []);
   assert.deepEqual(result.blockers, []);
-  assert.equal(result.units[0].components.length, 3);
+  assert.equal(result.units[0].components.length, 4);
 });
 
 test("missing water leaves the obligation in progress and excludes it from totals", async () => {
@@ -75,7 +81,7 @@ test("missing water leaves the obligation in progress and excludes it from total
   );
 
   assert.equal(result.knownTotal, "12.00");
-  assert.equal(result.readiness, "in_progress");
+  assert.equal(result.readiness, "blocked");
   assert.deepEqual(result.missingComponents, ["metered_water"]);
   assert.deepEqual(result.blockers, ["Sedapal water bill has not been entered yet."]);
 });
@@ -95,7 +101,7 @@ test("missing common water leaves the obligation in progress and keeps assessed 
   );
 
   assert.equal(result.knownTotal, "15.00");
-  assert.equal(result.readiness, "in_progress");
+  assert.equal(result.readiness, "blocked");
   assert.deepEqual(result.missingComponents, ["common_water"]);
 });
 
@@ -106,12 +112,35 @@ test("assessment only can be fully ready when other components are not applicabl
     makeProviders({
       metered_water: async () => ({ status: "not_applicable", provenance: "water", sourceMonth: "2026-08" }),
       common_water: async () => ({ status: "not_applicable", provenance: "water", sourceMonth: "2026-08" }),
+      gas: async () => ({ status: "not_applicable", provenance: "gas", sourceMonth: "2026-08" }),
     }),
   );
 
   assert.equal(result.knownTotal, "10.00");
   assert.equal(result.readiness, "ready");
   assert.deepEqual(result.missingComponents, []);
+});
+
+test("gas component is available only for participating condo units", async () => {
+  const result = await composeMonthlyObligation(
+    baseContext,
+    [makeUnit(), makeUnit({ unitId: "unit-2", unitNumber: "102", unitAccountId: "account-2", hasMeter: false })],
+    makeProviders({
+      gas: async ({ unit }) =>
+        unit.unitId === "unit-1"
+          ? {
+              status: "available",
+              amount: "3.00",
+              currency: "PEN",
+              sourceMonth: "2026-07",
+              provenance: "gas",
+            }
+          : { status: "not_applicable", provenance: "gas", sourceMonth: "2026-07" },
+    }),
+  );
+
+  assert.equal(result.units[0].components.find((component) => component.key === "gas")?.status, "available");
+  assert.equal(result.units[1].components.find((component) => component.key === "gas")?.status, "not_applicable");
 });
 
 test("zero amounts remain distinct from missing components", async () => {
@@ -153,4 +182,3 @@ test("repeated reads are idempotent", async () => {
 
   assert.deepEqual(first, second);
 });
-

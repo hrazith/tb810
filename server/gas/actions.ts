@@ -55,7 +55,6 @@ function toBoolean(value: FormDataEntryValue | null) {
 
 export async function createGasBillAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
   const values = {
-    building_id: String(formData.get("building_id") ?? ""),
     supplier_name: String(formData.get("supplier_name") ?? ""),
     invoice_number: String(formData.get("invoice_number") ?? ""),
     invoice_date: String(formData.get("invoice_date") ?? ""),
@@ -74,7 +73,6 @@ export async function createGasBillAction(_prev: GasFormState, formData: FormDat
 export async function updateGasBillAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
   const billId = String(formData.get("bill_id") ?? "");
   const values = {
-    building_id: String(formData.get("building_id") ?? ""),
     supplier_name: String(formData.get("supplier_name") ?? ""),
     invoice_number: String(formData.get("invoice_number") ?? ""),
     invoice_date: String(formData.get("invoice_date") ?? ""),
@@ -97,16 +95,9 @@ export async function deleteGasBillAction(formData: FormData): Promise<void> {
 
 export async function createGasReadingAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
   const values = {
-    building_id: String(formData.get("building_id") ?? ""),
     unit_id: String(formData.get("unit_id") ?? ""),
     reading_month: String(formData.get("reading_month") ?? ""),
     reading_date: String(formData.get("reading_date") ?? ""),
-    previous_reading: (() => {
-      const raw = String(formData.get("previous_reading") ?? "").trim();
-      if (!raw) return null;
-      const parsed = Number(raw);
-      return Number.isFinite(parsed) ? parsed : Number.NaN;
-    })(),
     current_reading: toNumber(formData.get("current_reading")),
     notes: String(formData.get("notes") ?? ""),
   };
@@ -122,16 +113,9 @@ export async function createGasReadingAction(_prev: GasFormState, formData: Form
 export async function updateGasReadingAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
   const readingId = String(formData.get("reading_id") ?? "");
   const values = {
-    building_id: String(formData.get("building_id") ?? ""),
     unit_id: String(formData.get("unit_id") ?? ""),
     reading_month: String(formData.get("reading_month") ?? ""),
     reading_date: String(formData.get("reading_date") ?? ""),
-    previous_reading: (() => {
-      const raw = String(formData.get("previous_reading") ?? "").trim();
-      if (!raw) return null;
-      const parsed = Number(raw);
-      return Number.isFinite(parsed) ? parsed : Number.NaN;
-    })(),
     current_reading: toNumber(formData.get("current_reading")),
     notes: String(formData.get("notes") ?? ""),
   };

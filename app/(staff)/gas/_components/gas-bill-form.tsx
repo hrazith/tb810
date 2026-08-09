@@ -11,7 +11,6 @@ import type { GasFormState } from "@/server/gas/actions";
 type Props = {
   action: (prev: GasFormState, formData: FormData) => Promise<GasFormState>;
   bill?: GasBillSummary | null;
-  buildingId?: string;
   submitLabel: string;
   deleteAction?: ComponentPropsWithoutRef<"form">["action"];
 };
@@ -22,11 +21,10 @@ function fieldError(field: string, state: GasFormState) {
   return state.fieldErrors?.[field];
 }
 
-export function GasBillForm({ action, bill, buildingId, submitLabel, deleteAction }: Props) {
+export function GasBillForm({ action, bill, submitLabel, deleteAction }: Props) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const values = state.values ?? {
     bill_id: bill?.id ?? "",
-    building_id: bill?.building_id ?? buildingId ?? "",
     supplier_name: bill?.supplier_name ?? "",
     invoice_number: bill?.invoice_number ?? "",
     invoice_date: bill?.invoice_date ?? "",
@@ -39,7 +37,6 @@ export function GasBillForm({ action, bill, buildingId, submitLabel, deleteActio
     <div className="space-y-4">
       <Panel as="form" action={formAction} className="space-y-6">
         <input type="hidden" name="bill_id" value={values.bill_id ?? ""} />
-        <input type="hidden" name="building_id" value={values.building_id ?? ""} />
         {locked ? <input type="hidden" name="processed_at" value={bill?.processed_at ?? ""} /> : null}
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-2 md:col-span-2">

@@ -44,7 +44,6 @@ export type GasReadingSummary = GasReadingRecord & {
 };
 
 export type GasBillInput = {
-  building_id: string;
   supplier_name: string;
   invoice_number: string;
   invoice_date: string;
@@ -53,7 +52,6 @@ export type GasBillInput = {
 };
 
 export type GasReadingInput = {
-  building_id: string;
   unit_id: string;
   reading_month: string;
   reading_date: string;

@@ -15,6 +15,7 @@ const DEFAULT_COMPONENT_ORDER: MonthlyObligationComponentKey[] = [
   "fixed_assessment",
   "metered_water",
   "common_water",
+  "gas",
 ];
 
 const COMPONENT_LABELS: Record<MonthlyObligationComponentKey, string> = {
@@ -223,4 +224,3 @@ export async function composeMonthlyObligation(
 }
 
 export type { ProviderMap };
-

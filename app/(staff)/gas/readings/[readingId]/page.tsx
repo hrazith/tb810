@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { getGasReadingById } from "@/server/gas";
+import { getGasReadingById, listGasReadings } from "@/server/gas";
 import { deleteGasReadingAction } from "@/server/gas/actions";
 import { listUnits } from "@/server/units";
 
@@ -18,9 +18,10 @@ type PageProps = {
 
 export default async function GasReadingDetailPage({ params }: PageProps) {
   const { readingId } = await params;
-  const [result, unitsResult] = await Promise.all([getGasReadingById(readingId), listUnits()]);
+  const [result, unitsResult, readingsResult] = await Promise.all([getGasReadingById(readingId), listUnits(), listGasReadings()]);
   if (result.error) throw new Error(result.error);
   if (unitsResult.error) throw new Error(unitsResult.error);
+  if (readingsResult.error) throw new Error(readingsResult.error);
   if (!result.data) notFound();
 
   return (
@@ -41,9 +42,10 @@ export default async function GasReadingDetailPage({ params }: PageProps) {
 
       <GasReadingForm
         action={updateGasReadingAction}
-        reading={result.data}
         units={unitsResult.data}
+        readings={readingsResult.data}
         submitLabel="Save Reading"
+        initialMonth={result.data.reading_month.slice(0, 7)}
       />
       <form action={deleteGasReadingAction}>
         <input type="hidden" name="reading_id" value={result.data.id} />

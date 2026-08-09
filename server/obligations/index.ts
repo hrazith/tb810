@@ -1,5 +1,6 @@
 import { getUnitFixedMonthlyAssessment } from "../budget-plans";
 import { getCurrentBuilding, getUnitById, listUnits } from "../units";
+import { getGasChargePreviewsForUnit } from "../gas";
 import { getAugust2026WaterChargePreviewsForUnit } from "../water";
 import { composeMonthlyObligation, type ProviderMap } from "./core";
 
@@ -79,6 +80,31 @@ function createMonthlyObligationProviders(): ProviderMap {
         status: "missing",
         blocker: result.commonWater.message,
         provenance: "server/water",
+        sourceMonth: context.obligationMonth,
+      };
+    },
+    gas: async ({ context, unit }) => {
+      if (unit.unitTypeCode !== "condo") {
+        return { status: "not_applicable", provenance: "server/gas/provider", sourceMonth: context.obligationMonth };
+      }
+
+      const result = await getGasChargePreviewsForUnit(unit.unitId);
+      if (result.status === "available") {
+        return {
+          status: "available",
+          amount: result.data.unitCharges.find((charge) => charge.unitId === unit.unitId)?.amount ?? "0.00",
+          currency: "PEN",
+          provenance: "server/gas",
+          sourceMonth: result.data.sourceReadingMonth,
+        };
+      }
+      if (result.status === "not-applicable") {
+        return { status: "not_applicable", provenance: "server/gas", sourceMonth: context.obligationMonth };
+      }
+      return {
+        status: "missing",
+        blocker: result.message,
+        provenance: "server/gas",
         sourceMonth: context.obligationMonth,
       };
     },

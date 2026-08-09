@@ -4,6 +4,7 @@ import { UserSwitchIcon } from "@phosphor-icons/react/dist/ssr";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import { getUnitFixedMonthlyAssessment } from "@/server/budget-plans";
 import { getUnitOwnershipSnapshot } from "@/server/ownerships";
 import { getUnitMonthlyObligation } from "@/server/obligations";
 import { getUnitById, getUnitByNumberForCurrentBuilding } from "@/server/units";
@@ -29,6 +30,32 @@ function formatCurrency(value: string, currency = "PEN") {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(value));
+}
+
+function formatBudget(value: string, currency = "PEN") {
+  return new Intl.NumberFormat("es-PE", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Number(value));
+}
+
+function formatAssessmentPercentage(value: number) {
+  return `${value.toFixed(3).replace(/\.?0+$/, "")}%`;
+}
+
+function formatObligationMonth(value: string) {
+  const [year, month] = value.split("-");
+  const parsedYear = Number(year);
+  const parsedMonth = Number(month);
+  if (!Number.isFinite(parsedYear) || !Number.isFinite(parsedMonth)) return value;
+  const date = new Date(Date.UTC(parsedYear, parsedMonth - 1, 1));
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 function statusLabel(status: string) {
@@ -62,6 +89,10 @@ export default async function UnitDetailPage({ params }: PageProps) {
   const ownershipSnapshot = ownershipResult.data;
   const obligation = obligationResult.data;
   const unitObligation = obligation;
+  const fixedAssessmentResult = await getUnitFixedMonthlyAssessment({
+    unitId,
+    planYear: Number(unitObligation.obligationMonth.slice(0, 4)),
+  });
 
   return (
     <section className="space-y-6">
@@ -108,11 +139,8 @@ export default async function UnitDetailPage({ params }: PageProps) {
       <Panel as="section" className="space-y-6">
         <div className="space-y-1">
           <h2 className="text-2xl font-semibold text-zinc-950">
-            Monthly Obligation {obligation.obligationMonth}
+            Monthly Obligation: {formatObligationMonth(obligation.obligationMonth)}
           </h2>
-          <p className="text-sm text-zinc-600">
-            Read-only obligation state from getMonthlyObligation().
-          </p>
         </div>
 
         <div className="space-y-6">
@@ -147,25 +175,53 @@ export default async function UnitDetailPage({ params }: PageProps) {
 
           <div className="space-y-4">
             {unitObligation.units[0]?.components.map((component) => (
-              <div key={component.key} className="rounded-2xl border border-zinc-200 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-zinc-950">{component.label}</p>
-                    <p className="text-xs uppercase tracking-wide text-zinc-500">{component.key}</p>
+              <div key={component.key} className="mt-12">
+                {component.key === "fixed_assessment" ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-950">Fixed Monthly Assessment</p>
+                        <p className="text-sm text-zinc-600">
+                          {fixedAssessmentResult.status === "ready"
+                            ? `assessed @ ${formatAssessmentPercentage(fixedAssessmentResult.data.assessmentPercentage)} of the monthly budget`
+                            : fixedAssessmentResult.message}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        
+                        <p className="text-base font-semibold text-zinc-950">
+                          {fixedAssessmentResult.status === "ready"
+                            ? formatBudget(
+                                fixedAssessmentResult.data.fixedMonthlyAssessment,
+                                fixedAssessmentResult.data.currency,
+                              )
+                            : "—"}
+                        </p>
+                      </div>
+                    </div>
+                    
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-zinc-950">{component.status}</p>
-                    <p className="text-base font-semibold text-zinc-950">
-                      {component.amount ? formatCurrency(component.amount, component.currency ?? "PEN") : "—"}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 grid gap-2 text-sm text-zinc-600 sm:grid-cols-2">
-                  <p>Currency: {component.currency ?? "—"}</p>
-                  <p>Source month: {component.sourceMonth ?? "—"}</p>
-                  <p>Blocker: {component.blocker ?? "—"}</p>
-                  <p>Provenance: {component.provenance ?? "—"}</p>
-                </div>
+                ) : (
+                  <>
+                    <div className="flex  flex-wrap items-start justify-between gap-4 ">
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-950">{component.label}</p>
+                        <p className="text-xs uppercase tracking-wide text-zinc-500">
+                          {component.key}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-zinc-950">{component.status}</p>
+                        <p className="text-base font-semibold text-zinc-950">
+                          {component.amount
+                            ? formatCurrency(component.amount, component.currency ?? "PEN")
+                            : "—"}
+                        </p>
+                      </div>
+                    </div>
+                   
+                  </>
+                )}
               </div>
             ))}
           </div>

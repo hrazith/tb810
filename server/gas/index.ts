@@ -39,6 +39,35 @@ function isCondoUnit(unitTypeCode: string) {
   return unitTypeCode === "condo";
 }
 
+export function normalizeGasReadingMonth(month: string) {
+  return `${month}-01`;
+}
+
+export function gasReadingMonthKey(date: string) {
+  return date.slice(0, 7);
+}
+
+export async function getPreviousGasReadingForUnit({
+  unitId,
+  readingMonth,
+}: {
+  unitId: string;
+  readingMonth: string;
+}): Promise<QueryResult<GasReadingSummary | null>> {
+  const building = await getCurrentBuilding();
+  if (building.error) return { data: null, error: building.error };
+  if (!building.data) return { data: null, error: "Building not found." };
+
+  const readings = await listGasReadings();
+  if (readings.error) return { data: null, error: readings.error };
+
+  const previous = readings.data
+    .filter((reading) => reading.unit_id === unitId && gasReadingMonthKey(reading.reading_month) < readingMonth)
+    .sort((a, b) => b.reading_month.localeCompare(a.reading_month))[0] ?? null;
+
+  return { data: previous, error: null };
+}
+
 export async function getGasCurrentBuilding() {
   return getCurrentBuilding();
 }
@@ -68,10 +97,13 @@ export async function getGasBillById(id: string): Promise<QueryResult<GasBillSum
 }
 
 export async function createGasBill(input: GasBillInput): Promise<QueryResult<GasBillRecord>> {
+  const building = await getCurrentBuilding();
+  if (building.error) return { data: null as never, error: building.error };
+  if (!building.data) return { data: null as never, error: "Building not found." };
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tb810_gas_bills")
-    .insert({ ...input, processed_at: null })
+    .insert({ ...input, building_id: building.data.id, processed_at: null })
     .select(GAS_BILL_SELECT)
     .single();
   if (error) return { data: null as never, error: error.message };
@@ -79,12 +111,21 @@ export async function createGasBill(input: GasBillInput): Promise<QueryResult<Ga
 }
 
 export async function updateGasBill(id: string, input: GasBillInput): Promise<QueryResult<GasBillRecord>> {
+  const building = await getCurrentBuilding();
+  if (building.error) return { data: null as never, error: building.error };
+  if (!building.data) return { data: null as never, error: "Building not found." };
   const supabase = await createClient();
   const bill = await getGasBillById(id);
   if (bill.error) return { data: null as never, error: bill.error };
   if (!bill.data) return { data: null as never, error: "Bill not found." };
   if (bill.data.processed_at) return { data: null as never, error: "Processed bills are read-only." };
-  const { data, error } = await supabase.from("tb810_gas_bills").update(input).eq("id", id).select(GAS_BILL_SELECT).single();
+  const { data, error } = await supabase
+    .from("tb810_gas_bills")
+    .update({ ...input, building_id: building.data.id })
+    .eq("id", id)
+    .eq("building_id", building.data.id)
+    .select(GAS_BILL_SELECT)
+    .single();
   if (error) return { data: null as never, error: error.message };
   return { data, error: null };
 }
@@ -137,6 +178,9 @@ export async function getGasReadingById(id: string): Promise<QueryResult<GasRead
 }
 
 export async function createGasReading(input: GasReadingInput): Promise<QueryResult<GasReadingRecord>> {
+  const building = await getCurrentBuilding();
+  if (building.error) return { data: null as never, error: building.error };
+  if (!building.data) return { data: null as never, error: "Building not found." };
   const supabase = await createClient();
   const unitResult = await listUnits();
   if (unitResult.error) return { data: null as never, error: unitResult.error };
@@ -144,16 +188,27 @@ export async function createGasReading(input: GasReadingInput): Promise<QueryRes
   if (!unit || unit.unit_type_code !== "condo" || !unit.has_gas_service) {
     return { data: null as never, error: "Only gas-enabled condo Units may receive Gas readings." };
   }
-  if (input.current_reading < (input.previous_reading ?? 0)) {
+  const previousReadingResult = await getPreviousGasReadingForUnit({ unitId: input.unit_id, readingMonth: gasReadingMonthKey(normalizeGasReadingMonth(input.reading_month)) });
+  if (previousReadingResult.error) return { data: null as never, error: previousReadingResult.error };
+  const previousReading = previousReadingResult.data?.current_reading ?? null;
+  if (previousReading != null && input.current_reading < previousReading) {
     return { data: null as never, error: "Current reading must be greater than or equal to previous reading." };
   }
-  const payload = { ...input, consumption: input.current_reading - (input.previous_reading ?? 0) };
+  const payload = {
+    ...input,
+    building_id: building.data.id,
+    reading_month: normalizeGasReadingMonth(input.reading_month),
+    consumption: input.current_reading - (previousReading ?? 0),
+  };
   const { data, error } = await supabase.from("tb810_gas_readings").insert(payload).select(GAS_READING_SELECT).single();
   if (error) return { data: null as never, error: error.message };
   return { data, error: null };
 }
 
 export async function updateGasReading(id: string, input: GasReadingInput): Promise<QueryResult<GasReadingRecord>> {
+  const building = await getCurrentBuilding();
+  if (building.error) return { data: null as never, error: building.error };
+  if (!building.data) return { data: null as never, error: "Building not found." };
   const supabase = await createClient();
   const existing = await getGasReadingById(id);
   if (existing.error) return { data: null as never, error: existing.error };
@@ -164,11 +219,25 @@ export async function updateGasReading(id: string, input: GasReadingInput): Prom
   if (!unit || unit.unit_type_code !== "condo" || !unit.has_gas_service) {
     return { data: null as never, error: "Only gas-enabled condo Units may receive Gas readings." };
   }
-  if (input.current_reading < (input.previous_reading ?? 0)) {
+  const previousReadingResult = await getPreviousGasReadingForUnit({ unitId: input.unit_id, readingMonth: gasReadingMonthKey(normalizeGasReadingMonth(input.reading_month)) });
+  if (previousReadingResult.error) return { data: null as never, error: previousReadingResult.error };
+  const previousReading = previousReadingResult.data?.current_reading ?? null;
+  if (previousReading != null && input.current_reading < previousReading) {
     return { data: null as never, error: "Current reading must be greater than or equal to previous reading." };
   }
-  const payload = { ...input, consumption: input.current_reading - (input.previous_reading ?? 0) };
-  const { data, error } = await supabase.from("tb810_gas_readings").update(payload).eq("id", id).select(GAS_READING_SELECT).single();
+  const payload = {
+    ...input,
+    building_id: building.data.id,
+    reading_month: normalizeGasReadingMonth(input.reading_month),
+    consumption: input.current_reading - (previousReading ?? 0),
+  };
+  const { data, error } = await supabase
+    .from("tb810_gas_readings")
+    .update(payload)
+    .eq("id", id)
+    .eq("building_id", building.data.id)
+    .select(GAS_READING_SELECT)
+    .single();
   if (error) return { data: null as never, error: error.message };
   return { data, error: null };
 }
