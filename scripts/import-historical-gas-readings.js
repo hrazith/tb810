@@ -597,7 +597,7 @@ async function main() {
 
   if (
     verifiedSafeInserts.length !== 0 ||
-    verifiedApprovedReplacements.length !== 3 ||
+    verifiedApprovedReplacements.length !== 0 ||
     verifiedUnexpectedConflicts.length !== 0 ||
     unexpectedUnresolved.length !== 0 ||
     canonicalUnits.length !== 58 ||
