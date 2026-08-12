@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 
 import { brandConfig, gothamSans } from "@/brand";
 import { DevToolsProvider, DevToolsToolbar } from "@/components/dev-tools";
+import { getBusinessDateCookieName, parseBusinessDateCookieValue } from "@/server/business-date";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,7 +11,7 @@ export const metadata: Metadata = {
   description: `${brandConfig.productName} ${brandConfig.descriptor}`,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -21,6 +23,10 @@ export default function RootLayout({
   const historicalEditingAvailable =
     process.env.NODE_ENV === "development" &&
     process.env.TB810_ALLOW_HISTORICAL_READING_EDITS === "true";
+  const businessDateValue =
+    process.env.NODE_ENV === "development"
+      ? parseBusinessDateCookieValue((await cookies()).get(getBusinessDateCookieName())?.value)
+      : null;
 
   return (
     <html lang={brandConfig.defaultLocale} className={`${gothamSans.variable} h-full antialiased`}>
@@ -31,6 +37,8 @@ export default function RootLayout({
         data-dev-spacing={devSpacing ? "1" : undefined}
         data-dev-page-breaks={devPageBreaks ? "1" : undefined}
         data-dev-historical-editing-available={historicalEditingAvailable ? "1" : undefined}
+        data-dev-business-date-active={businessDateValue ? "1" : undefined}
+        data-dev-business-date={businessDateValue ?? undefined}
       >
         <DevToolsProvider>
           {children}

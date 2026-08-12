@@ -1,6 +1,9 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
+
+import { clearDevBusinessDateAction, setDevBusinessDateAction } from "@/server/business-date/actions";
 
 const STORAGE_KEYS = {
   outline: "tb810-dev-outline",
@@ -17,6 +20,8 @@ type DevToolsSnapshot = {
   pageBreaks: boolean;
   historicalEditingEnabled: boolean;
   historicalEditingAvailable: boolean;
+  businessDateActive: boolean;
+  businessDateValue: string;
 };
 
 type DevToolsStore = DevToolsSnapshot & {
@@ -34,6 +39,8 @@ let snapshot: DevToolsSnapshot = {
   pageBreaks: false,
   historicalEditingEnabled: false,
   historicalEditingAvailable: false,
+  businessDateActive: false,
+  businessDateValue: "",
 };
 
 const listeners = new Set<() => void>();
@@ -78,6 +85,13 @@ function setSnapshot(patch: Partial<DevToolsSnapshot>) {
     applyBodyFlag("data-dev-spacing", snapshot.spacing);
     applyBodyFlag("data-dev-page-breaks", snapshot.pageBreaks);
     applyBodyFlag("data-dev-historical-editing", snapshot.historicalEditingEnabled);
+    if (snapshot.businessDateActive) {
+      document.body.setAttribute("data-dev-business-date-active", "1");
+      document.body.setAttribute("data-dev-business-date", snapshot.businessDateValue);
+    } else {
+      document.body.removeAttribute("data-dev-business-date-active");
+      document.body.removeAttribute("data-dev-business-date");
+    }
   }
   writeStoredFlag(STORAGE_KEYS.outline, snapshot.outline);
   writeStoredFlag(STORAGE_KEYS.grid, snapshot.grid);
@@ -97,6 +111,8 @@ function initializeStore() {
   const bodyPageBreaks = document.body.dataset.devPageBreaks === "1";
   const bodyHistoricalEditingAvailable =
     document.body.dataset.devHistoricalEditingAvailable === "1";
+  const bodyBusinessDateActive = document.body.dataset.devBusinessDateActive === "1";
+  const bodyBusinessDate = document.body.dataset.devBusinessDate ?? "";
 
   snapshot = {
     outline: readStoredFlag(STORAGE_KEYS.outline) || bodyOutline,
@@ -106,6 +122,8 @@ function initializeStore() {
     historicalEditingEnabled:
       bodyHistoricalEditingAvailable && readStoredFlag(STORAGE_KEYS.historicalEditing),
     historicalEditingAvailable: bodyHistoricalEditingAvailable,
+    businessDateActive: bodyBusinessDateActive,
+    businessDateValue: bodyBusinessDate,
   };
 
   applyBodyFlag("data-dev-outline", snapshot.outline);
@@ -113,6 +131,10 @@ function initializeStore() {
   applyBodyFlag("data-dev-spacing", snapshot.spacing);
   applyBodyFlag("data-dev-page-breaks", snapshot.pageBreaks);
   applyBodyFlag("data-dev-historical-editing", snapshot.historicalEditingEnabled);
+  if (snapshot.businessDateActive) {
+    document.body.setAttribute("data-dev-business-date-active", "1");
+    document.body.setAttribute("data-dev-business-date", snapshot.businessDateValue);
+  }
 }
 
 function readSnapshot() {
@@ -173,6 +195,7 @@ export function useDevTools() {
 
 export function DevToolsToolbar() {
   const state = useDevTools();
+  const pathname = usePathname();
   const showToolbar = process.env.NODE_ENV === "development";
 
   const items = useMemo(
@@ -222,9 +245,19 @@ export function DevToolsToolbar() {
 
   return (
     <>
-      <div className="fixed bottom-4 right-4 z-[10000] w-44 rounded-xl border border-white/10 bg-black/70 p-3 text-xs text-white shadow-xl backdrop-blur">
+      <div className="fixed bottom-4 right-4 z-[10000] w-64 rounded-xl border border-white/10 bg-black/70 p-3 text-xs text-white shadow-xl backdrop-blur">
         <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/80">
           Dev only
+        </div>
+        <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-2 text-[11px] text-white/80">
+          {state.businessDateActive ? (
+            <div className="flex items-center justify-between gap-2">
+              <span>Business date override</span>
+              <span className="font-medium text-emerald-300">{state.businessDateValue}</span>
+            </div>
+          ) : (
+            <span>No business date override</span>
+          )}
         </div>
         {items.map(([label, checked, setChecked]) => (
           <label
@@ -240,6 +273,33 @@ export function DevToolsToolbar() {
             />
           </label>
         ))}
+        <form action={setDevBusinessDateAction} className="mt-3 space-y-2">
+          <input type="hidden" name="return_to" value={pathname} />
+          <label className="block space-y-1">
+            <span className="text-[11px] text-white/70">Business date</span>
+            <input
+              name="business_date"
+              type="date"
+              defaultValue={state.businessDateValue}
+              className="h-9 w-full rounded-md border border-white/15 bg-black/40 px-2 text-white"
+            />
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              className="flex-1 rounded-md bg-white px-2 py-1.5 font-medium text-black"
+            >
+              Set
+            </button>
+            <button
+              formAction={clearDevBusinessDateAction}
+              type="submit"
+              className="rounded-md border border-white/15 px-2 py-1.5 text-white"
+            >
+              Clear
+            </button>
+          </div>
+        </form>
       </div>
       <div
         data-dev-spacing-tooltip

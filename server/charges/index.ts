@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 
-import { defaultStartMonthForNewCharge, firstDayOfMonth, isChargeEligibleForMonth, previousMonthKey } from "./month";
+import { currentMonthKey, defaultStartMonthForNewCharge, firstDayOfMonth, isChargeEligibleForMonth, previousMonthKey } from "./month";
 import type { ChargeInput, ChargeLineItem, ChargeRecord, ChargeSummary } from "./types";
 
 type QueryResult<T> = { data: T; error: string | null };
@@ -18,17 +18,12 @@ function isUnitCharge(row: ChargeRecord) {
   return row.unit_id != null && row.owner_id == null;
 }
 
-function summarizeState(row: ChargeRecord) {
-  const currentMonth = currentMonthKey();
+async function summarizeState(row: ChargeRecord) {
+  const currentMonth = await currentMonthKey();
   if (row.effective_from_month.slice(0, 7) > currentMonth) return "future" as const;
   if (row.effective_to_month && row.effective_to_month.slice(0, 7) < currentMonth) return "ended" as const;
   if (row.stop_note) return "stopped" as const;
   return "active" as const;
-}
-
-function currentMonthKey() {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 async function getCurrentBuildingId() {
@@ -69,7 +64,7 @@ export async function listCharges(): Promise<QueryResult<ChargeSummary[]>> {
   }
 
   return {
-    data: [...latestBySeries.values()].map((row) => ({
+    data: await Promise.all([...latestBySeries.values()].map(async (row) => ({
       ...row,
       target_label: isUnitCharge(row) ? "Unit" : "Owner",
       target_unit_number: row.unit_id ? unitById.get(row.unit_id)?.unit_number ?? null : null,
@@ -77,8 +72,8 @@ export async function listCharges(): Promise<QueryResult<ChargeSummary[]>> {
       current_effective_from_month: monthKeyFromDate(row.effective_from_month),
       current_effective_to_month: row.effective_to_month ? monthKeyFromDate(row.effective_to_month) : null,
       current_stop_note: row.stop_note,
-      state: summarizeState(row),
-    })),
+      state: await summarizeState(row),
+    }))),
     error: null,
   };
 }
@@ -103,7 +98,7 @@ export async function createUnitCharge(input: ChargeInput): Promise<QueryResult<
   if (!unitResult.data) return { data: null as never, error: "Unit not found." };
 
   const startMonth = input.starts_month;
-  const currentMonth = currentMonthKey();
+  const currentMonth = await currentMonthKey();
   const defaultStartMonth = defaultStartMonthForNewCharge(currentMonth);
   if (startMonth < defaultStartMonth) {
     return { data: null as never, error: `Start month cannot be before ${defaultStartMonth}.` };
@@ -151,7 +146,7 @@ export async function changeFutureChargeEconomics(
     return { data: null as never, error: "Only recurring charges can change future economics." };
   }
   const effectiveMonth = input.effective_month;
-  const currentMonth = currentMonthKey();
+  const currentMonth = await currentMonthKey();
   if (effectiveMonth < currentMonth) return { data: null as never, error: "Effective month cannot be in the past." };
   if (effectiveMonth <= monthKeyFromDate(current.effective_from_month)) {
     return { data: null as never, error: "Effective month must be after the current charge start month." };

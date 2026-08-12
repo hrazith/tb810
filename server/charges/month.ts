@@ -1,3 +1,5 @@
+import { getBusinessMonthKey } from "../business-date";
+
 export function monthStart(monthKey: string) {
   return `${monthKey}-01`;
 }
@@ -20,10 +22,8 @@ export function previousMonthKey(monthKey: string) {
   return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-export function currentMonthKey() {
-  const now = new Date();
-  // Sprint 4A uses UTC month boundaries; TB810 business timezone remains a separate decision.
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+export async function currentMonthKey() {
+  return getBusinessMonthKey();
 }
 
 export function nextMonthKey(monthKey: string) {

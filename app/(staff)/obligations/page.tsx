@@ -52,7 +52,8 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
     transactions = (data ?? []) as typeof transactions;
   }
 
-  const nextStartMonth = nextMonthKey(currentMonthKey()) ?? currentMonthKey();
+  const currentMonth = await currentMonthKey();
+  const nextStartMonth = nextMonthKey(currentMonth) ?? currentMonth;
 
   return (
     <section className="space-y-6">
