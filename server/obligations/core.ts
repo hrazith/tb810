@@ -16,6 +16,7 @@ const DEFAULT_COMPONENT_ORDER: MonthlyObligationComponentKey[] = [
   "metered_water",
   "common_water",
   "gas",
+  "other_charge",
 ];
 
 const COMPONENT_LABELS: Record<MonthlyObligationComponentKey, string> = {
@@ -63,6 +64,7 @@ function createAvailableComponent(
   amount: string,
   provenance: string,
   sourceMonth: string | null = null,
+  lineItems?: MonthlyObligationComponent["lineItems"],
 ): MonthlyObligationComponent {
   return {
     key,
@@ -73,6 +75,7 @@ function createAvailableComponent(
     sourceMonth,
     provenance,
     blocker: null,
+    lineItems,
   };
 }
 
@@ -158,7 +161,7 @@ function mapProviderResult(
   result: MonthlyObligationProviderResult,
 ): MonthlyObligationComponent {
   if (result.status === "available") {
-    return createAvailableComponent(key, result.amount, result.provenance, result.sourceMonth ?? null);
+    return createAvailableComponent(key, result.amount, result.provenance, result.sourceMonth ?? null, result.lineItems);
   }
   if (result.status === "missing") {
     return createMissingComponent(key, result.blocker, result.provenance, result.sourceMonth ?? null);

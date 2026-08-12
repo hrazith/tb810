@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 
 import { calculateGasCharges, type GasCalculationResult } from "./calculation";
+import { isEligibleGasBill, previousMonthKeyFromMonthKey } from "./month-utils";
 
 export type GasChargePreviewState =
   | {
@@ -37,14 +38,33 @@ function nextMonthLabel(monthKey: string) {
   }).format(parsed);
 }
 
-function toMonthKey(date: string) {
-  return `${date.slice(0, 7)}`;
+export async function listGasReadingsForMonth(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  buildingId: string,
+  sourceReadingMonth: string,
+) {
+  const { data, error } = await supabase
+    .from("tb810_gas_readings")
+    .select("id, unit_id, reading_month, current_reading, previous_reading, consumption")
+    .eq("building_id", buildingId)
+    .eq("reading_month", `${sourceReadingMonth}-01`);
+
+  if (error) return { data: null, error: error.message };
+  return { data: data ?? [], error: null };
 }
 
-export async function getGasChargePreviewsForUnit(unitId: string): Promise<GasChargePreviewState> {
+export async function getGasChargePreviewsForUnit(
+  unitId: string,
+  obligationMonth: string,
+): Promise<GasChargePreviewState> {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { status: "unavailable", message: buildingResult.error };
   if (!buildingResult.data) return { status: "unavailable", message: "Current building not found." };
+
+  const sourceReadingMonth = previousMonthKeyFromMonthKey(obligationMonth);
+  if (!sourceReadingMonth) {
+    return { status: "unavailable", message: "Gas lookup data is incomplete." };
+  }
 
   const supabase = await createClient();
   const [unitResult, unitsResult, billResult, readingResult] = await Promise.all([
@@ -61,18 +81,13 @@ export async function getGasChargePreviewsForUnit(unitId: string): Promise<GasCh
       .eq("building_id", buildingResult.data.id)
       .order("invoice_date", { ascending: false })
       .order("created_at", { ascending: false }),
-    supabase
-      .from("tb810_gas_readings")
-      .select("id, unit_id, reading_month, current_reading, previous_reading, consumption")
-      .eq("building_id", buildingResult.data.id)
-      .order("reading_month", { ascending: false })
-      .order("created_at", { ascending: false }),
+    listGasReadingsForMonth(supabase, buildingResult.data.id, sourceReadingMonth),
   ]);
 
   if (unitResult.error) return { status: "unavailable", message: unitResult.error.message };
   if (unitsResult.error) return { status: "unavailable", message: unitsResult.error };
   if (billResult.error) return { status: "unavailable", message: billResult.error.message };
-  if (readingResult.error) return { status: "unavailable", message: readingResult.error.message };
+  if (readingResult.error) return { status: "unavailable", message: readingResult.error };
   const unitRow = unitResult.data;
   if (!unitRow) return { status: "unavailable", message: "Unit not found." };
 
@@ -91,12 +106,7 @@ export async function getGasChargePreviewsForUnit(unitId: string): Promise<GasCh
     return { status: "not-applicable", message: "Gas is not applicable for this Unit." };
   }
 
-  const sourceReadingMonth = (readingResult.data ?? []).find((row) => row.unit_id === unitId)?.reading_month?.slice(0, 7);
-  if (!sourceReadingMonth) {
-    return { status: "unavailable", message: "No Gas reading is available for this Unit." };
-  }
-
-  const gasBillsForMonth = (billResult.data ?? []).filter((bill) => toMonthKey(bill.invoice_date) === sourceReadingMonth);
+  const gasBillsForMonth = (billResult.data ?? []).filter((bill) => isEligibleGasBill(bill.invoice_date, bill.processed_at, obligationMonth));
   const readingsForMonth = new Map<
     string,
     {
@@ -140,6 +150,13 @@ export async function getGasChargePreviewsForUnit(unitId: string): Promise<GasCh
   const billingMonthLabel = nextMonthLabel(sourceReadingMonth);
   if (!sourceReadingMonthLabel || !billingMonthLabel) {
     return { status: "unavailable", message: "Gas lookup data is incomplete." };
+  }
+
+  if (calculation.blockers.length > 0) {
+    return {
+      status: "unavailable",
+      message: calculation.blockers.join(" "),
+    };
   }
 
   return {

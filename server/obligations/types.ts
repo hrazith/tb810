@@ -22,6 +22,13 @@ export type MonthlyObligationComponent = {
   sourceMonth: string | null;
   provenance: string | null;
   blocker: string | null;
+  lineItems?: Array<{
+    chargeId: string;
+    description: string;
+    amount: string;
+    effectiveFromMonth: string;
+    effectiveToMonth: string | null;
+  }>;
 };
 
 export type UnitMonthlyObligation = {
@@ -59,6 +66,7 @@ export type MonthlyObligationProviderResult =
       currency: string;
       sourceMonth: string | null;
       provenance: string;
+      lineItems?: MonthlyObligationComponent["lineItems"];
     }
   | {
       status: "missing";
@@ -90,4 +98,3 @@ export type MonthlyObligationProvider = (args: {
     participationPercentage: number | null;
   };
 }) => Promise<MonthlyObligationProviderResult>;
-

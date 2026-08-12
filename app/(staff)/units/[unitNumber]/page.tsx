@@ -127,12 +127,7 @@ export default async function UnitDetailPage({ params }: PageProps) {
           >
             Edit
           </Link>
-          <Button asChild variant="secondary" shape="default">
-            <Link href={`/units/${unit.unit_number}/transfer-ownership`}>
-              <UserSwitchIcon size={16} aria-hidden="true" />
-              {ownershipSnapshot?.currentOwnership ? "Transfer ownership" : "Assign owner"}
-            </Link>
-          </Button>
+          
         </div>
       </div>
 
@@ -231,12 +226,17 @@ export default async function UnitDetailPage({ params }: PageProps) {
       <Panel as="section" className="space-y-6">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-zinc-950">Ownership</h2>
+          <Button asChild variant="secondary" shape="default">
           <Link
             href={`/units/${unit.unit_number}/transfer-ownership`}
-            className="text-sm font-medium text-zinc-950 underline-offset-4 transition hover:underline"
+            className=""
           >
+            <UserSwitchIcon size={16} aria-hidden="true" />
             {ownershipSnapshot?.currentOwnership ? "Transfer ownership" : "Assign owner"}
           </Link>
+          </Button>
+
+          
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">

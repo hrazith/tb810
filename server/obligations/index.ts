@@ -2,6 +2,7 @@ import { getUnitFixedMonthlyAssessment } from "../budget-plans";
 import { getCurrentBuilding, getUnitById, listUnits } from "../units";
 import { getGasChargePreviewsForUnit } from "../gas";
 import { getWaterChargePreviewsForUnit } from "../water";
+import { getUnitChargesForObligationMonth } from "../charges";
 import { composeMonthlyObligation, type ProviderMap } from "./core";
 
 function createMonthlyObligationProviders(): ProviderMap {
@@ -88,7 +89,7 @@ function createMonthlyObligationProviders(): ProviderMap {
         return { status: "not_applicable", provenance: "server/gas/provider", sourceMonth: context.obligationMonth };
       }
 
-      const result = await getGasChargePreviewsForUnit(unit.unitId);
+      const result = await getGasChargePreviewsForUnit(unit.unitId, context.obligationMonth);
       if (result.status === "available") {
         return {
           status: "available",
@@ -106,6 +107,28 @@ function createMonthlyObligationProviders(): ProviderMap {
         blocker: result.message,
         provenance: "server/gas",
         sourceMonth: context.obligationMonth,
+      };
+    },
+    other_charge: async ({ context, unit }) => {
+      const result = await getUnitChargesForObligationMonth(unit.unitId, context.obligationMonth);
+      if (result.error) {
+        return {
+          status: "blocked",
+          blocker: result.error,
+          provenance: "server/charges",
+          sourceMonth: context.obligationMonth,
+        };
+      }
+      if (result.data.lineItems.length === 0) {
+        return { status: "not_applicable", provenance: "server/charges", sourceMonth: context.obligationMonth };
+      }
+      return {
+        status: "available",
+        amount: result.data.amount,
+        currency: "PEN",
+        provenance: "server/charges",
+        sourceMonth: context.obligationMonth,
+        lineItems: result.data.lineItems,
       };
     },
   };

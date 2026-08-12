@@ -53,7 +53,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
     <section className="space-y-6 ">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Unit Water Meter Readings</h1>
+          <MonthLedgerSelector activeMonthKey={month} searchQuery={query ?? ""} monthOptions={monthOptions} />
         </div>
         <div className="flex items-center gap-3">
           <form action={`/water/unit-meter-readings/${month}`} method="get" className="flex items-center gap-3">
@@ -68,7 +68,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
         </div>
       </div>
 
-      <MonthLedgerSelector activeMonthKey={month} searchQuery={query ?? ""} monthOptions={monthOptions} />
+      
 
       {result.error ? <Panel className="border-red-200 bg-red-50 text-sm text-red-700">{result.error}</Panel> : null}
       {deleted ? <Panel className="border-emerald-200 bg-emerald-50 text-sm text-emerald-700">{deleted}</Panel> : null}
