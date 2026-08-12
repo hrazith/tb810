@@ -24,7 +24,7 @@ export function GasImportDialog({ action }: Props) {
   return (
     <>
       <Button type="button" variant="secondary" shape="pill" onClick={() => setOpen(true)}>
-        Import Workbook
+        Upload Bills
       </Button>
       <Dialog
         open={open}
