@@ -239,6 +239,91 @@ export type Database = {
           },
         ]
       }
+      tb810_charges: {
+        Row: {
+          amount: number
+          building_id: string
+          created_at: string
+          created_by: string | null
+          description: string
+          effective_from_month: string
+          effective_to_month: string | null
+          legacy_id: string | null
+          legacy_metadata: Json
+          legacy_table: string | null
+          owner_id: string | null
+          id: string
+          schedule: Database["public"]["Enums"]["tb810_charge_schedule"]
+          series_id: string
+          stop_note: string | null
+          unit_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount: number
+          building_id: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          effective_from_month: string
+          effective_to_month?: string | null
+          legacy_id?: string | null
+          legacy_metadata?: Json
+          legacy_table?: string | null
+          owner_id?: string | null
+          id?: string
+          schedule?: Database["public"]["Enums"]["tb810_charge_schedule"]
+          series_id?: string
+          stop_note?: string | null
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number
+          building_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          effective_from_month?: string
+          effective_to_month?: string | null
+          legacy_id?: string | null
+          legacy_metadata?: Json
+          legacy_table?: string | null
+          unit_id?: string | null
+          id?: string
+          schedule?: Database["public"]["Enums"]["tb810_charge_schedule"]
+          series_id?: string
+          stop_note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          owner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tb810_charges_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "tb810_buildings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tb810_charges_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "tb810_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tb810_charges_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "tb810_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tb810_budget_plans: {
         Row: {
           building_id: string
@@ -2205,6 +2290,7 @@ export type Database = {
         | "viewer"
       tb810_unit_type_code: "condo" | "parking" | "storage"
       tb810_utility_type_code: "water" | "common_water" | "common_electricity"
+      tb810_charge_schedule: "one_off" | "recurring"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2400,6 +2486,7 @@ export const Constants = {
       ],
       tb810_unit_type_code: ["condo", "parking", "storage"],
       tb810_utility_type_code: ["water", "common_water", "common_electricity"],
+      tb810_charge_schedule: ["one_off", "recurring"],
     },
   },
 } as const
