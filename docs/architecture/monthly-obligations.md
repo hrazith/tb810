@@ -32,6 +32,8 @@ It belongs to the Unit Account, never to the Owner.
 
 It may be incomplete while upstream facts are still arriving.
 
+Unit-attributable charges flow into this Monthly Obligation as the `other_charge` component.
+
 ### Finalized Monthly Obligation
 
 The immutable historical snapshot of a Monthly Obligation after the month is finalized.
@@ -158,11 +160,14 @@ Source domains own their facts and calculations:
 - Budget Plan owns the assessment inputs.
 - Water owns readings, Sedapal bills, and water calculations.
 - Gas will own gas facts and gas calculations.
-- Other Charges will own approved arbitrary charges.
+- Charges own source-charge definitions.
+- Other Charges is the Unit-facing charge source that contributes to `other_charge`.
 
 The Obligations domain owns the composed monthly result.
 
 It does not own the formulas that produced the upstream facts.
+
+Owner-direct charges do not contribute to Monthly Obligations and are handled in the Owner Account path instead.
 
 ## 8. Read-Service Contract
 
@@ -199,6 +204,8 @@ The Monthly Obligation service is the shared read model for:
 - future invoice generation, which reads finalized obligations only
 
 The Unit page must not independently orchestrate assessment, water, gas, or other-charge calculations once it is tethered to this service.
+
+Owner-direct receivables are intentionally outside this read model.
 
 ## 10. Invoice Timing
 

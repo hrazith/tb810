@@ -55,5 +55,4 @@ Examples of upstream facts:
 The Unit Ledger is the single source of truth for financial history.
 
 Owner-level views are derived by aggregating the unit-level ledger, not by
-storing a second competing truth.
-
+storing a second competing truth. Direct Owner receivables are handled by Owner Account truth, not by the Unit Ledger.

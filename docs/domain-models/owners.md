@@ -26,7 +26,7 @@ The Owner aggregate is responsible for:
 
 The Owner aggregate should remain focused on who the owner is and how to contact them. It should not directly own financial data such as balances, invoices, payments, or receipts.
 
-Financial information belongs to downstream billing and accounting aggregates that reference the owner as needed.
+Financial information belongs to downstream billing and accounting aggregates that reference the owner as needed, including genuinely owner-direct receivables that do not belong to any Unit.
 
 ## Fields
 
@@ -163,6 +163,7 @@ The Owner also connects indirectly to:
 - Payments
 - Invoices
 - Receipts
+- Owner Account truth for direct owner receivables
 
 These relationships occur through other aggregates and billing records, not by placing financial fields on the Owner itself.
 

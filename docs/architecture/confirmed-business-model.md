@@ -87,6 +87,21 @@ The transfer closes one Ownership and creates the next without changing the Unit
 Billing responsibility is resolved at the billing-cycle boundary from the Ownership active on that period start date.
 The incoming Owner becomes responsible for all outstanding Unit Account debt, while historical invoices remain unchanged and no prorating occurs.
 
+## Owner Account
+
+TB810 also supports genuinely Owner-direct receivables that have no Unit attribution.
+
+Owner-direct obligations:
+
+- belong financially to the Owner
+- require no Unit
+- must not be attached to one of the Owner's Units for convenience
+- remain outside the Unit Account / PUA
+- remain outside `getMonthlyObligation()`
+
+Owner Account is an architectural concept, not necessarily a literal table name.
+It may reuse existing financial primitives wherever they fit cleanly.
+
 ## Monthly Invoices
 
 TB810 generates one invoice per permanent Unit Account.
@@ -181,6 +196,8 @@ Future edits to budgets, ownership percentages or rates must never silently rewr
 
 Historical months remain historically correct.
 
+Unit-attributable additional charges become Monthly Obligation components. Owner-direct charges do not.
+
 ## Invoice Corrections
 
 If an invoice mistake is found after sending it, the wrong invoice should be canceled and a new one issued.
@@ -232,6 +249,8 @@ Facts are observable or authoritative business inputs, such as:
 - Unit participation percentage
 - Water meter reading
 - Sedapal supplier invoice
+- Unit charge source
+- Owner charge source
 - one-off charge entered by authorized staff
 
 Calculations are deterministic financial consequences derived by Asset-Edge, such as:
@@ -245,6 +264,7 @@ Calculations are deterministic financial consequences derived by Asset-Edge, suc
 Accounting is the historical record created from finalized calculation outputs, such as:
 
 - Monthly Obligation
+- Owner obligation
 - Payments
 - Payment allocations
 - Unit balances

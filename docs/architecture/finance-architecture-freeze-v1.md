@@ -40,11 +40,11 @@ Financial history should never silently change.
 
 Corrections create new historical events rather than rewriting existing ones.
 
-5. The Unit is the accounting anchor.
+5. The Unit is the accounting anchor for Unit-attributable financial truth.
 
-Financial responsibility belongs to Units.
+Financial responsibility belongs to Units when the receivable is attributable to a Unit.
 
-Owner-facing views are presentation models.
+Owner-facing views are presentation models for Unit truth, except for genuinely owner-direct receivables.
 
 ## Frozen Domains
 
@@ -55,6 +55,7 @@ Owner-facing views are presentation models.
 - Budget Plan - annual configuration that establishes the Monthly Assessment Pool
 - Billing Period - operational month created by the passage of time
 - Monthly Obligation - first-class persistent record of what each Unit owes for a Billing Period
+- Owner Account - permanent accounting anchor for genuinely Owner-direct receivables with no Unit attribution
 
 ## Accepted Architectural Decisions
 
@@ -67,6 +68,8 @@ Owner-facing views are presentation models.
 - Every financial obligation belongs to a Unit.
 - Owner statements consolidate obligations but do not own them.
 - Other Charges remain attached to the Unit to which they belong.
+- A genuinely Owner-direct receivable belongs to the Owner and must not be forced onto a Unit.
+- Owner Account is an architectural concept for direct Owner receivables; it may reuse existing financial primitives and does not imply a new table name.
 - Monthly obligations preserve their historical calculation inputs.
 - Invoice corrections occur by cancellation and replacement rather than editing.
 
@@ -86,8 +89,7 @@ The following decisions are intentionally outside Finance Foundation v1:
 
 ## Business Clarifications Still Required
 
-1. Whether common-area damage charges belong directly to an Owner or continue to belong to one of the Owner's Units.
-2. How historical obligation corrections should be represented once Carlos explains the real operational scenarios.
+1. How historical obligation corrections should be represented once Carlos explains the real operational scenarios.
 
 These questions are intentionally isolated because they do not block the UI sprint.
 

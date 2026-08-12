@@ -34,6 +34,8 @@ It is the orchestration context that:
 - generates one invoice per Unit Account
 - records completion state for the monthly billing run
 
+Charge inputs can also include genuine Owner-direct receivables, but those do not become Unit Account obligations.
+
 Monthly Obligations and Water use the Billing Period as their shared monthly timing container.
 Billing Period does not itself create obligations; it provides the month boundary on which downstream domains converge.
 
@@ -214,6 +216,8 @@ Historical months remain historically correct.
 - include amount, description, reason or source, and status
 - do not alter the Budget Plan or participation percentage
 
+Owner-direct charges follow the same month-based scheduling and cutoff rules for MVP, but they remain outside the Unit Account path and are handled by Owner Account truth.
+
 ## Invoice Corrections
 
 If an invoice mistake is found after sending it, cancel the wrong invoice and send a new one.
@@ -238,6 +242,7 @@ Rules:
 - invoice lines link to their Unit Account
 - invoice generation must be idempotent
 - preview and final generation are separate concepts
+- Owner statements or owner invoices, if generated, must be derived from Owner Account truth and not from Unit Account aggregation alone.
 - correcting an issued invoice should eventually use adjustment, void, or replacement workflows rather than silent recalculation
 
 ## Ownership Responsibility
@@ -315,6 +320,7 @@ Ownerships determine the responsible Owner for the billing cycle.
 Meter readings and utility inputs feed private water and gas charges.
 Common utility bills feed common-water allocations.
 Additional charges become targeted Unit Account invoice lines.
+Owner-direct charges remain outside Unit Account invoice lines.
 
 ## Invariants
 
@@ -324,6 +330,7 @@ These are permanent rules for the modern TB810 model:
 - one monthly invoice per eligible Unit Account
 - no combined multi-asset invoice
 - invoice debt belongs to the Unit Account
+- owner-direct receivables may belong to an Owner Account
 - Owner is preserved as addressee-at-issue context
 - ownership changes do not reset balances
 - participation percentage is persisted Unit data
