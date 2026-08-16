@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 
 import { clearDevBusinessDateAction, setDevBusinessDateAction } from "@/server/business-date/actions";
+import { resetDevTestSessionAction, startDevTestSessionAction } from "@/server/dev-test-session/actions";
 
 const STORAGE_KEYS = {
   outline: "tb810-dev-outline",
@@ -15,32 +16,29 @@ const STORAGE_KEYS = {
 
 type DevToolsSnapshot = {
   outline: boolean;
-  grid: boolean;
-  spacing: boolean;
-  pageBreaks: boolean;
   historicalEditingEnabled: boolean;
   historicalEditingAvailable: boolean;
   businessDateActive: boolean;
   businessDateValue: string;
+  testSessionActive: boolean;
+  testSessionId: string;
+  testSessionMutations: number;
 };
 
 type DevToolsStore = DevToolsSnapshot & {
   setOutline: (next: boolean | ((current: boolean) => boolean)) => void;
-  setGrid: (next: boolean | ((current: boolean) => boolean)) => void;
-  setSpacing: (next: boolean | ((current: boolean) => boolean)) => void;
-  setPageBreaks: (next: boolean | ((current: boolean) => boolean)) => void;
   setHistoricalEditingEnabled: (next: boolean | ((current: boolean) => boolean)) => void;
 };
 
 let snapshot: DevToolsSnapshot = {
   outline: false,
-  grid: false,
-  spacing: false,
-  pageBreaks: false,
   historicalEditingEnabled: false,
   historicalEditingAvailable: false,
   businessDateActive: false,
   businessDateValue: "",
+  testSessionActive: false,
+  testSessionId: "",
+  testSessionMutations: 0,
 };
 
 const listeners = new Set<() => void>();
@@ -81,9 +79,6 @@ function setSnapshot(patch: Partial<DevToolsSnapshot>) {
   snapshot = { ...snapshot, ...patch };
   if (typeof document !== "undefined") {
     applyBodyFlag("data-dev-outline", snapshot.outline);
-    applyBodyFlag("data-dev-grid", snapshot.grid);
-    applyBodyFlag("data-dev-spacing", snapshot.spacing);
-    applyBodyFlag("data-dev-page-breaks", snapshot.pageBreaks);
     applyBodyFlag("data-dev-historical-editing", snapshot.historicalEditingEnabled);
     if (snapshot.businessDateActive) {
       document.body.setAttribute("data-dev-business-date-active", "1");
@@ -92,11 +87,17 @@ function setSnapshot(patch: Partial<DevToolsSnapshot>) {
       document.body.removeAttribute("data-dev-business-date-active");
       document.body.removeAttribute("data-dev-business-date");
     }
+    if (snapshot.testSessionActive) {
+      document.body.setAttribute("data-dev-test-session-active", "1");
+      document.body.setAttribute("data-dev-test-session-id", snapshot.testSessionId);
+      document.body.setAttribute("data-dev-test-session-mutations", String(snapshot.testSessionMutations));
+    } else {
+      document.body.removeAttribute("data-dev-test-session-active");
+      document.body.removeAttribute("data-dev-test-session-id");
+      document.body.removeAttribute("data-dev-test-session-mutations");
+    }
   }
   writeStoredFlag(STORAGE_KEYS.outline, snapshot.outline);
-  writeStoredFlag(STORAGE_KEYS.grid, snapshot.grid);
-  writeStoredFlag(STORAGE_KEYS.spacing, snapshot.spacing);
-  writeStoredFlag(STORAGE_KEYS.pageBreaks, snapshot.pageBreaks);
   writeStoredFlag(STORAGE_KEYS.historicalEditing, snapshot.historicalEditingEnabled);
   notify();
 }
@@ -106,34 +107,36 @@ function initializeStore() {
   initialized = true;
 
   const bodyOutline = document.body.dataset.devOutline === "1";
-  const bodyGrid = document.body.dataset.devGrid === "1";
-  const bodySpacing = document.body.dataset.devSpacing === "1";
-  const bodyPageBreaks = document.body.dataset.devPageBreaks === "1";
   const bodyHistoricalEditingAvailable =
     document.body.dataset.devHistoricalEditingAvailable === "1";
   const bodyBusinessDateActive = document.body.dataset.devBusinessDateActive === "1";
   const bodyBusinessDate = document.body.dataset.devBusinessDate ?? "";
+  const bodyTestSessionActive = document.body.dataset.devTestSessionActive === "1";
+  const bodyTestSessionId = document.body.dataset.devTestSessionId ?? "";
+  const bodyTestSessionMutations = Number(document.body.dataset.devTestSessionMutations ?? "0");
 
   snapshot = {
     outline: readStoredFlag(STORAGE_KEYS.outline) || bodyOutline,
-    grid: readStoredFlag(STORAGE_KEYS.grid) || bodyGrid,
-    spacing: readStoredFlag(STORAGE_KEYS.spacing) || bodySpacing,
-    pageBreaks: readStoredFlag(STORAGE_KEYS.pageBreaks) || bodyPageBreaks,
     historicalEditingEnabled:
       bodyHistoricalEditingAvailable && readStoredFlag(STORAGE_KEYS.historicalEditing),
     historicalEditingAvailable: bodyHistoricalEditingAvailable,
     businessDateActive: bodyBusinessDateActive,
     businessDateValue: bodyBusinessDate,
+    testSessionActive: bodyTestSessionActive,
+    testSessionId: bodyTestSessionId,
+    testSessionMutations: Number.isFinite(bodyTestSessionMutations) ? bodyTestSessionMutations : 0,
   };
 
   applyBodyFlag("data-dev-outline", snapshot.outline);
-  applyBodyFlag("data-dev-grid", snapshot.grid);
-  applyBodyFlag("data-dev-spacing", snapshot.spacing);
-  applyBodyFlag("data-dev-page-breaks", snapshot.pageBreaks);
   applyBodyFlag("data-dev-historical-editing", snapshot.historicalEditingEnabled);
   if (snapshot.businessDateActive) {
     document.body.setAttribute("data-dev-business-date-active", "1");
     document.body.setAttribute("data-dev-business-date", snapshot.businessDateValue);
+  }
+  if (snapshot.testSessionActive) {
+    document.body.setAttribute("data-dev-test-session-active", "1");
+    document.body.setAttribute("data-dev-test-session-id", snapshot.testSessionId);
+    document.body.setAttribute("data-dev-test-session-mutations", String(snapshot.testSessionMutations));
   }
 }
 
@@ -144,10 +147,6 @@ function readSnapshot() {
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => listeners.delete(listener);
-}
-
-function formatSpacingValue(value: string) {
-  return value === "0px" ? "0" : value;
 }
 
 export function DevToolsProvider({ children }: { children: ReactNode }) {
@@ -165,18 +164,6 @@ export function useDevTools() {
     const resolved = typeof next === "function" ? next(snapshot.outline) : next;
     setSnapshot({ outline: resolved });
   };
-  const setGrid = (next: boolean | ((current: boolean) => boolean)) => {
-    const resolved = typeof next === "function" ? next(snapshot.grid) : next;
-    setSnapshot({ grid: resolved });
-  };
-  const setSpacing = (next: boolean | ((current: boolean) => boolean)) => {
-    const resolved = typeof next === "function" ? next(snapshot.spacing) : next;
-    setSnapshot({ spacing: resolved });
-  };
-  const setPageBreaks = (next: boolean | ((current: boolean) => boolean)) => {
-    const resolved = typeof next === "function" ? next(snapshot.pageBreaks) : next;
-    setSnapshot({ pageBreaks: resolved });
-  };
   const setHistoricalEditingEnabled = (next: boolean | ((current: boolean) => boolean)) => {
     const resolved =
       typeof next === "function" ? next(snapshot.historicalEditingEnabled) : next;
@@ -186,9 +173,6 @@ export function useDevTools() {
   return {
     ...current,
     setOutline,
-    setGrid,
-    setSpacing,
-    setPageBreaks,
     setHistoricalEditingEnabled,
   } as DevToolsStore;
 }
@@ -201,9 +185,6 @@ export function DevToolsToolbar() {
   const items = useMemo(
     () => [
       ["Outline", state.outline, state.setOutline],
-      ["Grid", state.grid, state.setGrid],
-      ["Spacing", state.spacing, state.setSpacing],
-      ["Page breaks", state.pageBreaks, state.setPageBreaks],
       ...(state.historicalEditingAvailable
         ? [["Edit", state.historicalEditingEnabled, state.setHistoricalEditingEnabled] as const]
         : []),
@@ -211,52 +192,80 @@ export function DevToolsToolbar() {
     [state],
   );
 
-  useEffect(() => {
-    if (!state.spacing) return;
-
-    function onMouseMove(event: MouseEvent) {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const style = window.getComputedStyle(target);
-      const padding = [
-        style.paddingTop,
-        style.paddingRight,
-        style.paddingBottom,
-        style.paddingLeft,
-      ].map(formatSpacingValue);
-      const margin = [
-        style.marginTop,
-        style.marginRight,
-        style.marginBottom,
-        style.marginLeft,
-      ].map(formatSpacingValue);
-      const tooltip = document.querySelector<HTMLElement>("[data-dev-spacing-tooltip]");
-      if (!tooltip) return;
-      tooltip.textContent = `p ${padding.join(" ")} | m ${margin.join(" ")}`;
-      tooltip.style.left = `${event.clientX}px`;
-      tooltip.style.top = `${event.clientY}px`;
-    }
-
-    document.addEventListener("mousemove", onMouseMove);
-    return () => document.removeEventListener("mousemove", onMouseMove);
-  }, [state.spacing]);
-
   if (!showToolbar) return null;
 
   return (
     <>
-      <div className="fixed bottom-4 right-4 z-[10000] w-64 rounded-xl border border-white/10 bg-black/70 p-3 text-xs text-white shadow-xl backdrop-blur">
+      <div className="fixed bottom-4 right-4 z-[10000] w-72 rounded-xl border border-white/10 bg-black/70 p-3 text-xs text-white shadow-xl backdrop-blur">
         <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/80">
           Dev only
         </div>
         <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-2 text-[11px] text-white/80">
+          <div className="flex items-center justify-between gap-2">
+            <span>Business date</span>
+            <span className="font-medium text-emerald-300">{state.businessDateValue}</span>
+          </div>
           {state.businessDateActive ? (
-            <div className="flex items-center justify-between gap-2">
-              <span>Business date override</span>
-              <span className="font-medium text-emerald-300">{state.businessDateValue}</span>
+            <form action={clearDevBusinessDateAction} className="mt-2">
+              <input type="hidden" name="return_to" value={pathname} />
+              <button
+                type="submit"
+                className="w-full rounded-md border border-white/15 px-2 py-1.5 text-white"
+              >
+                Reset to today
+              </button>
+            </form>
+          ) : null}
+          <form action={setDevBusinessDateAction} className="mt-2 space-y-2">
+            <input type="hidden" name="return_to" value={pathname} />
+            <label className="block space-y-1">
+              <span className="text-[11px] text-white/70">Change business date</span>
+              <input
+                name="business_date"
+                type="date"
+                defaultValue={state.businessDateValue}
+                className="h-9 w-full rounded-md border border-white/15 bg-black/40 px-2 text-white"
+              />
+            </label>
+            <button
+              type="submit"
+              className="w-full rounded-md bg-white px-2 py-1.5 font-medium text-black"
+            >
+              Set date
+            </button>
+          </form>
+        </div>
+        <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-2 text-[11px] text-white/80">
+          {state.testSessionActive ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span>Test session</span>
+                <span className="font-medium text-emerald-300">Active</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-emerald-300">{state.testSessionMutations} mutations</span>
+              </div>
+              <form action={resetDevTestSessionAction} className="space-y-2">
+                <input type="hidden" name="return_to" value={pathname} />
+                <input type="hidden" name="session_id" value={state.testSessionId} />
+                <button type="submit" className="w-full rounded-md border border-white/15 px-2 py-1.5 text-white">
+                  Reset test session
+                </button>
+              </form>
             </div>
           ) : (
-            <span>No business date override</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span>Test session</span>
+                <span className="font-medium text-white/70">Not active</span>
+              </div>
+              <form action={startDevTestSessionAction}>
+                <input type="hidden" name="return_to" value={pathname} />
+                <button type="submit" className="w-full rounded-md border border-white/15 px-2 py-1.5 text-white">
+                  Start test session
+                </button>
+              </form>
+            </div>
           )}
         </div>
         {items.map(([label, checked, setChecked]) => (
@@ -273,38 +282,7 @@ export function DevToolsToolbar() {
             />
           </label>
         ))}
-        <form action={setDevBusinessDateAction} className="mt-3 space-y-2">
-          <input type="hidden" name="return_to" value={pathname} />
-          <label className="block space-y-1">
-            <span className="text-[11px] text-white/70">Business date</span>
-            <input
-              name="business_date"
-              type="date"
-              defaultValue={state.businessDateValue}
-              className="h-9 w-full rounded-md border border-white/15 bg-black/40 px-2 text-white"
-            />
-          </label>
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              className="flex-1 rounded-md bg-white px-2 py-1.5 font-medium text-black"
-            >
-              Set
-            </button>
-            <button
-              formAction={clearDevBusinessDateAction}
-              type="submit"
-              className="rounded-md border border-white/15 px-2 py-1.5 text-white"
-            >
-              Clear
-            </button>
-          </div>
-        </form>
       </div>
-      <div
-        data-dev-spacing-tooltip
-        className="pointer-events-none fixed z-[10000] rounded-md bg-black/80 px-2 py-1 text-[10px] text-white opacity-0"
-      />
     </>
   );
 }

@@ -1,4 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import {
+  getActiveDevTestSessionId,
+  isRecordCreatedByActiveDevTestSession,
+  recordDevTestMutation,
+} from "@/server/dev-test-session";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 
 type QueryResult<T> = {
@@ -164,7 +169,7 @@ export async function listUnitMeterReadingMonths(): Promise<QueryResult<UnitMete
   if (!buildingResult.data) return { data: [], error: null };
 
   const supabase = await createClient();
-  const { data, error } = await (supabase as any).rpc("tb810_list_meter_reading_months", {
+  const { data, error } = await supabase.rpc("tb810_list_meter_reading_months", {
     p_building_id: buildingResult.data.id,
   });
   if (error) return { data: [], error: error.message };
@@ -233,27 +238,6 @@ async function getPriorReadingForUnit(
     .eq("unit_id", unitId)
     .lt("reading_date", beforeDate)
     .order("reading_date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) return { data: null, error: error.message };
-  return { data, error: null };
-}
-
-async function getCurrentMonthReadingForUnit(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  buildingId: string,
-  utilityTypeId: string,
-  unitId: string,
-  readingDate: string,
-) {
-  const { data, error } = await supabase
-    .from("tb810_meter_readings")
-    .select(READING_SELECT)
-    .eq("building_id", buildingId)
-    .eq("utility_type_id", utilityTypeId)
-    .eq("unit_id", unitId)
-    .eq("reading_date", readingDate)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -596,6 +580,12 @@ export async function createUnitMeterReading(
     .select(READING_SELECT)
     .single();
   if (error) return { data: null as never, error: error.message };
+  await recordDevTestMutation({
+    domain: "water",
+    recordType: "meter_reading",
+    operation: "create",
+    recordIdentity: data.id,
+  });
   return { data, error: null };
 }
 
@@ -628,6 +618,28 @@ export async function updateUnitMeterReading(
   );
   if (validated.error) return { data: null as never, error: validated.error };
   const safe = validated.data!;
+
+  const activeSessionId = await getActiveDevTestSessionId();
+  if (activeSessionId) {
+    const { data: existingRow, error: existingError } = await supabase
+      .from("tb810_meter_readings")
+      .select(READING_SELECT)
+      .eq("id", readingId)
+      .eq("building_id", buildingResult.data.id)
+      .eq("utility_type_id", utilityType.data.id)
+      .maybeSingle();
+    if (existingError) return { data: null as never, error: existingError.message };
+    if (existingRow) {
+      const journalResult = await recordDevTestMutation({
+        domain: "water",
+        recordType: "meter_reading",
+        operation: "update",
+        recordIdentity: readingId,
+        beforeState: existingRow as unknown as Record<string, unknown>,
+      });
+      if (journalResult.error) return { data: null as never, error: journalResult.error };
+    }
+  }
 
   const { data, error } = await supabase
     .from("tb810_meter_readings")
@@ -689,6 +701,18 @@ export async function deleteUnitMeterReading(
 
   if (!reading) {
     return { data: null as never, error: "Meter reading not found." };
+  }
+
+  const activeSessionId = await getActiveDevTestSessionId();
+  if (activeSessionId) {
+    const createdBySession = await isRecordCreatedByActiveDevTestSession({
+      domain: "water",
+      recordType: "meter_reading",
+      recordIdentity: readingId,
+    });
+    if (!createdBySession) {
+      return { data: null as never, error: "Delete is disabled during a DEV test session." };
+    }
   }
 
   const active = getActiveReadingMonth();

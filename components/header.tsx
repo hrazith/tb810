@@ -80,6 +80,9 @@ export function Header({ userEmail, signOutAction }: HeaderProps) {
                 </div>
               </div>
             </div>
+            <Link href="/obligations" className="inline-flex items-center gap-2 transition hover:text-zinc-950">
+              Obligations
+            </Link>
           </nav>
         </div>
 

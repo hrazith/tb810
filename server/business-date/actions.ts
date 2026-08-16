@@ -26,7 +26,10 @@ export async function setDevBusinessDateAction(formData: FormData) {
   }
 
   if (!parsed.success) {
-    cookieStore.delete(getBusinessDateCookieName());
+    cookieStore.set(getBusinessDateCookieName(), "", {
+      path: "/",
+      expires: new Date(0),
+    });
     redirect(returnTo);
   }
 
@@ -42,6 +45,9 @@ export async function setDevBusinessDateAction(formData: FormData) {
 export async function clearDevBusinessDateAction(formData: FormData) {
   const returnTo = returnToValue(formData);
   const cookieStore = await cookies();
-  cookieStore.delete(getBusinessDateCookieName());
+  cookieStore.set(getBusinessDateCookieName(), "", {
+    path: "/",
+    expires: new Date(0),
+  });
   redirect(returnTo);
 }

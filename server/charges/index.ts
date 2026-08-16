@@ -1,4 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import {
+  getActiveDevTestSessionId,
+  isRecordCreatedByActiveDevTestSession,
+  recordDevTestMutation,
+} from "@/server/dev-test-session";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 
 import { currentMonthKey, defaultStartMonthForNewCharge, firstDayOfMonth, isChargeEligibleForMonth, previousMonthKey } from "./month";
@@ -131,6 +136,12 @@ export async function createUnitCharge(input: ChargeInput): Promise<QueryResult<
     .select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
     .single();
   if (error) return { data: null as never, error: error.message };
+  await recordDevTestMutation({
+    domain: "charge",
+    recordType: "charge_series",
+    operation: "create",
+    recordIdentity: data.series_id,
+  });
   return { data, error: null };
 }
 
@@ -144,6 +155,17 @@ export async function changeFutureChargeEconomics(
   const current = chargeResult.data;
   if (current.schedule !== "recurring") {
     return { data: null as never, error: "Only recurring charges can change future economics." };
+  }
+  const activeSessionId = await getActiveDevTestSessionId();
+  if (activeSessionId) {
+    const createdBySession = await isRecordCreatedByActiveDevTestSession({
+      domain: "charge",
+      recordType: "charge_series",
+      recordIdentity: current.series_id,
+    });
+    if (!createdBySession) {
+      return { data: null as never, error: "DEV test sessions only support edits to test-created charges." };
+    }
   }
   const effectiveMonth = input.effective_month;
   const currentMonth = await currentMonthKey();
@@ -190,6 +212,17 @@ export async function stopFutureCharge(
   if (chargeResult.error) return { data: null as never, error: chargeResult.error };
   if (!chargeResult.data) return { data: null as never, error: "Charge not found." };
   const current = chargeResult.data;
+  const activeSessionId = await getActiveDevTestSessionId();
+  if (activeSessionId) {
+    const createdBySession = await isRecordCreatedByActiveDevTestSession({
+      domain: "charge",
+      recordType: "charge_series",
+      recordIdentity: current.series_id,
+    });
+    if (!createdBySession) {
+      return { data: null as never, error: "DEV test sessions only support edits to test-created charges." };
+    }
+  }
   const stopMonth = input.stop_month;
   if (stopMonth <= monthKeyFromDate(current.effective_from_month)) {
     return { data: null as never, error: "Stop month must be after the start month." };

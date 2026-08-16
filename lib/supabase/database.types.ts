@@ -1137,6 +1137,71 @@ export type Database = {
           },
         ]
       }
+      tb810_dev_test_mutations: {
+        Row: {
+          before_state: Json | null
+          created_at: string
+          domain: Database["public"]["Enums"]["tb810_dev_test_domain"]
+          id: string
+          operation: Database["public"]["Enums"]["tb810_dev_test_operation"]
+          record_identity: string
+          record_type: string
+          session_id: string
+        }
+        Insert: {
+          before_state?: Json | null
+          created_at?: string
+          domain: Database["public"]["Enums"]["tb810_dev_test_domain"]
+          id?: string
+          operation: Database["public"]["Enums"]["tb810_dev_test_operation"]
+          record_identity: string
+          record_type: string
+          session_id: string
+        }
+        Update: {
+          before_state?: Json | null
+          created_at?: string
+          domain?: Database["public"]["Enums"]["tb810_dev_test_domain"]
+          id?: string
+          operation?: Database["public"]["Enums"]["tb810_dev_test_operation"]
+          record_identity?: string
+          record_type?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tb810_dev_test_mutations_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "tb810_dev_test_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tb810_dev_test_sessions: {
+        Row: {
+          id: string
+          reset_completed_at: string | null
+          reset_started_at: string | null
+          started_at: string
+          status: Database["public"]["Enums"]["tb810_dev_test_session_status"]
+        }
+        Insert: {
+          id?: string
+          reset_completed_at?: string | null
+          reset_started_at?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["tb810_dev_test_session_status"]
+        }
+        Update: {
+          id?: string
+          reset_completed_at?: string | null
+          reset_started_at?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["tb810_dev_test_session_status"]
+        }
+        Relationships: []
+      }
       tb810_gas_bills: {
         Row: {
           amount: number
@@ -2191,6 +2256,14 @@ export type Database = {
       }
       has_tb810_role: { Args: { role_key: string }; Returns: boolean }
       is_tb810_staff: { Args: never; Returns: boolean }
+      tb810_list_meter_reading_months: {
+        Args: { p_building_id: string }
+        Returns: { reading_month: string | null }[]
+      }
+      tb810_reset_dev_test_session: {
+        Args: { p_session_id: string }
+        Returns: undefined
+      }
       tb810_ensure_unit_account_for_unit: {
         Args: { target_unit_id: string }
         Returns: string
@@ -2288,6 +2361,9 @@ export type Database = {
         | "reconciliation_specialist"
         | "building_staff"
         | "viewer"
+      tb810_dev_test_domain: "water" | "charge"
+      tb810_dev_test_operation: "create" | "update"
+      tb810_dev_test_session_status: "active" | "resetting" | "completed"
       tb810_unit_type_code: "condo" | "parking" | "storage"
       tb810_utility_type_code: "water" | "common_water" | "common_electricity"
       tb810_charge_schedule: "one_off" | "recurring"
@@ -2484,6 +2560,9 @@ export const Constants = {
         "building_staff",
         "viewer",
       ],
+      tb810_dev_test_domain: ["water", "charge"],
+      tb810_dev_test_operation: ["create", "update"],
+      tb810_dev_test_session_status: ["active", "resetting", "completed"],
       tb810_unit_type_code: ["condo", "parking", "storage"],
       tb810_utility_type_code: ["water", "common_water", "common_electricity"],
       tb810_charge_schedule: ["one_off", "recurring"],
