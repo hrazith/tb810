@@ -6,6 +6,7 @@ import {
   getCurrentBillingMonth,
   ownershipTransferSchema,
 } from "./validation";
+import { classifyOwnershipRow } from "./classification";
 import type {
   OwnershipRecord,
   OwnershipTransferDefaults,
@@ -27,25 +28,6 @@ const OWNERSHIP_SELECT =
 
 function mapOwnershipRow(row: OwnershipRecord): OwnershipRecord {
   return row;
-}
-
-function toBillingMonth(dateString: string) {
-  return dateString.slice(0, 7);
-}
-
-function classifyOwnershipRow(
-  row: OwnershipRecord,
-  currentBillingMonth: string,
-): OwnershipWithRelations["ownership_status"] {
-  const startMonth = toBillingMonth(row.start_date);
-  const endMonth = row.end_date ? toBillingMonth(row.end_date) : null;
-
-  if (startMonth > currentBillingMonth) return "scheduled";
-  if (endMonth !== null && endMonth < currentBillingMonth) return "past";
-  if (startMonth <= currentBillingMonth && (endMonth === null || endMonth >= currentBillingMonth)) {
-    return "current";
-  }
-  return "past";
 }
 
 async function getUnitAccountSummary(
@@ -313,6 +295,47 @@ export async function getCurrentUnitsForOwner(
   };
 }
 
+export async function getOwnerUnitsForBillingMonth(
+  ownerId: string,
+  billingMonth: string,
+): Promise<QueryResult<OwnerUnitSummary[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tb810_ownerships")
+    .select(OWNERSHIP_SELECT)
+    .eq("owner_id", ownerId)
+    .order("start_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) return { data: [], error: error.message };
+
+  const rows = (data ?? []) as OwnershipRecord[];
+  const currentRows = rows.filter((row) => classifyOwnershipRow(row, billingMonth) === "current");
+  const unitIds = [...new Set(currentRows.map((row) => row.unit_id))];
+  const { data: unitMap, error: unitError } = await getUnitMap(supabase, unitIds);
+  if (unitError) return { data: [], error: unitError };
+  if (!unitMap) return { data: [], error: null };
+
+  return {
+    data: currentRows
+      .map((row) => {
+        const unit = unitMap.get(row.unit_id);
+        if (!unit) return null;
+        return {
+          unit_id: row.unit_id,
+          unit_number: unit.unit_number,
+          unit_type_code: unit.unit_type_code,
+          unit_type_name: unit.unit_type_name,
+          ownership_start_date: row.start_date,
+          ownership_end_date: row.end_date,
+          ownership_status: "current" as const,
+        };
+      })
+      .filter(Boolean) as OwnerUnitSummary[],
+    error: null,
+  };
+}
+
 export async function getScheduledUnitsForOwner(
   ownerId: string,
 ): Promise<QueryResult<OwnerUnitSummary[]>> {
@@ -440,7 +463,7 @@ export async function getTransferDefaults(
   const currentMonth = getCurrentBillingMonth();
   let minimumEffectiveMonth = currentMonth;
   const currentOwnershipMonth = snapshot.data?.currentOwnership
-    ? toBillingMonth(snapshot.data.currentOwnership.start_date)
+    ? snapshot.data.currentOwnership.start_date.slice(0, 7)
     : null;
 
   if (currentOwnershipMonth) {

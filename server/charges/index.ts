@@ -276,3 +276,39 @@ export async function getUnitChargesForObligationMonth(unitId: string, obligatio
   const total = lineItems.reduce((sum, item) => sum + Number(item.amount), 0);
   return { data: { amount: total.toFixed(2), lineItems }, error: null };
 }
+
+export async function getOwnerDirectChargesForObligationMonth(
+  ownerId: string,
+  obligationMonth: string,
+): Promise<QueryResult<{ amount: string; count: number; lineItems: ChargeLineItem[] }>> {
+  const buildingResult = await getCurrentBuildingId();
+  if (buildingResult.error) return { data: null as never, error: buildingResult.error };
+  const supabase = await createClient();
+  const buildingId = buildingResult.data;
+  if (!buildingId) return { data: null as never, error: "Current building not found." };
+  const { data, error } = await supabase
+    .from("tb810_charges")
+    .select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
+    .eq("building_id", buildingId)
+    .eq("owner_id", ownerId);
+  if (error) return { data: null as never, error: error.message };
+  const lineItems = ((data ?? []) as ChargeRecord[])
+    .filter((row) =>
+      row.unit_id == null &&
+      isChargeEligibleForMonth({
+        schedule: row.schedule,
+        effectiveFromMonth: row.effective_from_month.slice(0, 7),
+        effectiveToMonth: row.effective_to_month ? row.effective_to_month.slice(0, 7) : null,
+        obligationMonth,
+      }),
+    )
+    .map((row) => ({
+      chargeId: row.id,
+      description: row.description,
+      amount: row.amount.toFixed(2),
+      effectiveFromMonth: monthKeyFromDate(row.effective_from_month),
+      effectiveToMonth: row.effective_to_month ? monthKeyFromDate(row.effective_to_month) : null,
+    }));
+  const total = lineItems.reduce((sum, item) => sum + Number(item.amount), 0);
+  return { data: { amount: total.toFixed(2), count: lineItems.length, lineItems }, error: null };
+}
