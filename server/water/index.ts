@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { listUnits } from "@/server/units";
 import { getCurrentBuilding } from "@/server/units";
 import { getCurrentReadingMonthCompleteness } from "@/server/water/unit-meter-readings";
 import { previousMonthKeyFromMonthKey } from "./month-utils";
@@ -1441,6 +1442,192 @@ export async function getWaterChargePreviewsForUnit(
   })();
 
   return { meteredWater, commonWater };
+}
+
+export async function getMonthlyWaterObligationSummary({
+  obligationMonth,
+}: {
+  obligationMonth: string;
+}): Promise<{
+  metered_water: { state: "available" | "blocked"; amount: string | null; reason?: string };
+  common_water: { state: "available" | "blocked"; amount: string | null; reason?: string };
+  eligibleUnitCount: number;
+}> {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) {
+    return {
+      metered_water: { state: "blocked", amount: null, reason: buildingResult.error },
+      common_water: { state: "blocked", amount: null, reason: buildingResult.error },
+      eligibleUnitCount: 0,
+    };
+  }
+  if (!buildingResult.data) {
+    return {
+      metered_water: { state: "blocked", amount: null, reason: "Current building not found." },
+      common_water: { state: "blocked", amount: null, reason: "Current building not found." },
+      eligibleUnitCount: 0,
+    };
+  }
+
+  const sourceReadingMonth = previousMonthKeyFromMonthKey(obligationMonth);
+  if (!sourceReadingMonth) {
+    return {
+      metered_water: { state: "blocked", amount: null, reason: "Obligation month is invalid." },
+      common_water: { state: "blocked", amount: null, reason: "Obligation month is invalid." },
+      eligibleUnitCount: 0,
+    };
+  }
+
+  const supabase = await createClient();
+  const [commonWaterTypeResult, completenessResult, unitsResult] = await Promise.all([
+    getUtilityTypeId(supabase, "common_water"),
+    getCurrentReadingMonthCompleteness(sourceReadingMonth),
+    listUnits(),
+  ]);
+
+  if (commonWaterTypeResult.error) {
+    return {
+      metered_water: { state: "blocked", amount: null, reason: commonWaterTypeResult.error },
+      common_water: { state: "blocked", amount: null, reason: commonWaterTypeResult.error },
+      eligibleUnitCount: 0,
+    };
+  }
+  if (completenessResult.error) {
+    return {
+      metered_water: { state: "blocked", amount: null, reason: completenessResult.error },
+      common_water: { state: "blocked", amount: null, reason: completenessResult.error },
+      eligibleUnitCount: 0,
+    };
+  }
+  if (unitsResult.error) {
+    return {
+      metered_water: { state: "blocked", amount: null, reason: unitsResult.error },
+      common_water: { state: "blocked", amount: null, reason: unitsResult.error },
+      eligibleUnitCount: 0,
+    };
+  }
+
+  const commonWaterType = commonWaterTypeResult.data;
+  const completeness = completenessResult.data;
+  if (!commonWaterType || !completeness) {
+    const reason = "Water lookup data is incomplete.";
+    return {
+      metered_water: { state: "blocked", amount: null, reason },
+      common_water: { state: "blocked", amount: null, reason },
+      eligibleUnitCount: 0,
+    };
+  }
+
+  const eligibleUnits = (unitsResult.data ?? []).filter((unit) => unit.unit_type_code === "condo");
+  const meteredUnits = eligibleUnits.filter((unit) => unit.has_meter);
+  const billResult = await getCommonWaterBillForCycleMonth(
+    supabase,
+    buildingResult.data.id,
+    commonWaterType.id,
+    sourceReadingMonth,
+  );
+  if (billResult.error) {
+    return {
+      metered_water: { state: "blocked", amount: null, reason: billResult.error },
+      common_water: { state: "blocked", amount: null, reason: billResult.error },
+      eligibleUnitCount: eligibleUnits.length,
+    };
+  }
+  if (!billResult.data) {
+    const reason = "Sedapal water bill has not been entered yet.";
+    return {
+      metered_water: { state: "blocked", amount: null, reason },
+      common_water: { state: "blocked", amount: null, reason },
+      eligibleUnitCount: eligibleUnits.length,
+    };
+  }
+
+  const amountCents = parseMoneyCents(billResult.data.amount);
+  const totalConsumptionMilli = parseMilliUnits(billResult.data.total_consumption);
+  if (amountCents === null || totalConsumptionMilli === null || totalConsumptionMilli <= BigInt(0)) {
+    const reason = "Sedapal bill total consumption is invalid.";
+    return {
+      metered_water: { state: "blocked", amount: null, reason },
+      common_water: { state: "blocked", amount: null, reason },
+      eligibleUnitCount: eligibleUnits.length,
+    };
+  }
+
+  const { data: readings, error: readingsError } = await supabase
+    .from("tb810_meter_readings")
+    .select("unit_id, consumption")
+    .eq("building_id", buildingResult.data.id)
+    .eq("utility_type_id", commonWaterType.id)
+    .eq("reading_month", monthKeyToDate(sourceReadingMonth));
+  if (readingsError) {
+    return {
+      metered_water: { state: "blocked", amount: null, reason: readingsError.message },
+      common_water: { state: "blocked", amount: null, reason: readingsError.message },
+      eligibleUnitCount: eligibleUnits.length,
+    };
+  }
+
+  const readingsByUnit = new Map<string, number | null>();
+  for (const row of readings ?? []) {
+    if (!readingsByUnit.has(row.unit_id)) {
+      readingsByUnit.set(row.unit_id, row.consumption);
+    }
+  }
+
+  let meteredTotalCents = BigInt(0);
+  for (const unit of meteredUnits) {
+    const consumption = readingsByUnit.get(unit.id);
+    if (consumption === undefined || consumption === null) {
+      const reason = `Cannot be calculated because ${completeness.monthLabel} meter readings are incomplete.`;
+      return {
+        metered_water: { state: "blocked", amount: null, reason },
+        common_water: { state: "blocked", amount: null, reason },
+        eligibleUnitCount: eligibleUnits.length,
+      };
+    }
+    const consumptionMilli = parseMilliUnits(consumption);
+    if (consumptionMilli === null) {
+      const reason = `${completeness.monthLabel} meter reading is incomplete.`;
+      return {
+        metered_water: { state: "blocked", amount: null, reason },
+        common_water: { state: "blocked", amount: null, reason },
+        eligibleUnitCount: eligibleUnits.length,
+      };
+    }
+    const chargeCents =
+      (amountCents * consumptionMilli + totalConsumptionMilli / BigInt(2)) /
+      totalConsumptionMilli;
+    meteredTotalCents += chargeCents;
+  }
+
+  const commonWaterPoolCents = amountCents - meteredTotalCents;
+  if (commonWaterPoolCents < BigInt(0)) {
+    const reason = "Common Water pool would be negative.";
+    return {
+      metered_water: { state: "blocked", amount: null, reason },
+      common_water: { state: "blocked", amount: null, reason },
+      eligibleUnitCount: eligibleUnits.length,
+    };
+  }
+
+  const unitCount = BigInt(eligibleUnits.length);
+  if (unitCount <= BigInt(0)) {
+    const reason = "No eligible residential units are available.";
+    return {
+      metered_water: { state: "blocked", amount: null, reason },
+      common_water: { state: "blocked", amount: null, reason },
+      eligibleUnitCount: 0,
+    };
+  }
+
+  return {
+    metered_water: { state: "available", amount: formatDecimal(meteredTotalCents, 2) },
+    common_water: {
+      state: "available",
+      amount: formatDecimal(roundToNearestInteger(commonWaterPoolCents, unitCount), 2),
+    },
+    eligibleUnitCount: eligibleUnits.length,
+  };
 }
 
 export async function getAugust2026WaterChargePreviewsForUnit(unitId: string) {

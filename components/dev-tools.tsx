@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore, useState, type ReactNode } from "react";
 
 import { clearDevBusinessDateAction, setDevBusinessDateAction } from "@/server/business-date/actions";
 import { resetDevTestSessionAction, startDevTestSessionAction } from "@/server/dev-test-session/actions";
@@ -181,6 +181,15 @@ export function DevToolsToolbar() {
   const state = useDevTools();
   const pathname = usePathname();
   const showToolbar = process.env.NODE_ENV === "development";
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startLeft: number;
+    startTop: number;
+  } | null>(null);
+  const [position, setPosition] = useState({ left: 0, top: 0 });
 
   const items = useMemo(
     () => [
@@ -194,12 +203,58 @@ export function DevToolsToolbar() {
 
   if (!showToolbar) return null;
 
+  const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+    const rect = toolbar.getBoundingClientRect();
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: rect.left,
+      startTop: rect.top,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const dragState = dragStateRef.current;
+    const toolbar = toolbarRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId || !toolbar) return;
+
+    const width = toolbar.offsetWidth;
+    const height = toolbar.offsetHeight;
+    const nextLeft = Math.max(12, Math.min(window.innerWidth - width - 12, dragState.startLeft + (event.clientX - dragState.startX)));
+    const nextTop = Math.max(12, Math.min(window.innerHeight - height - 12, dragState.startTop + (event.clientY - dragState.startY)));
+    setPosition({ left: nextLeft, top: nextTop });
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (dragStateRef.current?.pointerId === event.pointerId) {
+      dragStateRef.current = null;
+    }
+  };
+
   return (
     <>
-      <div className="fixed bottom-4 right-4 z-[10000] w-72 rounded-xl border border-white/10 bg-black/70 p-3 text-xs text-white shadow-xl backdrop-blur">
-        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/80">
-          Dev only
-        </div>
+      <div
+        ref={toolbarRef}
+        className="fixed z-[10000] w-72 rounded-xl border border-white/10 bg-black/70 p-3 text-xs text-white shadow-xl backdrop-blur"
+        style={{ left: position.left, top: position.top }}
+      >
+        <button
+          type="button"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className="mb-2 flex w-full cursor-grab items-center justify-between rounded-lg px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/80 active:cursor-grabbing"
+          aria-label="Drag DEV toolbar"
+          title="Drag to move"
+        >
+          <span>Dev only</span>
+          <span className="text-[10px] font-normal text-white/50">Drag</span>
+        </button>
         <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-2 text-[11px] text-white/80">
           <div className="flex items-center justify-between gap-2">
             <span>Business date</span>

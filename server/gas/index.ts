@@ -369,4 +369,4 @@ export async function importGasWorkbook(file: File, confirmed = false): Promise<
   return { data: { importedBillCount, importedReadingCount }, error: null, imported: true, review };
 }
 
-export { getGasChargePreviewsForUnit } from "./provider";
+export { getGasChargePreviewsForUnit, getMonthlyGasObligationSummary } from "./provider";

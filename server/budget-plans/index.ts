@@ -80,6 +80,84 @@ function calculateFixedMonthlyAssessment(
   return formatMoney(roundedCents);
 }
 
+export function calculateFixedMonthlyAssessmentAmount(
+  monthlyOperatingBudget: string,
+  assessmentPercentage: number,
+) {
+  return calculateFixedMonthlyAssessment(monthlyOperatingBudget, assessmentPercentage);
+}
+
+export async function getMonthlyFixedAssessmentSummary({
+  obligationMonth,
+}: {
+  obligationMonth: string;
+}) {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: null, error: buildingResult.error };
+  if (!buildingResult.data) return { data: null, error: "Current building not found." };
+
+  const planYear = Number(obligationMonth.slice(0, 4));
+  if (!Number.isFinite(planYear)) {
+    return { data: null, error: `Invalid obligation month: ${obligationMonth}.` };
+  }
+
+  const supabase = await createClient();
+  const [{ data: plan, error: planError }, { data: units, error: unitsError }] = await Promise.all([
+    supabase
+      .from("tb810_budget_plans")
+      .select(BUDGET_PLAN_SELECT)
+      .eq("building_id", buildingResult.data.id)
+      .eq("plan_year", planYear)
+      .maybeSingle(),
+    supabase
+      .from("tb810_units")
+      .select(UNIT_SELECT)
+      .eq("building_id", buildingResult.data.id),
+  ]);
+
+  if (planError) return { data: null, error: planError.message };
+  if (unitsError) return { data: null, error: unitsError.message };
+  if (!plan) {
+    return {
+      data: {
+        state: "blocked" as const,
+        amount: null,
+        reason: `Fixed Monthly Assessment is unavailable because the ${planYear} Budget Plan has not been entered.`,
+      },
+      error: null,
+    };
+  }
+
+  const eligibleUnits = (units ?? []).filter((unit) => unit.participation_percentage !== null && unit.participation_percentage !== undefined);
+  let totalCents = BigInt(0);
+  for (const unit of eligibleUnits) {
+    const amount = calculateFixedMonthlyAssessment(
+      String(plan.monthly_operating_budget),
+      unit.participation_percentage,
+    );
+    if (!amount) {
+      return {
+        data: {
+          state: "blocked" as const,
+          amount: null,
+          reason: "Fixed Monthly Assessment is unavailable because a Unit has an invalid Assessment Percentage.",
+        },
+        error: null,
+      };
+    }
+    const [whole, fraction = ""] = amount.split(".");
+    totalCents += BigInt(`${whole}${fraction.padEnd(2, "0")}`);
+  }
+
+  return {
+    data: {
+      state: "available" as const,
+      amount: `${totalCents / BigInt(100)}.${(totalCents % BigInt(100)).toString().padStart(2, "0")}`,
+    },
+    error: null,
+  };
+}
+
 export async function getBudgetPlanByYear(
   planYear: number,
 ): Promise<QueryResult<BudgetPlanRecord | null>> {

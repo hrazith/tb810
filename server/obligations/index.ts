@@ -1,9 +1,15 @@
-import { getUnitFixedMonthlyAssessment } from "../budget-plans";
+import { createClient } from "@/lib/supabase/server";
+import { getMonthlyFixedAssessmentSummary, getUnitFixedMonthlyAssessment } from "../budget-plans";
 import { getCurrentBuilding, getUnitById, listUnits } from "../units";
-import { getGasChargePreviewsForUnit } from "../gas";
-import { getWaterChargePreviewsForUnit } from "../water";
+import { getMonthlyGasObligationSummary, getGasChargePreviewsForUnit } from "../gas";
+import { getMonthlyWaterObligationSummary, getWaterChargePreviewsForUnit } from "../water";
 import { getUnitChargesForObligationMonth } from "../charges";
+import { isChargeEligibleForMonth } from "../charges/month";
 import { composeMonthlyObligation, type ProviderMap } from "./core";
+import {
+  buildMonthlyObligationSummary,
+  type MonthlyObligationSummaryComponent,
+} from "./summary";
 
 function createMonthlyObligationProviders(): ProviderMap {
   const providers: ProviderMap = {
@@ -201,6 +207,73 @@ export async function getUnitMonthlyObligation({
   );
 
   return { data: composed, error: null };
+}
+
+export async function getMonthlyObligationSummary({ obligationMonth }: { obligationMonth: string }) {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: null as never, error: buildingResult.error };
+  if (!buildingResult.data) return { data: null as never, error: "Current building not found." };
+
+  const unitsResult = await listUnits();
+  if (unitsResult.error) return { data: null as never, error: unitsResult.error };
+
+  const eligibleUnits = unitsResult.data.filter((unit) => unit.unit_type_code === "condo");
+  const [fixedResult, waterResult, gasResult] = await Promise.all([
+    getMonthlyFixedAssessmentSummary({ obligationMonth }),
+    getMonthlyWaterObligationSummary({ obligationMonth }),
+    getMonthlyGasObligationSummary({ obligationMonth }),
+  ]);
+
+  if (fixedResult.error) return { data: null as never, error: fixedResult.error };
+  if (waterResult.metered_water.state === "blocked" && !waterResult.common_water.reason) {
+    return { data: null as never, error: waterResult.metered_water.reason ?? "Water summary unavailable." };
+  }
+  if (gasResult.state === "blocked" && !gasResult.reason) {
+    return { data: null as never, error: gasResult.reason ?? "Gas summary unavailable." };
+  }
+
+  const supabase = await createClient();
+  const { data: charges, error: chargesError } = await supabase
+    .from("tb810_charges")
+    .select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
+    .eq("building_id", buildingResult.data.id);
+  if (chargesError) return { data: null as never, error: chargesError.message };
+
+  const applicableCharges = (charges ?? []).filter((row) => {
+    if (row.owner_id != null || row.unit_id == null) return false;
+    if (!eligibleUnits.some((unit) => unit.id === row.unit_id)) return false;
+    const effectiveFromMonth = row.effective_from_month.slice(0, 7);
+    const effectiveToMonth = row.effective_to_month ? row.effective_to_month.slice(0, 7) : null;
+    return isChargeEligibleForMonth({
+      schedule: row.schedule,
+      effectiveFromMonth,
+      effectiveToMonth,
+      obligationMonth,
+    });
+  });
+
+  const otherChargeAmount = applicableCharges.reduce((total, row) => total + Number(row.amount), 0);
+
+  const fixedAssessmentComponent: MonthlyObligationSummaryComponent =
+    fixedResult.data ?? {
+      state: "blocked",
+      amount: null,
+      reason: fixedResult.error ?? "Fixed Monthly Assessment is unavailable.",
+    };
+
+  return {
+    data: buildMonthlyObligationSummary({
+      obligationMonth,
+      eligibleUnitCount: eligibleUnits.length,
+      fixedAssessment: fixedAssessmentComponent,
+      meteredWater: waterResult.metered_water,
+      commonWater: waterResult.common_water,
+      gas: gasResult,
+      otherChargeAmount: otherChargeAmount.toFixed(2),
+      otherChargeCount: applicableCharges.length,
+    }),
+    error: null,
+  };
 }
 
 export type {

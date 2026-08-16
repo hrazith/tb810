@@ -9,7 +9,7 @@ import {
   stopFutureChargeAction,
 } from "@/server/charges/actions";
 import { currentMonthKey, monthLabel, nextMonthKey } from "@/server/charges/month";
-import { getUnitMonthlyObligation } from "@/server/obligations";
+import { getMonthlyObligationSummary, getUnitMonthlyObligation } from "@/server/obligations";
 import { getUnitOwnershipSnapshot } from "@/server/ownerships";
 import { listUnits } from "@/server/units";
 import { createClient } from "@/lib/supabase/server";
@@ -70,6 +70,9 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
     : null;
   if (selectedObligation?.error) throw new Error(selectedObligation.error);
 
+  const monthlySummary = selectedUnit ? null : await getMonthlyObligationSummary({ obligationMonth: monthKey });
+  if (monthlySummary?.error) throw new Error(monthlySummary.error);
+
   const selectedSnapshot = selectedUnit ? await getUnitOwnershipSnapshot(selectedUnit.id) : null;
   if (selectedSnapshot?.error) throw new Error(selectedSnapshot.error);
 
@@ -108,7 +111,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
 
       <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)] ">
         <Panel className="space-y-6 ">
-          <div className="rounded-[28px] bg-zinc-100 p-1">
+              <div className="rounded-[28px] bg-zinc-100 p-1">
             <div className="grid grid-cols-2 gap-1">
               <div className="rounded-2xl bg-zinc-950 px-6 py-4 text-center text-xl font-semibold text-white shadow-sm ring-2 ring-sky-500">
                 Units
@@ -177,6 +180,66 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                   <div className="mt-2 text-sm text-zinc-600">
                     {eligibleUnits.length} obligation-eligible Units
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
+                  <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+                    Monthly obligations
+                  </div>
+                  <div className="space-y-3 text-sm text-zinc-600">
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Fixed assessments</span>
+                      <span>{monthlySummary?.data?.components.fixed_assessment.amount ? `S/ ${monthlySummary.data.components.fixed_assessment.amount}` : "S/ —"}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Metered water</span>
+                      <span>{monthlySummary?.data?.components.metered_water.amount ? `S/ ${monthlySummary.data.components.metered_water.amount}` : "S/ —"}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Common water</span>
+                      <span>{monthlySummary?.data?.components.common_water.amount ? `S/ ${monthlySummary.data.components.common_water.amount}` : "S/ —"}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Gas</span>
+                      <span>{monthlySummary?.data?.components.gas.amount ? `S/ ${monthlySummary.data.components.gas.amount}` : "S/ —"}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Other charges</span>
+                      <span>{monthlySummary?.data?.components.other_charge.amount ? `S/ ${monthlySummary.data.components.other_charge.amount}` : "S/ —"}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 border-t border-zinc-200 pt-3 text-zinc-950">
+                      <span className="font-medium">Total</span>
+                      <span>{monthlySummary?.data?.total ? `S/ ${monthlySummary.data.total}` : "S/ —"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
+                  <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+                    Invoices
+                  </div>
+                  <div className="text-sm text-zinc-600">Coming soon</div>
+                  <div className="mt-4">
+                    <Button type="button" variant="secondary" size="sm" disabled>
+                      Download all
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
+                  <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+                    Other charges
+                  </div>
+                  {monthlySummary?.data?.components.other_charge.amount ? (
+                    <div className="flex items-center justify-between gap-4 text-sm text-zinc-600">
+                      <span>{monthlySummary.data.components.other_charge.count} charges</span>
+                      <span>S/ {monthlySummary.data.components.other_charge.amount}</span>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-zinc-600">—</div>
+                  )}
                 </div>
               </div>
 

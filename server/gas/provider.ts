@@ -168,3 +168,76 @@ export async function getGasChargePreviewsForUnit(
     },
   };
 }
+
+export async function getMonthlyGasObligationSummary({
+  obligationMonth,
+}: {
+  obligationMonth: string;
+}): Promise<{
+  state: "available" | "blocked";
+  amount: string | null;
+  reason?: string;
+}> {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { state: "blocked", amount: null, reason: buildingResult.error };
+  if (!buildingResult.data) return { state: "blocked", amount: null, reason: "Current building not found." };
+
+  const sourceReadingMonth = previousMonthKeyFromMonthKey(obligationMonth);
+  if (!sourceReadingMonth) return { state: "blocked", amount: null, reason: "Gas lookup data is incomplete." };
+
+  const supabase = await createClient();
+  const [unitsResult, billResult, readingResult] = await Promise.all([
+    listUnits(),
+    supabase
+      .from("tb810_gas_bills")
+      .select("id, amount, processed_at, invoice_date")
+      .eq("building_id", buildingResult.data.id)
+      .order("invoice_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    listGasReadingsForMonth(supabase, buildingResult.data.id, sourceReadingMonth),
+  ]);
+
+  if (unitsResult.error) return { state: "blocked", amount: null, reason: unitsResult.error };
+  if (billResult.error) return { state: "blocked", amount: null, reason: billResult.error.message };
+  if (readingResult.error) return { state: "blocked", amount: null, reason: readingResult.error };
+
+  const gasUnits = (unitsResult.data ?? []).filter((item) => item.unit_type_code === "condo" && item.has_gas_service);
+  const gasBillsForMonth = (billResult.data ?? []).filter((bill) => isEligibleGasBill(bill.invoice_date, bill.processed_at, obligationMonth));
+
+  const readingsForMonth = new Map<string, { consumption: number | null }>();
+  for (const row of readingResult.data ?? []) {
+    if (row.reading_month.slice(0, 7) !== sourceReadingMonth) continue;
+    if (!readingsForMonth.has(row.unit_id)) {
+      readingsForMonth.set(row.unit_id, { consumption: row.consumption });
+    }
+  }
+
+  const chargesInput = {
+    sourceReadingMonth,
+    obligationMonth: nextMonthLabel(sourceReadingMonth)?.slice(0, 7) ?? sourceReadingMonth,
+    supplierBills: gasBillsForMonth.map((bill) => ({
+      billId: bill.id,
+      amount: String(bill.amount),
+      status: bill.processed_at ? ("processed" as const) : ("unprocessed" as const),
+    })),
+    units: gasUnits.map((gasUnit) => {
+      const reading = readingsForMonth.get(gasUnit.id);
+      return {
+        unitId: gasUnit.id,
+        unitNumber: gasUnit.unit_number,
+        unitTypeCode: gasUnit.unit_type_code,
+        hasGasService: Boolean(gasUnit.has_gas_service),
+        readingMonth: sourceReadingMonth,
+        consumption: reading?.consumption == null ? null : String(reading.consumption),
+      };
+    }),
+  };
+
+  const calculation = calculateGasCharges(chargesInput);
+  if (calculation.blockers.length > 0) {
+    return { state: "blocked", amount: null, reason: calculation.blockers.join(" ") };
+  }
+
+  const amount = calculation.unitCharges.reduce((total, item) => total + Number(item.amount), 0).toFixed(2);
+  return { state: "available", amount };
+}
