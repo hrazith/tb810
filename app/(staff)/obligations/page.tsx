@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
 import { createClient } from "@/lib/supabase/server";
 import {
+  createOwnerDirectChargeAction,
   createUnitChargeAction,
   deleteFutureChargeAction,
   editFutureChargeAction,
@@ -431,6 +432,76 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                               {charge.stop_note ? (
                                 <div className="mt-1 text-sm text-zinc-500">{charge.stop_note}</div>
                               ) : null}
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <details className="group">
+                                  <summary className="cursor-pointer rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 hover:border-zinc-400">
+                                    Edit
+                                  </summary>
+                                  <div className="mt-3 w-[min(32rem,80vw)] rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                                    <form action={editFutureChargeAction} className="space-y-3">
+                                      <input type="hidden" name="return_to" value={`/obligations?mode=owners&ownerId=${selectedOwner.id}`} />
+                                      <input type="hidden" name="charge_id" value={charge.id} />
+                                      <label className="block space-y-2">
+                                        <span className="text-sm font-medium text-zinc-700">Description</span>
+                                        <Input name="description" defaultValue={charge.description} />
+                                      </label>
+                                      <label className="block space-y-2">
+                                        <span className="text-sm font-medium text-zinc-700">Amount</span>
+                                        <Input name="amount" type="number" step="0.01" defaultValue={charge.amount} />
+                                      </label>
+                                      <label className="block space-y-2">
+                                        <span className="text-sm font-medium text-zinc-700">Schedule</span>
+                                        <select
+                                          name="schedule"
+                                          defaultValue={charge.schedule}
+                                          className="h-12 w-full rounded-xl border border-zinc-300 bg-white px-4 text-sm"
+                                        >
+                                          <option value="one_off">One-off</option>
+                                          <option value="recurring">Recurring</option>
+                                        </select>
+                                      </label>
+                                      <label className="block space-y-2">
+                                        <span className="text-sm font-medium text-zinc-700">Starts</span>
+                                        <Input
+                                          name="starts_month"
+                                          type="month"
+                                          min={nextMonthKey(monthKey) ?? monthKey}
+                                          defaultValue={charge.effective_from_month.slice(0, 7)}
+                                        />
+                                      </label>
+                                      <label className="block space-y-2">
+                                        <span className="text-sm font-medium text-zinc-700">Ends</span>
+                                        <Input
+                                          name="ends_month"
+                                          type="month"
+                                          min={nextMonthKey(monthKey) ?? monthKey}
+                                          defaultValue={charge.effective_to_month?.slice(0, 7) ?? ""}
+                                        />
+                                      </label>
+                                      <Button type="submit" variant="primary" className="w-full">
+                                        Save Changes
+                                      </Button>
+                                    </form>
+                                  </div>
+                                </details>
+                                <details className="group">
+                                  <summary className="cursor-pointer rounded-full border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 hover:border-red-400">
+                                    Delete
+                                  </summary>
+                                  <div className="mt-3 w-[min(24rem,80vw)] rounded-2xl border border-red-200 bg-red-50 p-4">
+                                    <div className="text-sm text-red-900">
+                                      This will permanently delete this future charge series before it takes effect.
+                                    </div>
+                                    <form action={deleteFutureChargeAction} className="mt-3 space-y-3">
+                                      <input type="hidden" name="return_to" value={`/obligations?mode=owners&ownerId=${selectedOwner.id}`} />
+                                      <input type="hidden" name="charge_id" value={charge.id} />
+                                      <Button type="submit" variant="destructive" className="w-full">
+                                        Confirm Delete
+                                      </Button>
+                                    </form>
+                                  </div>
+                                </details>
+                              </div>
                             </div>
                             <div className="text-right">
                               <div className="text-lg font-semibold text-zinc-950">{formatMoney(charge.amount)}</div>
@@ -444,6 +515,59 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                     <div className="text-sm text-zinc-600">No upcoming owner-direct charges.</div>
                   )}
                 </div>
+
+                <details className="group rounded-[24px] border border-zinc-200 bg-white px-5 py-4 md:col-span-2">
+                  <summary className="cursor-pointer list-none text-sm font-medium text-zinc-950">
+                    + Add owner-direct charge
+                  </summary>
+                  <div className="mt-5 border-t border-zinc-200 pt-5">
+                    <form action={createOwnerDirectChargeAction} className="space-y-4">
+                      <input type="hidden" name="return_to" value={`/obligations?mode=owners&ownerId=${selectedOwner.id}`} />
+                      <label className="block space-y-2">
+                        <span className="text-sm font-medium text-zinc-700">Charge to</span>
+                        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-950">
+                          {selectedOwner.full_name}
+                        </div>
+                        <input type="hidden" name="owner_id" value={selectedOwner.id} />
+                      </label>
+                      <label className="block space-y-2">
+                        <span className="text-sm font-medium text-zinc-700">Description</span>
+                        <Input name="description" placeholder="Owner charge description" />
+                      </label>
+                      <label className="block space-y-2">
+                        <span className="text-sm font-medium text-zinc-700">Amount</span>
+                        <Input name="amount" type="number" step="0.01" placeholder="100.00" />
+                      </label>
+                      <label className="block space-y-2">
+                        <span className="text-sm font-medium text-zinc-700">Schedule</span>
+                        <select
+                          name="schedule"
+                          defaultValue="one_off"
+                          className="h-12 w-full rounded-xl border border-zinc-300 bg-white px-4 text-sm"
+                        >
+                          <option value="one_off">One-off</option>
+                          <option value="recurring">Recurring</option>
+                        </select>
+                      </label>
+                      <label className="block space-y-2">
+                        <span className="text-sm font-medium text-zinc-700">Starts</span>
+                        <Input
+                          name="starts_month"
+                          type="month"
+                          min={nextMonthKey(monthKey) ?? monthKey}
+                          defaultValue={nextMonthKey(monthKey) ?? monthKey}
+                        />
+                      </label>
+                      <label className="block space-y-2">
+                        <span className="text-sm font-medium text-zinc-700">Ends</span>
+                        <Input name="ends_month" type="month" min={nextMonthKey(monthKey) ?? monthKey} />
+                      </label>
+                      <Button type="submit" variant="primary" className="w-full">
+                        Save Charge
+                      </Button>
+                    </form>
+                  </div>
+                </details>
 
                 <div className="rounded-[24px] border border-zinc-200 bg-white p-5">
                   <div className="text-sm font-medium uppercase tracking-wide text-zinc-500">Consolidated owner</div>

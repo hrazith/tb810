@@ -3,13 +3,21 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { createUnitCharge, deleteFutureCharge, editFutureCharge, changeFutureChargeEconomics, stopFutureCharge } from "./index";
+import {
+  createOwnerDirectCharge,
+  createUnitCharge,
+  deleteFutureCharge,
+  editFutureCharge,
+  changeFutureChargeEconomics,
+  stopFutureCharge,
+} from "./index";
 import {
   chargeEconomicsSchema,
   chargeInputSchema,
   chargeStopSchema,
   futureChargeDeleteSchema,
   futureChargeEditSchema,
+  ownerChargeInputSchema,
 } from "./validation";
 
 function redirectWithError(returnTo: string, message: string) {
@@ -51,6 +59,25 @@ export async function createUnitChargeAction(formData: FormData): Promise<void> 
     return;
   }
   const result = await createUnitCharge(parsed.data);
+  if (result.error) redirectWithError(returnTo, result.error);
+  redirectBack(returnTo);
+}
+
+export async function createOwnerDirectChargeAction(formData: FormData): Promise<void> {
+  const returnTo = pickString(formData, "return_to") || "/obligations";
+  const parsed = ownerChargeInputSchema.safeParse({
+    owner_id: pickString(formData, "owner_id"),
+    description: pickString(formData, "description"),
+    amount: parseNumber(formData.get("amount")),
+    schedule: pickString(formData, "schedule"),
+    starts_month: pickString(formData, "starts_month"),
+    ends_month: pickString(formData, "ends_month"),
+  });
+  if (!parsed.success) {
+    redirectWithError(returnTo, validationError(parsed.error));
+    return;
+  }
+  const result = await createOwnerDirectCharge(parsed.data);
   if (result.error) redirectWithError(returnTo, result.error);
   redirectBack(returnTo);
 }

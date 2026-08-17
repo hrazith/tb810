@@ -5,6 +5,8 @@ import {
   recordDevTestMutation,
 } from "@/server/dev-test-session";
 import { getCurrentBuilding, listUnits } from "@/server/units";
+import { getOwnerById } from "@/server/owners";
+import { getOwnerUnitsForBillingMonth } from "@/server/ownerships";
 
 import {
   currentMonthKey,
@@ -17,6 +19,10 @@ import {
 import type { ChargeInput, ChargeLineItem, ChargeRecord, ChargeSummary } from "./types";
 
 type QueryResult<T> = { data: T; error: string | null };
+
+type ChargeLifecycleValidationResult =
+  | { error: string; effectiveFromMonth?: never; effectiveToMonth?: never }
+  | { error: null; effectiveFromMonth: string; effectiveToMonth: string | null };
 
 function monthKeyFromDate(date: string) {
   return date.slice(0, 7);
@@ -86,7 +92,7 @@ export function validateFutureChargeInput(input: {
   starts_month: string;
   ends_month?: string | null;
   currentMonth: string;
-}) {
+}): ChargeLifecycleValidationResult {
   const defaultStartMonth = defaultStartMonthForNewCharge(input.currentMonth);
   if (input.starts_month < defaultStartMonth) {
     return { error: `Start month cannot be before ${defaultStartMonth}.` };
@@ -102,7 +108,7 @@ export function validateFutureChargeInput(input: {
   const effectiveToMonth = input.ends_month ? firstDayOfMonth(input.ends_month) : null;
   if (input.ends_month && !effectiveToMonth) return { error: "Invalid end month." };
   return {
-    error: null as string | null,
+    error: null,
     effectiveFromMonth,
     effectiveToMonth,
   };
@@ -114,6 +120,33 @@ export function canStopCharge(charge: ChargeRecord) {
 
 export function canDeleteFutureChargeSeries(seriesRows: ChargeRecord[], currentMonth: string) {
   return seriesRows.length > 0 && seriesRows.every((row) => isFutureEffectiveCharge(row, currentMonth));
+}
+
+export function validateChargeLifecycleInput(input: {
+  schedule: "one_off" | "recurring";
+  starts_month: string;
+  ends_month?: string | null;
+  currentMonth: string;
+}): ChargeLifecycleValidationResult {
+  const defaultStartMonth = defaultStartMonthForNewCharge(input.currentMonth);
+  if (input.starts_month < defaultStartMonth) {
+    return { error: `Start month cannot be before ${defaultStartMonth}.` };
+  }
+  if (input.schedule === "one_off" && input.ends_month) {
+    return { error: "One-off charges cannot have an end month." };
+  }
+  if (input.schedule === "recurring" && input.ends_month && input.ends_month < input.starts_month) {
+    return { error: "End month cannot be before the start month." };
+  }
+  const effectiveFromMonth = firstDayOfMonth(input.starts_month);
+  if (!effectiveFromMonth) return { error: "Invalid start month." };
+  const effectiveToMonth = input.ends_month ? firstDayOfMonth(input.ends_month) : null;
+  if (input.ends_month && !effectiveToMonth) return { error: "Invalid end month." };
+  return {
+    error: null,
+    effectiveFromMonth,
+    effectiveToMonth,
+  };
 }
 
 export async function editFutureCharge(
@@ -256,38 +289,74 @@ export async function getCharge(chargeId: string): Promise<QueryResult<ChargeRec
 }
 
 export async function createUnitCharge(input: ChargeInput): Promise<QueryResult<ChargeRecord>> {
+  return createTargetCharge({
+    unitId: input.unit_id,
+    description: input.description,
+    amount: input.amount,
+    schedule: input.schedule,
+    starts_month: input.starts_month,
+    ends_month: input.ends_month,
+  });
+}
+
+async function createTargetCharge(input: {
+  unitId?: string;
+  ownerId?: string;
+  description: string;
+  amount: number;
+  schedule: "one_off" | "recurring";
+  starts_month: string;
+  ends_month?: string | null;
+}): Promise<QueryResult<ChargeRecord>> {
   const buildingResult = await getCurrentBuildingId();
   if (buildingResult.error) return { data: null as never, error: buildingResult.error };
   const supabase = await createClient();
-  const unitResult = await supabase.from("tb810_units").select("id").eq("id", input.unit_id).maybeSingle();
-  if (unitResult.error) return { data: null as never, error: unitResult.error.message };
-  if (!unitResult.data) return { data: null as never, error: "Unit not found." };
-
-  const startMonth = input.starts_month;
-  const currentMonth = await currentMonthKey();
-  const defaultStartMonth = defaultStartMonthForNewCharge(currentMonth);
-  if (startMonth < defaultStartMonth) {
-    return { data: null as never, error: `Start month cannot be before ${defaultStartMonth}.` };
-  }
-  if (input.schedule === "one_off" && input.ends_month) {
-    return { data: null as never, error: "One-off charges cannot have an end month." };
-  }
-  if (input.schedule === "recurring" && input.ends_month && input.ends_month < startMonth) {
-    return { data: null as never, error: "End month cannot be before the start month." };
-  }
-  const effectiveFromMonth = firstDayOfMonth(startMonth);
-  if (!effectiveFromMonth) return { data: null as never, error: "Invalid start month." };
-  const effectiveToMonth = input.ends_month ? firstDayOfMonth(input.ends_month) : null;
-  if (input.ends_month && !effectiveToMonth) return { data: null as never, error: "Invalid end month." };
   const buildingId = buildingResult.data;
   if (!buildingId) return { data: null as never, error: "Current building not found." };
 
+  if (input.unitId && input.ownerId) {
+    return { data: null as never, error: "Charge target is invalid." };
+  }
+  if (!input.unitId && !input.ownerId) {
+    return { data: null as never, error: "Charge target is required." };
+  }
+
+  if (input.unitId) {
+    const unitResult = await supabase.from("tb810_units").select("id").eq("id", input.unitId).maybeSingle();
+    if (unitResult.error) return { data: null as never, error: unitResult.error.message };
+    if (!unitResult.data) return { data: null as never, error: "Unit not found." };
+  }
+
+  if (input.ownerId) {
+    const ownerResult = await getOwnerById(input.ownerId);
+    if (ownerResult.error) return { data: null as never, error: ownerResult.error };
+    if (!ownerResult.data) return { data: null as never, error: "Owner not found." };
+
+    const ownerUnitsResult = await getOwnerUnitsForBillingMonth(input.ownerId, await currentMonthKey());
+    if (ownerUnitsResult.error) return { data: null as never, error: ownerUnitsResult.error };
+    if (!ownerUnitsResult.data.length) {
+      return { data: null as never, error: "Owner is not currently responsible for any units." };
+    }
+  }
+
+  const startMonth = input.starts_month;
+  const currentMonth = await currentMonthKey();
+  const validated = validateChargeLifecycleInput({
+    schedule: input.schedule,
+    starts_month: startMonth,
+    ends_month: input.ends_month ?? null,
+    currentMonth,
+  });
+  if (validated.error) return { data: null as never, error: validated.error };
+  const successValidated = validated as Extract<ChargeLifecycleValidationResult, { error: null }>;
+  const effectiveFromMonth = successValidated.effectiveFromMonth;
+  const effectiveToMonth = successValidated.effectiveToMonth;
   const { data, error } = await supabase
     .from("tb810_charges")
     .insert({
       building_id: buildingId,
-      unit_id: input.unit_id,
-      owner_id: null,
+      unit_id: input.unitId ?? null,
+      owner_id: input.ownerId ?? null,
       description: input.description,
       amount: input.amount,
       schedule: input.schedule,
@@ -304,6 +373,24 @@ export async function createUnitCharge(input: ChargeInput): Promise<QueryResult<
     recordIdentity: data.series_id,
   });
   return { data, error: null };
+}
+
+export async function createOwnerDirectCharge(input: {
+  owner_id: string;
+  description: string;
+  amount: number;
+  schedule: "one_off" | "recurring";
+  starts_month: string;
+  ends_month?: string | null;
+}): Promise<QueryResult<ChargeRecord>> {
+  return createTargetCharge({
+    ownerId: input.owner_id,
+    description: input.description,
+    amount: input.amount,
+    schedule: input.schedule,
+    starts_month: input.starts_month,
+    ends_month: input.ends_month,
+  });
 }
 
 export async function changeFutureChargeEconomics(
