@@ -4,7 +4,15 @@ import { getGasChargePreviewsForUnit } from "../gas";
 import { getWaterChargePreviewsForUnit } from "../water";
 import type { ProviderMap } from "./core";
 
-export function createMonthlyObligationProviders(): ProviderMap {
+type MonthlyObligationProviderDeps = {
+  getWaterChargePreviewsForUnit?: typeof getWaterChargePreviewsForUnit;
+  getGasChargePreviewsForUnit?: typeof getGasChargePreviewsForUnit;
+};
+
+export function createMonthlyObligationProviders(deps: MonthlyObligationProviderDeps = {}): ProviderMap {
+  const getWaterChargePreviews = deps.getWaterChargePreviewsForUnit ?? getWaterChargePreviewsForUnit;
+  const getGasChargePreviews = deps.getGasChargePreviewsForUnit ?? getGasChargePreviewsForUnit;
+
   return {
     fixed_assessment: async ({ context, unit }) => {
       const planYear = Number(context.obligationMonth.slice(0, 4));
@@ -38,7 +46,7 @@ export function createMonthlyObligationProviders(): ProviderMap {
         return { status: "not_applicable", provenance: "server/water/monthly-ledger", sourceMonth: context.obligationMonth };
       }
 
-      const result = await getWaterChargePreviewsForUnit(unit.unitId, context.obligationMonth);
+      const result = await getWaterChargePreviews(unit.unitId, context.obligationMonth);
       if (result.meteredWater.status === "available") {
         return {
           status: "available",
@@ -63,7 +71,7 @@ export function createMonthlyObligationProviders(): ProviderMap {
         return { status: "not_applicable", provenance: "server/water/monthly-ledger", sourceMonth: context.obligationMonth };
       }
 
-      const result = await getWaterChargePreviewsForUnit(unit.unitId, context.obligationMonth);
+      const result = await getWaterChargePreviews(unit.unitId, context.obligationMonth);
       if (result.commonWater.status === "available") {
         return {
           status: "available",
@@ -88,7 +96,7 @@ export function createMonthlyObligationProviders(): ProviderMap {
         return { status: "not_applicable", provenance: "server/gas/provider", sourceMonth: context.obligationMonth };
       }
 
-      const result = await getGasChargePreviewsForUnit(unit.unitId, context.obligationMonth);
+      const result = await getGasChargePreviews(unit.unitId, context.obligationMonth);
       if (result.status === "available") {
         return {
           status: "available",

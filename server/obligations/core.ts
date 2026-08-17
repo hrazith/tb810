@@ -200,6 +200,7 @@ export async function composeMonthlyObligation(
       unitId: unit.unitId,
       unitNumber: unit.unitNumber,
       unitAccountId: unit.unitAccountId,
+      unitTypeCode: unit.unitTypeCode,
       components,
       knownTotal: sumAmounts(components) ?? "0.00",
       readiness: summary.readiness,

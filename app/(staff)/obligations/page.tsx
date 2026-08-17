@@ -1,11 +1,18 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
 import { createClient } from "@/lib/supabase/server";
-import { currentMonthKey, monthLabel } from "@/server/charges/month";
+import {
+  createUnitChargeAction,
+  deleteFutureChargeAction,
+  editFutureChargeAction,
+} from "@/server/charges/actions";
+import { getUpcomingOwnerDirectChargesForObligationMonth, getUpcomingUnitChargesForObligationMonth } from "@/server/charges";
+import { currentMonthKey, monthLabel, nextMonthKey } from "@/server/charges/month";
 import { getMonthlyObligationSummary, getOwnerMonthlyObligation, getUnitMonthlyObligation } from "@/server/obligations";
-import { getOwnerUnitsForBillingMonth, getUnitOwnershipSnapshot } from "@/server/ownerships";
+import { getUnitOwnershipSnapshot } from "@/server/ownerships";
 import { listOwners } from "@/server/owners";
 import { listUnits } from "@/server/units";
 
@@ -82,18 +89,18 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
   const monthKey = await currentMonthKey();
   const mode = params.mode ?? "owners";
 
-  const unitsResult = await listUnits();
-  if (unitsResult.error) throw new Error(unitsResult.error);
-  const eligibleUnits = unitsResult.data.filter((unit) => unit.unit_type_code === "condo");
+  const unitsResult = mode === "units" ? await listUnits() : null;
+  if (unitsResult?.error) throw new Error(unitsResult.error);
+  const eligibleUnits = unitsResult?.data.filter((unit) => unit.unit_type_code === "condo") ?? [];
 
-  const ownersResult = await listOwners({ status: "active" });
-  if (ownersResult.error) throw new Error(ownersResult.error);
+  const ownersResult = mode === "owners" ? await listOwners({ status: "active" }) : null;
+  if (ownersResult?.error) throw new Error(ownersResult.error);
 
   const selectedUnit = mode === "units" && params.unitId
     ? eligibleUnits.find((unit) => unit.id === params.unitId) ?? null
     : null;
   const selectedOwner = mode === "owners" && params.ownerId
-    ? ownersResult.data.find((owner) => owner.id === params.ownerId) ?? null
+    ? ownersResult?.data.find((owner) => owner.id === params.ownerId) ?? null
     : null;
 
   const selectedObligation = selectedUnit
@@ -105,10 +112,16 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
     ? await getOwnerMonthlyObligation({ ownerId: selectedOwner.id, obligationMonth: monthKey })
     : null;
   if (selectedOwnerObligation?.error) throw new Error(selectedOwnerObligation.error);
-  const selectedOwnerUnits = selectedOwner
-    ? await getOwnerUnitsForBillingMonth(selectedOwner.id, monthKey)
+
+  const selectedOwnerUpcomingCharges = selectedOwner
+    ? await getUpcomingOwnerDirectChargesForObligationMonth(selectedOwner.id, monthKey)
     : null;
-  if (selectedOwnerUnits?.error) throw new Error(selectedOwnerUnits.error);
+  if (selectedOwnerUpcomingCharges?.error) throw new Error(selectedOwnerUpcomingCharges.error);
+
+  const selectedUnitUpcomingCharges = selectedUnit
+    ? await getUpcomingUnitChargesForObligationMonth(selectedUnit.id, monthKey)
+    : null;
+  if (selectedUnitUpcomingCharges?.error) throw new Error(selectedUnitUpcomingCharges.error);
 
   const monthlySummary = !selectedUnit && !selectedOwner
     ? await getMonthlyObligationSummary({ obligationMonth: monthKey })
@@ -162,9 +175,6 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
         },
       ]
     : [];
-  const ownerUnitTypeByNumber = new Map(
-    (selectedOwnerUnits?.data ?? []).map((unit) => [unit.unit_number, unit.unit_type_code] as const),
-  );
 
   return (
     <section className="space-y-6">
@@ -206,7 +216,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
           <div className="max-h-[calc(100vh-18rem)] overflow-y-auto pr-1">
             {mode === "owners" ? (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-                {ownersResult.data.map((owner) => {
+                {ownersResult?.data.map((owner) => {
                   const active = owner.id === selectedOwner?.id;
                   return (
                     <Link
@@ -396,6 +406,45 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                   ) : null}
                 </div>
 
+                <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5 md:col-span-2">
+                  <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+                    Upcoming owner-direct charges
+                  </div>
+                  {selectedOwnerUpcomingCharges?.data && selectedOwnerUpcomingCharges.data.length > 0 ? (
+                    <div className="space-y-3">
+                      {selectedOwnerUpcomingCharges.data.map((charge) => (
+                        <div key={charge.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                          <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                              <div className="text-base font-semibold text-zinc-950">{charge.description}</div>
+                              <div className="mt-1 text-sm text-zinc-600">
+                                {charge.schedule === "one_off" ? "One-off" : "Recurring"}
+                              </div>
+                              <div className="mt-1 text-sm text-zinc-600">
+                                Starts {monthLabel(charge.effective_from_month.slice(0, 7))}
+                              </div>
+                              {charge.effective_to_month ? (
+                                <div className="mt-1 text-sm text-zinc-600">
+                                  Ends {monthLabel(charge.effective_to_month.slice(0, 7))}
+                                </div>
+                              ) : null}
+                              {charge.stop_note ? (
+                                <div className="mt-1 text-sm text-zinc-500">{charge.stop_note}</div>
+                              ) : null}
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-semibold text-zinc-950">{formatMoney(charge.amount)}</div>
+                              <div className="text-sm text-zinc-500">Owner-direct</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-zinc-600">No upcoming owner-direct charges.</div>
+                  )}
+                </div>
+
                 <div className="rounded-[24px] border border-zinc-200 bg-white p-5">
                   <div className="text-sm font-medium uppercase tracking-wide text-zinc-500">Consolidated owner</div>
                   <div className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">
@@ -409,18 +458,18 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
 
               <div className="space-y-4 rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
                 {selectedOwnerObligation.data.obligation.units.map((unit) => {
-                  const unitType =
-                    ownerUnitTypeByNumber.get(unit.unitNumber) === "parking"
-                      ? "Parking"
-                      : ownerUnitTypeByNumber.get(unit.unitNumber) === "storage"
-                        ? "Storage"
-                        : "Residential";
                   return (
                     <div key={unit.unitId} className="rounded-2xl border border-zinc-200 bg-white p-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                      <div className="text-lg font-semibold text-zinc-950">{unit.unitNumber}</div>
-                      <div className="text-sm text-zinc-500">{unitType}</div>
+                          <div className="text-lg font-semibold text-zinc-950">{unit.unitNumber}</div>
+                          <div className="text-sm text-zinc-500">
+                            {unit.unitTypeCode === "parking"
+                              ? "Parking"
+                              : unit.unitTypeCode === "storage"
+                                ? "Storage"
+                                : "Residential"}
+                          </div>
                         </div>
                         <div className="text-right">
                           <div className="text-lg font-semibold text-zinc-950">
@@ -500,6 +549,166 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                 <div className="text-lg font-medium text-zinc-950">{selectedUnitPanel.unit.current_owner_name ?? "No owner"}</div>
                 <div className="text-sm text-zinc-500">{selectedUnitPanel.unit.current_owner_reference ?? "Current owner"}</div>
               </div>
+
+              <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
+                <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Upcoming charges</div>
+                {selectedUnitUpcomingCharges?.data && selectedUnitUpcomingCharges.data.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedUnitUpcomingCharges.data.map((charge) => (
+                      <div key={charge.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div>
+                            <div className="text-base font-semibold text-zinc-950">{charge.description}</div>
+                            <div className="mt-1 text-sm text-zinc-600">
+                              {charge.schedule === "one_off" ? "One-off" : "Recurring"}
+                            </div>
+                            <div className="mt-1 text-sm text-zinc-600">
+                              Starts {monthLabel(charge.effective_from_month.slice(0, 7))}
+                            </div>
+                            {charge.effective_to_month ? (
+                              <div className="mt-1 text-sm text-zinc-600">
+                                Ends {monthLabel(charge.effective_to_month.slice(0, 7))}
+                              </div>
+                            ) : null}
+                            {charge.stop_note ? (
+                              <div className="mt-1 text-sm text-zinc-500">{charge.stop_note}</div>
+                            ) : null}
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              <details className="group">
+                                <summary className="cursor-pointer rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 hover:border-zinc-400">
+                                  Edit
+                                </summary>
+                                <div className="mt-3 w-[min(32rem,80vw)] rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                                  <form action={editFutureChargeAction} className="space-y-3">
+                                    <input type="hidden" name="return_to" value={`/obligations?mode=units&unitId=${selectedUnitPanel.unit.id}`} />
+                                    <input type="hidden" name="charge_id" value={charge.id} />
+                                    <label className="block space-y-2">
+                                      <span className="text-sm font-medium text-zinc-700">Description</span>
+                                      <Input name="description" defaultValue={charge.description} />
+                                    </label>
+                                    <label className="block space-y-2">
+                                      <span className="text-sm font-medium text-zinc-700">Amount</span>
+                                      <Input name="amount" type="number" step="0.01" defaultValue={charge.amount} />
+                                    </label>
+                                    <label className="block space-y-2">
+                                      <span className="text-sm font-medium text-zinc-700">Schedule</span>
+                                      <select
+                                        name="schedule"
+                                        defaultValue={charge.schedule}
+                                        className="h-12 w-full rounded-xl border border-zinc-300 bg-white px-4 text-sm"
+                                      >
+                                        <option value="one_off">One-off</option>
+                                        <option value="recurring">Recurring</option>
+                                      </select>
+                                    </label>
+                                    <label className="block space-y-2">
+                                      <span className="text-sm font-medium text-zinc-700">Starts</span>
+                                      <Input
+                                        name="starts_month"
+                                        type="month"
+                                        min={nextMonthKey(monthKey) ?? monthKey}
+                                        defaultValue={charge.effective_from_month.slice(0, 7)}
+                                      />
+                                    </label>
+                                    <label className="block space-y-2">
+                                      <span className="text-sm font-medium text-zinc-700">Ends</span>
+                                      <Input
+                                        name="ends_month"
+                                        type="month"
+                                        min={nextMonthKey(monthKey) ?? monthKey}
+                                        defaultValue={charge.effective_to_month?.slice(0, 7) ?? ""}
+                                      />
+                                    </label>
+                                    <Button type="submit" variant="primary" className="w-full">
+                                      Save Changes
+                                    </Button>
+                                  </form>
+                                </div>
+                              </details>
+                              <details className="group">
+                                <summary className="cursor-pointer rounded-full border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 hover:border-red-400">
+                                  Delete
+                                </summary>
+                                <div className="mt-3 w-[min(24rem,80vw)] rounded-2xl border border-red-200 bg-red-50 p-4">
+                                  <div className="text-sm text-red-900">
+                                    This will permanently delete this future charge series before it takes effect.
+                                  </div>
+                                  <form action={deleteFutureChargeAction} className="mt-3 space-y-3">
+                                    <input type="hidden" name="return_to" value={`/obligations?mode=units&unitId=${selectedUnitPanel.unit.id}`} />
+                                    <input type="hidden" name="charge_id" value={charge.id} />
+                                    <Button type="submit" variant="destructive" className="w-full">
+                                      Confirm Delete
+                                    </Button>
+                                  </form>
+                                </div>
+                              </details>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-semibold text-zinc-950">{formatMoney(charge.amount)}</div>
+                            <div className="text-sm text-zinc-500">Unit-targeted</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-zinc-600">No upcoming charges.</div>
+                )}
+              </div>
+
+              <details className="group rounded-[24px] border border-zinc-200 bg-white px-5 py-4">
+                <summary className="cursor-pointer list-none text-sm font-medium text-zinc-950">
+                  + Add charge
+                </summary>
+                <div className="mt-5 border-t border-zinc-200 pt-5">
+                  <form action={createUnitChargeAction} className="space-y-4">
+                    <input type="hidden" name="return_to" value={`/obligations?unitId=${selectedUnitPanel.unit.id}`} />
+                    <label className="block space-y-2">
+                      <span className="text-sm font-medium text-zinc-700">Charge to</span>
+                      <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-950">
+                        Unit {selectedUnitPanel.unit.unit_number}
+                      </div>
+                      <input type="hidden" name="unit_id" value={selectedUnitPanel.unit.id} />
+                    </label>
+                    <label className="block space-y-2">
+                      <span className="text-sm font-medium text-zinc-700">Description</span>
+                      <Input name="description" placeholder="Lavanderia" />
+                    </label>
+                    <label className="block space-y-2">
+                      <span className="text-sm font-medium text-zinc-700">Amount</span>
+                      <Input name="amount" type="number" step="0.01" placeholder="30.00" />
+                    </label>
+                    <label className="block space-y-2">
+                      <span className="text-sm font-medium text-zinc-700">Schedule</span>
+                      <select
+                        name="schedule"
+                        defaultValue="one_off"
+                        className="h-12 w-full rounded-xl border border-zinc-300 bg-white px-4 text-sm"
+                      >
+                        <option value="one_off">One-off</option>
+                        <option value="recurring">Recurring</option>
+                      </select>
+                    </label>
+                    <label className="block space-y-2">
+                      <span className="text-sm font-medium text-zinc-700">Starts</span>
+                      <Input
+                        name="starts_month"
+                        type="month"
+                        min={nextMonthKey(monthKey) ?? monthKey}
+                        defaultValue={nextMonthKey(monthKey) ?? monthKey}
+                      />
+                    </label>
+                    <label className="block space-y-2">
+                      <span className="text-sm font-medium text-zinc-700">Ends</span>
+                      <Input name="ends_month" type="month" min={nextMonthKey(monthKey) ?? monthKey} />
+                    </label>
+                    <Button type="submit" variant="primary" className="w-full">
+                      Save Charge
+                    </Button>
+                  </form>
+                </div>
+              </details>
 
               <div className="space-y-4 rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
                 <div className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Recent account activity</div>

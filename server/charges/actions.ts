@@ -3,8 +3,14 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { createUnitCharge, changeFutureChargeEconomics, stopFutureCharge } from "./index";
-import { chargeEconomicsSchema, chargeInputSchema, chargeStopSchema } from "./validation";
+import { createUnitCharge, deleteFutureCharge, editFutureCharge, changeFutureChargeEconomics, stopFutureCharge } from "./index";
+import {
+  chargeEconomicsSchema,
+  chargeInputSchema,
+  chargeStopSchema,
+  futureChargeDeleteSchema,
+  futureChargeEditSchema,
+} from "./validation";
 
 function redirectWithError(returnTo: string, message: string) {
   const url = new URL(returnTo, "http://localhost");
@@ -61,6 +67,40 @@ export async function changeFutureChargeEconomicsAction(formData: FormData): Pro
     return;
   }
   const result = await changeFutureChargeEconomics(chargeId, parsed.data);
+  if (result.error) redirectWithError(returnTo, result.error);
+  redirectBack(returnTo);
+}
+
+export async function editFutureChargeAction(formData: FormData): Promise<void> {
+  const returnTo = pickString(formData, "return_to") || "/obligations";
+  const parsed = futureChargeEditSchema.safeParse({
+    charge_id: pickString(formData, "charge_id"),
+    description: pickString(formData, "description"),
+    amount: parseNumber(formData.get("amount")),
+    schedule: pickString(formData, "schedule"),
+    starts_month: pickString(formData, "starts_month"),
+    ends_month: pickString(formData, "ends_month"),
+  });
+  if (!parsed.success) {
+    redirectWithError(returnTo, validationError(parsed.error));
+    return;
+  }
+  const { charge_id, ...input } = parsed.data;
+  const result = await editFutureCharge(charge_id, input);
+  if (result.error) redirectWithError(returnTo, result.error);
+  redirectBack(returnTo);
+}
+
+export async function deleteFutureChargeAction(formData: FormData): Promise<void> {
+  const returnTo = pickString(formData, "return_to") || "/obligations";
+  const parsed = futureChargeDeleteSchema.safeParse({
+    charge_id: pickString(formData, "charge_id"),
+  });
+  if (!parsed.success) {
+    redirectWithError(returnTo, validationError(parsed.error));
+    return;
+  }
+  const result = await deleteFutureCharge(parsed.data.charge_id);
   if (result.error) redirectWithError(returnTo, result.error);
   redirectBack(returnTo);
 }

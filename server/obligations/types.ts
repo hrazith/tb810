@@ -35,6 +35,7 @@ export type UnitMonthlyObligation = {
   unitId: string;
   unitNumber: string;
   unitAccountId: string;
+  unitTypeCode: string;
   components: MonthlyObligationComponent[];
   knownTotal: string;
   readiness: MonthlyObligationReadiness;

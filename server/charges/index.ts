@@ -6,17 +6,20 @@ import {
 } from "@/server/dev-test-session";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 
-import { currentMonthKey, defaultStartMonthForNewCharge, firstDayOfMonth, isChargeEligibleForMonth, previousMonthKey } from "./month";
+import {
+  currentMonthKey,
+  defaultStartMonthForNewCharge,
+  firstDayOfMonth,
+  isChargeEligibleForMonth,
+  monthLabel,
+  previousMonthKey,
+} from "./month";
 import type { ChargeInput, ChargeLineItem, ChargeRecord, ChargeSummary } from "./types";
 
 type QueryResult<T> = { data: T; error: string | null };
 
 function monthKeyFromDate(date: string) {
   return date.slice(0, 7);
-}
-
-function normalizeSchedule(schedule: ChargeInput["schedule"]) {
-  return schedule;
 }
 
 function isUnitCharge(row: ChargeRecord) {
@@ -40,6 +43,164 @@ async function getCurrentBuildingId() {
 
 function monthBefore(monthKey: string) {
   return previousMonthKey(monthKey);
+}
+
+function monthKeyFromDateTime(date: string) {
+  return date.slice(0, 7);
+}
+
+function isUpcomingChargeForMonth(row: ChargeRecord, obligationMonth: string) {
+  return monthKeyFromDateTime(row.effective_from_month) > obligationMonth;
+}
+
+function selectUpcomingChargesForTarget(
+  charges: ChargeRecord[],
+  target: { unitId?: string; ownerId?: string },
+  obligationMonth: string,
+) {
+  return charges
+    .filter((row) => {
+      if (target.unitId && (row.unit_id !== target.unitId || row.owner_id !== null)) return false;
+      if (target.ownerId && (row.owner_id !== target.ownerId || row.unit_id !== null)) return false;
+      return isUpcomingChargeForMonth(row, obligationMonth);
+    })
+    .sort((left, right) => {
+      const monthCompare = left.effective_from_month.localeCompare(right.effective_from_month);
+      if (monthCompare !== 0) return monthCompare;
+      return right.created_at.localeCompare(left.created_at);
+    });
+}
+
+export { selectUpcomingChargesForTarget };
+
+function chargeMonthKey(charge: ChargeRecord) {
+  return monthKeyFromDate(charge.effective_from_month);
+}
+
+export function isFutureEffectiveCharge(charge: ChargeRecord, currentMonth: string) {
+  return chargeMonthKey(charge) > currentMonth;
+}
+
+export function validateFutureChargeInput(input: {
+  schedule: "one_off" | "recurring";
+  starts_month: string;
+  ends_month?: string | null;
+  currentMonth: string;
+}) {
+  const defaultStartMonth = defaultStartMonthForNewCharge(input.currentMonth);
+  if (input.starts_month < defaultStartMonth) {
+    return { error: `Start month cannot be before ${defaultStartMonth}.` };
+  }
+  if (input.schedule === "one_off" && input.ends_month) {
+    return { error: "One-off charges cannot have an end month." };
+  }
+  if (input.schedule === "recurring" && input.ends_month && input.ends_month < input.starts_month) {
+    return { error: "End month cannot be before the start month." };
+  }
+  const effectiveFromMonth = firstDayOfMonth(input.starts_month);
+  if (!effectiveFromMonth) return { error: "Invalid start month." };
+  const effectiveToMonth = input.ends_month ? firstDayOfMonth(input.ends_month) : null;
+  if (input.ends_month && !effectiveToMonth) return { error: "Invalid end month." };
+  return {
+    error: null as string | null,
+    effectiveFromMonth,
+    effectiveToMonth,
+  };
+}
+
+export function canStopCharge(charge: ChargeRecord) {
+  return charge.schedule === "recurring";
+}
+
+export function canDeleteFutureChargeSeries(seriesRows: ChargeRecord[], currentMonth: string) {
+  return seriesRows.length > 0 && seriesRows.every((row) => isFutureEffectiveCharge(row, currentMonth));
+}
+
+export async function editFutureCharge(
+  chargeId: string,
+  input: {
+    description: string;
+    amount: number;
+    schedule: "one_off" | "recurring";
+    starts_month: string;
+    ends_month?: string | null;
+  },
+): Promise<QueryResult<ChargeRecord>> {
+  const chargeResult = await getCharge(chargeId);
+  if (chargeResult.error) return { data: null as never, error: chargeResult.error };
+  if (!chargeResult.data) return { data: null as never, error: "Charge not found." };
+
+  const currentMonth = await currentMonthKey();
+  const current = chargeResult.data;
+  if (!isFutureEffectiveCharge(current, currentMonth)) {
+    return { data: null as never, error: "Future charges only can be edited." };
+  }
+
+  const validated = validateFutureChargeInput({
+    schedule: input.schedule,
+    starts_month: input.starts_month,
+    ends_month: input.ends_month ?? null,
+    currentMonth,
+  });
+  if (validated.error) return { data: null as never, error: validated.error };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tb810_charges")
+    .update({
+      description: input.description,
+      amount: input.amount,
+      schedule: input.schedule,
+      effective_from_month: validated.effectiveFromMonth,
+      effective_to_month: validated.effectiveToMonth,
+      stop_note: null,
+    })
+    .eq("id", chargeId)
+    .eq("building_id", current.building_id)
+    .select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
+    .single();
+  if (error) return { data: null as never, error: error.message };
+  return { data: data as ChargeRecord, error: null };
+}
+
+export async function deleteFutureCharge(chargeId: string): Promise<QueryResult<{ id: string; series_id: string }>> {
+  const chargeResult = await getCharge(chargeId);
+  if (chargeResult.error) return { data: null as never, error: chargeResult.error };
+  if (!chargeResult.data) return { data: null as never, error: "Charge not found." };
+
+  const currentMonth = await currentMonthKey();
+  const current = chargeResult.data;
+  if (!isFutureEffectiveCharge(current, currentMonth)) {
+    return { data: null as never, error: "Future charges only can be deleted." };
+  }
+
+  const buildingResult = await getCurrentBuildingId();
+  if (buildingResult.error) return { data: null as never, error: buildingResult.error };
+
+  const supabase = await createClient();
+  const buildingId = buildingResult.data;
+  if (!buildingId) return { data: null as never, error: "Current building not found." };
+
+  const { data: seriesRows, error: seriesError } = await supabase
+    .from("tb810_charges")
+    .select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
+    .eq("building_id", buildingId)
+    .eq("series_id", current.series_id);
+  if (seriesError) return { data: null as never, error: seriesError.message };
+
+  const rows = (seriesRows ?? []) as ChargeRecord[];
+  if (!canDeleteFutureChargeSeries(rows, currentMonth)) {
+    return { data: null as never, error: "Future charges only can be deleted." };
+  }
+
+  const { error } = await supabase
+    .from("tb810_charges")
+    .delete()
+    .eq("building_id", buildingId)
+    .eq("series_id", current.series_id);
+  if (error) return { data: null as never, error: error.message };
+
+  return { data: { id: current.id, series_id: current.series_id }, error: null };
 }
 
 export async function listCharges(): Promise<QueryResult<ChargeSummary[]>> {
@@ -129,7 +290,7 @@ export async function createUnitCharge(input: ChargeInput): Promise<QueryResult<
       owner_id: null,
       description: input.description,
       amount: input.amount,
-      schedule: normalizeSchedule(input.schedule),
+      schedule: input.schedule,
       effective_from_month: effectiveFromMonth,
       effective_to_month: effectiveToMonth,
     })
@@ -212,6 +373,9 @@ export async function stopFutureCharge(
   if (chargeResult.error) return { data: null as never, error: chargeResult.error };
   if (!chargeResult.data) return { data: null as never, error: "Charge not found." };
   const current = chargeResult.data;
+  if (!canStopCharge(current)) {
+    return { data: null as never, error: "Only recurring charges can be stopped." };
+  }
   const activeSessionId = await getActiveDevTestSessionId();
   if (activeSessionId) {
     const createdBySession = await isRecordCreatedByActiveDevTestSession({
@@ -312,3 +476,47 @@ export async function getOwnerDirectChargesForObligationMonth(
   const total = lineItems.reduce((sum, item) => sum + Number(item.amount), 0);
   return { data: { amount: total.toFixed(2), count: lineItems.length, lineItems }, error: null };
 }
+
+export async function getUpcomingUnitChargesForObligationMonth(
+  unitId: string,
+  obligationMonth: string,
+): Promise<QueryResult<ChargeRecord[]>> {
+  const buildingResult = await getCurrentBuildingId();
+  if (buildingResult.error) return { data: [], error: buildingResult.error };
+  const supabase = await createClient();
+  const buildingId = buildingResult.data;
+  if (!buildingId) return { data: [], error: "Current building not found." };
+  const { data, error } = await supabase
+    .from("tb810_charges")
+    .select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
+    .eq("building_id", buildingId)
+    .eq("unit_id", unitId);
+  if (error) return { data: [], error: error.message };
+  return {
+    data: selectUpcomingChargesForTarget((data ?? []) as ChargeRecord[], { unitId }, obligationMonth),
+    error: null,
+  };
+}
+
+export async function getUpcomingOwnerDirectChargesForObligationMonth(
+  ownerId: string,
+  obligationMonth: string,
+): Promise<QueryResult<ChargeRecord[]>> {
+  const buildingResult = await getCurrentBuildingId();
+  if (buildingResult.error) return { data: [], error: buildingResult.error };
+  const supabase = await createClient();
+  const buildingId = buildingResult.data;
+  if (!buildingId) return { data: [], error: "Current building not found." };
+  const { data, error } = await supabase
+    .from("tb810_charges")
+    .select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
+    .eq("building_id", buildingId)
+    .eq("owner_id", ownerId);
+  if (error) return { data: [], error: error.message };
+  return {
+    data: selectUpcomingChargesForTarget((data ?? []) as ChargeRecord[], { ownerId }, obligationMonth),
+    error: null,
+  };
+}
+
+export { monthLabel };
