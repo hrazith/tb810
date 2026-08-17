@@ -11,6 +11,30 @@ import {
   type MonthlyObligationSummaryComponent,
 } from "./summary";
 
+export function selectBuildingOwnerDirectCharges(
+  charges: Array<{
+    amount: number;
+    schedule: "one_off" | "recurring";
+    effective_from_month: string;
+    effective_to_month: string | null;
+    owner_id: string | null;
+    unit_id: string | null;
+  }>,
+  obligationMonth: string,
+) {
+  return charges.filter((row) => {
+    if (row.owner_id == null || row.unit_id != null) return false;
+    const effectiveFromMonth = row.effective_from_month.slice(0, 7);
+    const effectiveToMonth = row.effective_to_month ? row.effective_to_month.slice(0, 7) : null;
+    return isChargeEligibleForMonth({
+      schedule: row.schedule,
+      effectiveFromMonth,
+      effectiveToMonth,
+      obligationMonth,
+    });
+  });
+}
+
 export async function getMonthlyObligation({ obligationMonth }: { obligationMonth: string }) {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: null as never, error: buildingResult.error };
@@ -122,6 +146,11 @@ export async function getMonthlyObligationSummary({ obligationMonth }: { obligat
   });
 
   const otherChargeAmount = applicableCharges.reduce((total, row) => total + Number(row.amount), 0);
+  const ownerDirectCharges = await getBuildingOwnerDirectChargeSummary({
+    buildingId: buildingResult.data.id,
+    obligationMonth,
+  });
+  if (ownerDirectCharges.error) return { data: null as never, error: ownerDirectCharges.error };
 
   const fixedAssessmentComponent: MonthlyObligationSummaryComponent =
     fixedResult.data ?? {
@@ -140,9 +169,33 @@ export async function getMonthlyObligationSummary({ obligationMonth }: { obligat
       gas: gasResult,
       otherChargeAmount: otherChargeAmount.toFixed(2),
       otherChargeCount: applicableCharges.length,
+      ownerDirectChargeAmount: ownerDirectCharges.data.amount,
+      ownerDirectChargeCount: ownerDirectCharges.data.count,
     }),
     error: null,
   };
+}
+
+async function getBuildingOwnerDirectChargeSummary({
+  buildingId,
+  obligationMonth,
+}: {
+  buildingId: string;
+  obligationMonth: string;
+}): Promise<{ data: { amount: string; count: number }; error: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tb810_charges")
+    .select("amount, schedule, effective_from_month, effective_to_month, owner_id, unit_id")
+    .eq("building_id", buildingId)
+    .not("owner_id", "is", null)
+    .is("unit_id", null);
+  if (error) return { data: { amount: "0.00", count: 0 }, error: error.message };
+
+  const applicableCharges = selectBuildingOwnerDirectCharges(data ?? [], obligationMonth);
+
+  const amount = applicableCharges.reduce((total, row) => total + Number(row.amount), 0).toFixed(2);
+  return { data: { amount, count: applicableCharges.length }, error: null };
 }
 
 export type {

@@ -326,7 +326,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                     </div>
                     <div className="flex items-center justify-between gap-4">
                       <span>Owner-direct charges</span>
-                      <span>S/ —</span>
+                      <span>{formatComponentValue(monthlySummary?.data?.components.owner_direct_charge.state ?? "available", monthlySummary?.data?.components.owner_direct_charge.amount ?? null)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-4 border-t border-zinc-200 pt-3 text-zinc-950">
                       <span className="font-medium">Total</span>
@@ -355,6 +355,14 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                   ) : (
                     <div className="text-sm text-zinc-600">—</div>
                   )}
+                  <div className="mt-4 flex items-center justify-between gap-4 text-sm text-zinc-600">
+                    <span>Owner-direct charges</span>
+                    <span>
+                      {monthlySummary?.data?.components.owner_direct_charge.count
+                        ? `S/ ${monthlySummary.data.components.owner_direct_charge.amount}`
+                        : "—"}
+                    </span>
+                  </div>
                 </div>
               </div>
 

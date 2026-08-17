@@ -13,6 +13,7 @@ export type MonthlyObligationSummary = {
     common_water: MonthlyObligationSummaryComponent;
     gas: MonthlyObligationSummaryComponent;
     other_charge: MonthlyObligationSummaryComponent & { count: number | null };
+    owner_direct_charge: MonthlyObligationSummaryComponent & { count: number | null };
   };
   total: string | null;
 };
@@ -26,6 +27,8 @@ export function buildMonthlyObligationSummary(input: {
   gas: MonthlyObligationSummaryComponent;
   otherChargeAmount: string;
   otherChargeCount: number;
+  ownerDirectChargeAmount: string;
+  ownerDirectChargeCount: number;
 }) {
   const components = {
     fixed_assessment: input.fixedAssessment,
@@ -37,6 +40,11 @@ export function buildMonthlyObligationSummary(input: {
       amount: input.otherChargeAmount,
       count: input.otherChargeCount,
     },
+    owner_direct_charge: {
+      state: "available" as const,
+      amount: input.ownerDirectChargeAmount,
+      count: input.ownerDirectChargeCount,
+    },
   };
 
   const total =
@@ -44,13 +52,15 @@ export function buildMonthlyObligationSummary(input: {
     components.metered_water.state === "available" &&
     components.common_water.state === "available" &&
     components.gas.state === "available" &&
-    components.other_charge.state === "available"
+    components.other_charge.state === "available" &&
+    components.owner_direct_charge.state === "available"
       ? [
           components.fixed_assessment.amount,
           components.metered_water.amount,
           components.common_water.amount,
           components.gas.amount,
           components.other_charge.amount,
+          components.owner_direct_charge.amount,
         ]
           .map((value) => Number(value))
           .reduce((sum, value) => sum + value, 0)
