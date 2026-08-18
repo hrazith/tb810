@@ -178,7 +178,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
     : [];
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-6 xl:w-[calc(100vw-3rem)] xl:max-w-none xl:-ml-[calc(50vw-50%-1.5rem)] test">
       <div className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Obligations</h1>
       </div>
