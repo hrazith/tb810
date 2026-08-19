@@ -585,6 +585,22 @@ export async function getUpcomingUnitChargesForObligationMonth(
   };
 }
 
+export function calculateUpcomingUnitChargesFromFacts(
+  charges: ChargeRecord[],
+  unitId: string,
+  obligationMonth: string,
+): { amount: string; lineItems: ChargeLineItem[] } {
+  const lineItems = selectUpcomingChargesForTarget(charges, { unitId }, obligationMonth).map((row) => ({
+    chargeId: row.id,
+    description: row.description,
+    amount: row.amount.toFixed(2),
+    effectiveFromMonth: monthKeyFromDate(row.effective_from_month),
+    effectiveToMonth: row.effective_to_month ? monthKeyFromDate(row.effective_to_month) : null,
+  }));
+  const total = lineItems.reduce((sum, item) => sum + Number(item.amount), 0);
+  return { amount: total.toFixed(2), lineItems };
+}
+
 export async function getUpcomingOwnerDirectChargesForObligationMonth(
   ownerId: string,
   obligationMonth: string,

@@ -3,15 +3,26 @@ import { getUnitChargesForObligationMonth } from "../charges";
 import { getGasChargePreviewsForUnit } from "../gas";
 import { getWaterChargePreviewsForUnit } from "../water";
 import type { ProviderMap } from "./core";
+import type { UnitFixedMonthlyAssessmentState } from "../budget-plans/types";
+import type { August2026MeteredWaterChargeState, CommonWaterChargePreviewState } from "../water";
+import type { GasChargePreviewState } from "../gas/provider";
 
 type MonthlyObligationProviderDeps = {
   getWaterChargePreviewsForUnit?: typeof getWaterChargePreviewsForUnit;
   getGasChargePreviewsForUnit?: typeof getGasChargePreviewsForUnit;
+  getUnitFixedMonthlyAssessment?: typeof getUnitFixedMonthlyAssessment;
+  getUnitChargesForObligationMonth?: typeof getUnitChargesForObligationMonth;
+  fixedAssessmentByUnitId?: Map<string, UnitFixedMonthlyAssessmentState>;
+  waterByUnitId?: Map<string, { meteredWater: August2026MeteredWaterChargeState; commonWater: CommonWaterChargePreviewState }>;
+  gasByUnitId?: Map<string, GasChargePreviewState>;
+  chargesByUnitId?: Map<string, { amount: string; lineItems: Array<{ chargeId: string; description: string; amount: string; effectiveFromMonth: string; effectiveToMonth: string | null; }> }>;
 };
 
 export function createMonthlyObligationProviders(deps: MonthlyObligationProviderDeps = {}): ProviderMap {
   const getWaterChargePreviews = deps.getWaterChargePreviewsForUnit ?? getWaterChargePreviewsForUnit;
   const getGasChargePreviews = deps.getGasChargePreviewsForUnit ?? getGasChargePreviewsForUnit;
+  const getFixedAssessment = deps.getUnitFixedMonthlyAssessment ?? getUnitFixedMonthlyAssessment;
+  const getUnitCharges = deps.getUnitChargesForObligationMonth ?? getUnitChargesForObligationMonth;
 
   return {
     fixed_assessment: async ({ context, unit }) => {
@@ -25,7 +36,8 @@ export function createMonthlyObligationProviders(deps: MonthlyObligationProvider
         };
       }
 
-      const result = await getUnitFixedMonthlyAssessment({ unitId: unit.unitId, planYear });
+      const cachedFixed = deps.fixedAssessmentByUnitId?.get(unit.unitId);
+      const result: UnitFixedMonthlyAssessmentState = cachedFixed ?? (await getFixedAssessment({ unitId: unit.unitId, planYear }));
       if (result.status !== "ready") {
         const blocker = result.message;
         return result.reason === "budget-plan-missing"
@@ -46,22 +58,24 @@ export function createMonthlyObligationProviders(deps: MonthlyObligationProvider
         return { status: "not_applicable", provenance: "server/water/monthly-ledger", sourceMonth: context.obligationMonth };
       }
 
-      const result = await getWaterChargePreviews(unit.unitId, context.obligationMonth);
-      if (result.meteredWater.status === "available") {
+      const cached = deps.waterByUnitId?.get(unit.unitId);
+      const result = cached ?? (await getWaterChargePreviews(unit.unitId, context.obligationMonth));
+      const meteredWater = result.meteredWater;
+      if (meteredWater.status === "available") {
         return {
           status: "available",
-          amount: result.meteredWater.data.amount,
+          amount: meteredWater.data.amount,
           currency: "PEN",
           provenance: "server/water",
           sourceMonth: context.obligationMonth,
         };
       }
-      if (result.meteredWater.status === "not-applicable") {
+      if (meteredWater.status === "not-applicable") {
         return { status: "not_applicable", provenance: "server/water", sourceMonth: context.obligationMonth };
       }
       return {
         status: "missing",
-        blocker: result.meteredWater.message,
+        blocker: meteredWater.message,
         provenance: "server/water",
         sourceMonth: context.obligationMonth,
       };
@@ -71,22 +85,24 @@ export function createMonthlyObligationProviders(deps: MonthlyObligationProvider
         return { status: "not_applicable", provenance: "server/water/monthly-ledger", sourceMonth: context.obligationMonth };
       }
 
-      const result = await getWaterChargePreviews(unit.unitId, context.obligationMonth);
-      if (result.commonWater.status === "available") {
+      const cached = deps.waterByUnitId?.get(unit.unitId);
+      const result = cached ?? (await getWaterChargePreviews(unit.unitId, context.obligationMonth));
+      const commonWater = result.commonWater;
+      if (commonWater.status === "available") {
         return {
           status: "available",
-          amount: result.commonWater.data.unitCommonWaterCharge,
+          amount: commonWater.data.unitCommonWaterCharge,
           currency: "PEN",
           provenance: "server/water",
           sourceMonth: context.obligationMonth,
         };
       }
-      if (result.commonWater.status === "not-applicable") {
+      if (commonWater.status === "not-applicable") {
         return { status: "not_applicable", provenance: "server/water", sourceMonth: context.obligationMonth };
       }
       return {
         status: "missing",
-        blocker: result.commonWater.message,
+        blocker: commonWater.message,
         provenance: "server/water",
         sourceMonth: context.obligationMonth,
       };
@@ -96,7 +112,8 @@ export function createMonthlyObligationProviders(deps: MonthlyObligationProvider
         return { status: "not_applicable", provenance: "server/gas/provider", sourceMonth: context.obligationMonth };
       }
 
-      const result = await getGasChargePreviews(unit.unitId, context.obligationMonth);
+      const cached = deps.gasByUnitId?.get(unit.unitId);
+      const result: GasChargePreviewState = cached ?? (await getGasChargePreviews(unit.unitId, context.obligationMonth));
       if (result.status === "available") {
         return {
           status: "available",
@@ -117,7 +134,10 @@ export function createMonthlyObligationProviders(deps: MonthlyObligationProvider
       };
     },
     other_charge: async ({ context, unit }) => {
-      const result = await getUnitChargesForObligationMonth(unit.unitId, context.obligationMonth);
+      const cached = deps.chargesByUnitId?.get(unit.unitId);
+      const result = cached
+        ? { error: null, data: cached }
+        : await getUnitCharges(unit.unitId, context.obligationMonth);
       if (result.error) {
         return {
           status: "blocked",

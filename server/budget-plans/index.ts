@@ -362,4 +362,65 @@ export async function getUnitFixedMonthlyAssessment({
   };
 }
 
+export function getUnitFixedMonthlyAssessmentFromFacts({
+  unitId,
+  planYear,
+  unitParticipationPercentage,
+  plan,
+}: {
+  unitId: string;
+  planYear: number;
+  unitParticipationPercentage: number | null | undefined;
+  plan: {
+    currency: string;
+    monthly_operating_budget: string;
+  } | null;
+}): UnitFixedMonthlyAssessmentState {
+  if (!plan) {
+    return {
+      status: "unavailable",
+      reason: "budget-plan-missing",
+      message: `Fixed Monthly Assessment is unavailable because the ${planYear} Budget Plan has not been entered.`,
+      planYear,
+    };
+  }
+
+  if (unitParticipationPercentage === null || unitParticipationPercentage === undefined) {
+    return {
+      status: "unavailable",
+      reason: "assessment-percentage-missing",
+      message:
+        "Fixed Monthly Assessment is unavailable because this Unit does not have an Assessment Percentage.",
+      planYear,
+    };
+  }
+
+  const fixedMonthlyAssessment = calculateFixedMonthlyAssessment(
+    String(plan.monthly_operating_budget),
+    unitParticipationPercentage,
+  );
+
+  if (!fixedMonthlyAssessment) {
+    return {
+      status: "unavailable",
+      reason: "invalid-assessment-percentage",
+      message:
+        "Fixed Monthly Assessment is unavailable because this Unit has an invalid Assessment Percentage.",
+      planYear,
+    };
+  }
+
+  return {
+    status: "ready",
+    data: {
+      unitId,
+      planYear,
+      currency: plan.currency,
+      monthlyOperatingBudget: String(plan.monthly_operating_budget),
+      assessmentPercentage: unitParticipationPercentage,
+      fixedMonthlyAssessment,
+    },
+  };
+}
+
 export type { BudgetPlanInput, BudgetPlanRecord };

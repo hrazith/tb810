@@ -77,6 +77,31 @@ export type CommonWaterChargePreviewState =
       message: string;
     };
 
+export type WaterChargePreviewBundle = {
+  meteredWater: August2026MeteredWaterChargeState;
+  commonWater: CommonWaterChargePreviewState;
+};
+
+type WaterPerfBreakdown = {
+  targetUnitMs: number;
+  utilityTypeMs: number;
+  targetTypeMs: number;
+  billingPeriodMs: number;
+  utilityBillMs: number;
+  completenessMs: number;
+  populationUnitsMs: number;
+  populationTypesMs: number;
+  meterReadingsMs: number;
+  calculationMs: number;
+  totalMs: number;
+};
+
+type WaterBillLookupPerf = {
+  billingPeriodMs: number;
+  utilityBillMs: number;
+  totalMs: number;
+};
+
 export type SedapalBillCycleState =
   | {
       status: "complete";
@@ -190,6 +215,50 @@ function roundToNearestInteger(value: bigint, divisor: bigint) {
   return (value + divisor / BigInt(2)) / divisor;
 }
 
+function logWaterPerf(input: {
+  unitId: string;
+  obligationMonth: string;
+  breakdown: WaterPerfBreakdown;
+}) {
+  if (process.env.NODE_ENV !== "development") return;
+  console.info(
+    [
+      "[WATER_PERF]",
+      `unit=${input.unitId}`,
+      `month=${input.obligationMonth}`,
+      `target_unit_ms=${input.breakdown.targetUnitMs}`,
+      `utility_type_ms=${input.breakdown.utilityTypeMs}`,
+      `target_type_ms=${input.breakdown.targetTypeMs}`,
+      `billing_period_ms=${input.breakdown.billingPeriodMs}`,
+      `utility_bill_ms=${input.breakdown.utilityBillMs}`,
+      `completeness_ms=${input.breakdown.completenessMs}`,
+      `population_units_ms=${input.breakdown.populationUnitsMs}`,
+      `population_types_ms=${input.breakdown.populationTypesMs}`,
+      `meter_readings_ms=${input.breakdown.meterReadingsMs}`,
+      `calculation_ms=${input.breakdown.calculationMs}`,
+      `total_ms=${input.breakdown.totalMs}`,
+    ].join(" "),
+  );
+}
+
+function logWaterBillLookupPerf(input: {
+  unitId: string;
+  obligationMonth: string;
+  breakdown: WaterBillLookupPerf;
+}) {
+  if (process.env.NODE_ENV !== "development") return;
+  console.info(
+    [
+      "[WATER_BILL_PERF]",
+      `unit=${input.unitId}`,
+      `month=${input.obligationMonth}`,
+      `billing_period_ms=${input.breakdown.billingPeriodMs}`,
+      `utility_bill_ms=${input.breakdown.utilityBillMs}`,
+      `total_ms=${input.breakdown.totalMs}`,
+    ].join(" "),
+  );
+}
+
 async function getUtilityTypeId(
   supabase: Awaited<ReturnType<typeof createClient>>,
   code: "water" | "common_water",
@@ -286,12 +355,19 @@ async function getCommonWaterBillForCycleMonth(
   utilityTypeId: string,
   sourceMonthKey: string,
 ) {
+  const startedAt = Date.now();
+  const breakdown: WaterBillLookupPerf = {
+    billingPeriodMs: 0,
+    utilityBillMs: 0,
+    totalMs: 0,
+  };
   const sourceMonth = new Date(`${sourceMonthKey}-01T00:00:00Z`);
   if (Number.isNaN(sourceMonth.getTime())) {
     return { data: null, error: "Reading month is invalid." };
   }
 
   const billingMonth = new Date(Date.UTC(sourceMonth.getUTCFullYear(), sourceMonth.getUTCMonth() - 1, 1));
+  const billingPeriodStarted = Date.now();
   const { data: billingPeriod, error: billingPeriodError } = await supabase
     .from("tb810_billing_periods")
     .select(BILLING_PERIOD_SELECT)
@@ -299,6 +375,7 @@ async function getCommonWaterBillForCycleMonth(
     .eq("period_year", billingMonth.getUTCFullYear())
     .eq("period_month", billingMonth.getUTCMonth() + 1)
     .maybeSingle();
+  breakdown.billingPeriodMs = Date.now() - billingPeriodStarted;
 
   if (billingPeriodError) {
     return { data: null, error: billingPeriodError.message };
@@ -307,6 +384,7 @@ async function getCommonWaterBillForCycleMonth(
     return { data: null, error: "Sedapal water bill has not been entered yet." };
   }
 
+  const utilityBillStarted = Date.now();
   const { data: bills, error } = await supabase
     .from("tb810_utility_bills")
     .select(WATER_BILL_SELECT)
@@ -314,6 +392,13 @@ async function getCommonWaterBillForCycleMonth(
     .eq("billing_period_id", billingPeriod.id)
     .eq("utility_type_id", utilityTypeId)
     .limit(2);
+  breakdown.utilityBillMs = Date.now() - utilityBillStarted;
+  breakdown.totalMs = Date.now() - startedAt;
+  logWaterBillLookupPerf({
+    unitId: buildingId,
+    obligationMonth: sourceMonthKey,
+    breakdown,
+  });
 
   if (error) {
     return { data: null, error: error.message };
@@ -335,6 +420,20 @@ async function getAugust2026UnitWaterCycleContext(
   | { data: August2026UnitWaterCycleContext; error: null }
   | { data: null; error: string }
 > {
+  const startedAt = Date.now();
+  const breakdown: WaterPerfBreakdown = {
+    targetUnitMs: 0,
+    utilityTypeMs: 0,
+    targetTypeMs: 0,
+    billingPeriodMs: 0,
+    utilityBillMs: 0,
+    completenessMs: 0,
+    populationUnitsMs: 0,
+    populationTypesMs: 0,
+    meterReadingsMs: 0,
+    calculationMs: 0,
+    totalMs: 0,
+  };
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: null, error: buildingResult.error };
   if (!buildingResult.data) {
@@ -346,16 +445,25 @@ async function getAugust2026UnitWaterCycleContext(
   if (!sourceReadingMonth) {
     return { data: null, error: "Obligation month is invalid." };
   }
-  const [unitResult, commonWaterTypeResult, completenessResult] = await Promise.all([
-    supabase
-      .from("tb810_units")
-      .select(UNIT_SELECT)
+  const targetUnitStarted = Date.now();
+  const unitPromise = supabase
+    .from("tb810_units")
+    .select(UNIT_SELECT)
     .eq("building_id", buildingResult.data.id)
     .eq("id", unitId)
-    .maybeSingle(),
-    getUtilityTypeId(supabase, "common_water"),
-    getCurrentReadingMonthCompleteness(sourceReadingMonth),
+    .maybeSingle();
+  const utilityTypeStarted = Date.now();
+  const commonWaterTypePromise = getUtilityTypeId(supabase, "common_water");
+  const completenessStarted = Date.now();
+  const completenessPromise = getCurrentReadingMonthCompleteness(sourceReadingMonth);
+  const [unitResult, commonWaterTypeResult, completenessResult] = await Promise.all([
+    unitPromise,
+    commonWaterTypePromise,
+    completenessPromise,
   ]);
+  breakdown.targetUnitMs = Date.now() - targetUnitStarted;
+  breakdown.utilityTypeMs = Date.now() - utilityTypeStarted;
+  breakdown.completenessMs = Date.now() - completenessStarted;
 
   if (unitResult.error) return { data: null, error: unitResult.error.message };
   if (commonWaterTypeResult.error) return { data: null, error: commonWaterTypeResult.error };
@@ -368,45 +476,58 @@ async function getAugust2026UnitWaterCycleContext(
     return { data: null, error: "Water lookup data is incomplete." };
   }
 
+  const targetTypeStarted = Date.now();
   const { data: unitType, error: unitTypeError } = await supabase
     .from("tb810_unit_types")
     .select(UNIT_TYPE_SELECT)
     .eq("id", unitResult.data.unit_type_id)
     .maybeSingle();
+  breakdown.targetTypeMs = Date.now() - targetTypeStarted;
   if (unitTypeError) return { data: null, error: unitTypeError.message };
   if (!unitType) return { data: null, error: "Unit type is missing." };
   if (unitType.code !== "condo") {
     return { data: null, error: "Common Water is not applicable for this Unit." };
   }
 
+  const populationUnitsStarted = Date.now();
+  const populationUnitsPromise = supabase
+    .from("tb810_units")
+    .select("id, unit_type_id")
+    .eq("building_id", buildingResult.data.id);
+  const billingPeriodStarted = Date.now();
+  const billPromise = getCommonWaterBillForCycleMonth(
+    supabase,
+    buildingResult.data.id,
+    commonWaterTypeResult.data.id,
+    sourceReadingMonth,
+  );
+  const meterReadingsStarted = Date.now();
+  const meterReadingsPromise = supabase
+    .from("tb810_meter_readings")
+    .select("unit_id, reading_end, consumption, reading_date, created_at")
+    .eq("building_id", buildingResult.data.id)
+    .eq("utility_type_id", commonWaterTypeResult.data.id)
+    .eq("reading_month", monthKeyToDate(sourceReadingMonth));
   const [unitRowsResult, billResult, readingsResult] = await Promise.all([
-    supabase
-      .from("tb810_units")
-      .select("id, unit_type_id")
-      .eq("building_id", buildingResult.data.id),
-    getCommonWaterBillForCycleMonth(
-        supabase,
-        buildingResult.data.id,
-        commonWaterTypeResult.data.id,
-        sourceReadingMonth,
-      ),
-    supabase
-      .from("tb810_meter_readings")
-      .select("unit_id, reading_end, consumption, reading_date, created_at")
-      .eq("building_id", buildingResult.data.id)
-      .eq("utility_type_id", commonWaterTypeResult.data.id)
-      .eq("reading_month", monthKeyToDate(sourceReadingMonth)),
+    populationUnitsPromise,
+    billPromise,
+    meterReadingsPromise,
   ]);
+  breakdown.populationUnitsMs = Date.now() - populationUnitsStarted;
+  breakdown.billingPeriodMs = Date.now() - billingPeriodStarted;
+  breakdown.meterReadingsMs = Date.now() - meterReadingsStarted;
 
   if (unitRowsResult.error) return { data: null, error: unitRowsResult.error.message };
   if (billResult.error) return { data: null, error: billResult.error };
   if (readingsResult.error) return { data: null, error: readingsResult.error.message };
 
+  const populationTypesStarted = Date.now();
   const unitTypeIds = [...new Set((unitRowsResult.data ?? []).map((row) => row.unit_type_id).filter(Boolean))];
   const unitTypesResult = await supabase
     .from("tb810_unit_types")
     .select("id, code")
     .in("id", unitTypeIds);
+  breakdown.populationTypesMs = Date.now() - populationTypesStarted;
   if (unitTypesResult.error) return { data: null, error: unitTypesResult.error.message };
 
   const condoTypeIds = new Set((unitTypesResult.data ?? []).filter((row) => row.code === "condo").map((row) => row.id));
@@ -418,6 +539,14 @@ async function getAugust2026UnitWaterCycleContext(
     rows.push(row);
     readingsByUnit.set(row.unit_id, rows);
   }
+
+  breakdown.calculationMs = 0;
+  breakdown.totalMs = Date.now() - startedAt;
+  logWaterPerf({
+    unitId,
+    obligationMonth,
+    breakdown,
+  });
 
   return {
     data: {
@@ -1302,13 +1431,30 @@ export async function getWaterChargePreviewsForUnit(
     };
   }
 
-  const context = contextResult.data;
-  const meteredWater = await (async (): Promise<August2026MeteredWaterChargeState> => {
+  const calculationStarted = Date.now();
+  const result = calculateWaterChargePreviewsForUnit(contextResult.data);
+  if (process.env.NODE_ENV === "development") {
+    console.info(
+      [
+        "[WATER_CALC_PERF]",
+        `unit=${unitId}`,
+        `month=${obligationMonth}`,
+        `calculation_ms=${Date.now() - calculationStarted}`,
+      ].join(" "),
+    );
+  }
+  return result;
+}
+
+export function calculateWaterChargePreviewsForUnit(
+  context: August2026UnitWaterCycleContext,
+): WaterChargePreviewBundle {
+  const meteredWater = (() : August2026MeteredWaterChargeState => {
     if (context.unitTypeCode !== "condo" || !context.unit.has_meter) {
       return { status: "not-applicable", message: "Metered water is not applicable for this Unit." };
     }
 
-    const readings = context.readingsByUnit.get(unitId) ?? [];
+    const readings = context.readingsByUnit.get(context.unit.id) ?? [];
     if (readings.length === 0) {
       return { status: "unavailable", message: `No ${context.sourceReadingMonthLabel} meter reading recorded.` };
     }
@@ -1359,7 +1505,7 @@ export async function getWaterChargePreviewsForUnit(
     };
   })();
 
-  const commonWater = await (async (): Promise<CommonWaterChargePreviewState> => {
+  const commonWater = (() : CommonWaterChargePreviewState => {
     if (context.unitTypeCode !== "condo") {
       return { status: "not-applicable", message: "Common Water is not applicable for this Unit." };
     }

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getFixedBuildingIdentity } from "@/server/building";
 
 import type {
   BuildingRecord,
@@ -73,9 +74,7 @@ export async function listBuildings(): Promise<QueryResult<BuildingRecord[]>> {
 }
 
 export async function getCurrentBuilding(): Promise<QueryResult<BuildingRecord | null>> {
-  const buildings = await listBuildings();
-  if (buildings.error) return { data: null, error: buildings.error };
-  return { data: buildings.data[0] ?? null, error: null };
+  return { data: getFixedBuildingIdentity(), error: null };
 }
 
 export async function listUnits(

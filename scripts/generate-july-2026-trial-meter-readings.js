@@ -8,7 +8,9 @@ const BUILDING_NAME = "TB810";
 const TARGET_MONTH_KEY = "2026-07";
 const TARGET_READING_DATE = "2026-07-01";
 const PREVIOUS_MONTH_KEY = "2026-06-01";
-const TRIAL_PURPOSE = "common_water_completion_test_2026_07";
+const TARGET_AGGREGATE_CONSUMPTION = 430.0;
+const CONSUMPTION_SCALE_DECIMALS = 3;
+const TRIAL_PURPOSE = "common_water_financially_valid_fixture_2026_07";
 const TRIAL_MARKER = {
   trial_data: true,
   trial_purpose: TRIAL_PURPOSE,
@@ -39,16 +41,45 @@ function parseArgs(argv) {
   };
 }
 
-function seedFromUnitNumber(unitNumber) {
-  return [...String(unitNumber)].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+function decimalToInt(value, decimals) {
+  return Math.round(Number(value) * 10 ** decimals);
 }
 
-function deriveConsumption(unitNumber, juneConsumption) {
-  const seed = seedFromUnitNumber(unitNumber);
-  const base = Number.isFinite(juneConsumption) && juneConsumption > 0 ? juneConsumption : 3.25;
-  const offset = ((seed % 11) - 5) * 0.08;
-  const scaled = base * 0.92 + offset;
-  return Math.max(0.5, Number(scaled.toFixed(3)));
+function intToDecimal(value, decimals) {
+  return Number((value / 10 ** decimals).toFixed(decimals));
+}
+
+function distributeRoundedConsumption(weights, targetTotal, decimals) {
+  const scale = 10 ** decimals;
+  const targetInt = decimalToInt(targetTotal, decimals);
+  const rawTotal = weights.reduce((sum, weight) => sum + weight, 0);
+  if (!(rawTotal > 0)) {
+    throw new Error("Cannot scale fixture consumption without a positive source total.");
+  }
+
+  const exacts = weights.map((weight) => (weight / rawTotal) * targetTotal);
+  const rounded = exacts.map((value) => decimalToInt(value, decimals));
+  let delta = targetInt - rounded.reduce((sum, value) => sum + value, 0);
+
+  const adjustments = exacts
+    .map((value, index) => {
+      const scaled = value * scale;
+      return {
+        index,
+        fraction: scaled - Math.floor(scaled),
+      };
+    })
+    .sort((left, right) => right.fraction - left.fraction || left.index - right.index);
+
+  let cursor = 0;
+  while (delta !== 0) {
+    const adjustment = adjustments[cursor % adjustments.length];
+    rounded[adjustment.index] += delta > 0 ? 1 : -1;
+    delta += delta > 0 ? -1 : 1;
+    cursor += 1;
+  }
+
+  return rounded.map((value) => intToDecimal(value, decimals));
 }
 
 function monthLabel(monthKey) {
@@ -124,13 +155,30 @@ async function main() {
   if (julyError) throw julyError;
   if (juneError) throw juneError;
 
-  const condoUnits = (units ?? []).filter((unit) => unit.unit_type_id === condoType.id);
-  const julyByUnit = new Map((existingJuly ?? []).map((row) => [row.unit_id, row]));
+  const condoUnits = (units ?? [])
+    .filter((unit) => unit.unit_type_id === condoType.id)
+    .sort((left, right) => left.unit_number.localeCompare(right.unit_number, "en", { numeric: true }));
   const juneByUnit = new Map((juneReadings ?? []).map((row) => [row.unit_id, row]));
+  const existingJulyByUnit = new Map((existingJuly ?? []).map((row) => [row.unit_id, row]));
+  const existingTrialJulyRows = (existingJuly ?? []).filter(
+    (row) => row.legacy_metadata && typeof row.legacy_metadata === "object" && row.legacy_metadata.trial_data === true,
+  );
+  const existingGenuineJulyRows = (existingJuly ?? []).filter(
+    (row) => !(row.legacy_metadata && typeof row.legacy_metadata === "object" && row.legacy_metadata.trial_data === true),
+  );
+  const genuineJulyConsumption = existingGenuineJulyRows.reduce((sum, row) => sum + Number(row.consumption ?? 0), 0);
+  const syntheticTargetAggregate = TARGET_AGGREGATE_CONSUMPTION - genuineJulyConsumption;
+  if (syntheticTargetAggregate <= 0) {
+    throw new Error("Synthetic fixture target must remain positive after accounting for genuine July readings.");
+  }
 
-  const eligibleUnits = condoUnits.filter((unit) => !julyByUnit.has(unit.id));
+  const eligibleUnits = condoUnits.filter((unit) => {
+    const existing = existingJulyByUnit.get(unit.id);
+    return !existing || (existing.legacy_metadata && typeof existing.legacy_metadata === "object" && existing.legacy_metadata.trial_data === true);
+  });
   const skipped = [];
-  const proposedRows = [];
+  const sourceWeights = [];
+  const sourceRows = [];
 
   for (const unit of eligibleUnits) {
     const june = juneByUnit.get(unit.id);
@@ -138,27 +186,48 @@ async function main() {
       skipped.push({ unit_number: unit.unit_number, reason: "missing valid June predecessor" });
       continue;
     }
+    const juneConsumption = Number(june.consumption);
+    if (!Number.isFinite(juneConsumption) || juneConsumption < 0) {
+      skipped.push({ unit_number: unit.unit_number, reason: "invalid June source consumption" });
+      continue;
+    }
 
+    sourceWeights.push(juneConsumption);
+    sourceRows.push({ unit, june });
+  }
+
+  const scaledConsumptions = distributeRoundedConsumption(
+    sourceWeights,
+    syntheticTargetAggregate,
+    CONSUMPTION_SCALE_DECIMALS,
+  );
+
+  const proposedRows = sourceRows.map(({ unit, june }, index) => {
     const readingStart = Number(june.reading_end);
-    const consumption = deriveConsumption(unit.unit_number, Number(june.consumption));
-    const readingEnd = Number((readingStart + consumption).toFixed(3));
+    const consumption = scaledConsumptions[index];
+    const readingEnd = Number((readingStart + consumption).toFixed(CONSUMPTION_SCALE_DECIMALS));
 
-    proposedRows.push({
+    return {
       building_id: building.id,
       unit_id: unit.id,
       utility_type_id: utilityType.id,
       reading_date: TARGET_READING_DATE,
       reading_start: readingStart,
       reading_end: readingEnd,
-      consumption: Number((readingEnd - readingStart).toFixed(3)),
+      consumption: Number(consumption.toFixed(CONSUMPTION_SCALE_DECIMALS)),
       unit_of_measure: "m³",
       status: "recorded",
-      notes: `Trial data for July 2026 completion test.`,
+      notes: `Synthetic July 2026 test fixture reconciled to the 2026-07 common-water bill.`,
       legacy_table: "tb810_trial_meter_readings",
       legacy_id: `trial-${unit.unit_number}-${TARGET_READING_DATE}`,
-      legacy_metadata: toLegacyMetadata(null, TRIAL_MARKER),
-    });
-  }
+      legacy_metadata: toLegacyMetadata(null, {
+        ...TRIAL_MARKER,
+        fixture_rule: "scaled_from_june_consumption_to_430_m3",
+        source_month: "2026-06",
+        target_month: TARGET_MONTH_KEY,
+      }),
+    };
+  });
 
   const summary = {
     targetSupabaseProject: url,
@@ -167,6 +236,13 @@ async function main() {
     monthLabel: monthLabel(TARGET_MONTH_KEY),
     existingJulyCount: (existingJuly ?? []).length,
     proposedRowCount: proposedRows.length,
+    existingTrialRowCount: existingTrialJulyRows.length,
+    existingGenuineRowCount: existingGenuineJulyRows.length,
+    genuineAggregateConsumption: Number(genuineJulyConsumption.toFixed(CONSUMPTION_SCALE_DECIMALS)),
+    targetAggregateConsumption: TARGET_AGGREGATE_CONSUMPTION,
+    targetSyntheticAggregateConsumption: Number(syntheticTargetAggregate.toFixed(CONSUMPTION_SCALE_DECIMALS)),
+    proposedSyntheticAggregateConsumption: proposedRows.reduce((sum, row) => sum + Number(row.consumption), 0),
+    proposedAggregateConsumption: Number((proposedRows.reduce((sum, row) => sum + Number(row.consumption), genuineJulyConsumption)).toFixed(CONSUMPTION_SCALE_DECIMALS)),
     skippedUnitCount: skipped.length,
     skipped,
     writesTrialData: true,
@@ -182,6 +258,14 @@ async function main() {
   if (proposedRows.length === 0) {
     console.log("No trial rows to insert.");
     return;
+  }
+
+  if (existingTrialJulyRows.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("tb810_meter_readings")
+      .delete()
+      .in("id", existingTrialJulyRows.map((row) => row.id));
+    if (deleteError) throw deleteError;
   }
 
   const { error: insertError } = await supabase.from("tb810_meter_readings").insert(proposedRows);

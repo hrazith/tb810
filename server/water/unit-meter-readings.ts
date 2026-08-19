@@ -4,11 +4,18 @@ import {
   isRecordCreatedByActiveDevTestSession,
   recordDevTestMutation,
 } from "@/server/dev-test-session";
-import { getCurrentBuilding, listUnits } from "@/server/units";
+import { getCurrentBuilding } from "@/server/units";
 
 type QueryResult<T> = {
   data: T;
   error: string | null;
+};
+
+type CompletenessPerf = {
+  utilityTypeMs: number;
+  populationUnitsMs: number;
+  meterReadingsMs: number;
+  totalMs: number;
 };
 
 export type UnitMeterReadingStatus = "recorded" | "reviewed" | "approved" | "void";
@@ -92,6 +99,11 @@ export type UnitOption = {
   floor: string | null;
 };
 
+type PopulationUnit = {
+  id: string;
+  unit_type_id: string;
+};
+
 export type UnitMeterReadingMonthOption = {
   key: string;
   label: string;
@@ -163,6 +175,20 @@ function readingToText(value: number | null) {
   return value == null ? "—" : value.toFixed(3).replace(/\.?0+$/, "");
 }
 
+function logCompletenessPerf(input: { month: string; breakdown: CompletenessPerf }) {
+  if (process.env.NODE_ENV !== "development") return;
+  console.info(
+    [
+      "[WATER_COMPLETENESS_PERF]",
+      `month=${input.month}`,
+      `utility_type_ms=${input.breakdown.utilityTypeMs}`,
+      `population_units_ms=${input.breakdown.populationUnitsMs}`,
+      `meter_readings_ms=${input.breakdown.meterReadingsMs}`,
+      `total_ms=${input.breakdown.totalMs}`,
+    ].join(" "),
+  );
+}
+
 export async function listUnitMeterReadingMonths(): Promise<QueryResult<UnitMeterReadingMonthOption[]>> {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: [], error: buildingResult.error };
@@ -199,16 +225,61 @@ async function getUtilityTypeId(supabase: Awaited<ReturnType<typeof createClient
 }
 
 async function getCondoUnits(): Promise<QueryResult<UnitOption[]>> {
-  const unitsResult = await listUnits();
-  if (unitsResult.error) return { data: [], error: unitsResult.error };
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: [], error: buildingResult.error };
+  if (!buildingResult.data) return { data: [], error: null };
+
+  const supabase = await createClient();
+  const { data: condoType, error: condoTypeError } = await supabase
+    .from("tb810_unit_types")
+    .select("id, code, name")
+    .eq("code", "condo")
+    .maybeSingle();
+  if (condoTypeError) return { data: [], error: condoTypeError.message };
+  if (!condoType) return { data: [], error: "Condo unit type is missing." };
+
+  const { data, error } = await supabase
+    .from("tb810_units")
+    .select("id, unit_number, floor, unit_type_id")
+    .eq("building_id", buildingResult.data.id)
+    .eq("unit_type_id", condoType.id)
+    .order("display_order", { ascending: true })
+    .order("unit_number", { ascending: true });
+  if (error) return { data: [], error: error.message };
   return {
-    data: unitsResult.data
-      .filter((unit) => unit.unit_type_code === "condo")
+    data: (data ?? [])
       .map((unit) => ({
         id: unit.id,
         unit_number: unit.unit_number,
         floor: unit.floor,
       })),
+    error: null,
+  };
+}
+
+async function getCondoPopulationFacts(): Promise<QueryResult<PopulationUnit[]>> {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: [], error: buildingResult.error };
+  if (!buildingResult.data) return { data: [], error: null };
+
+  const supabase = await createClient();
+  const [condoTypeResult, unitsResult] = await Promise.all([
+    supabase.from("tb810_unit_types").select("id, code").eq("code", "condo").maybeSingle(),
+    supabase
+      .from("tb810_units")
+      .select("id, unit_type_id")
+      .eq("building_id", buildingResult.data.id)
+      .order("display_order", { ascending: true })
+      .order("unit_number", { ascending: true }),
+  ]);
+
+  if (condoTypeResult.error) return { data: [], error: condoTypeResult.error.message };
+  if (!condoTypeResult.data) return { data: [], error: "Condo unit type is missing." };
+  if (unitsResult.error) return { data: [], error: unitsResult.error.message };
+
+  const condoTypeId = condoTypeResult.data.id;
+  return {
+    data: (unitsResult.data ?? []).filter((unit) => unit.unit_type_id === condoTypeId),
     error: null,
   };
 }
@@ -305,21 +376,32 @@ export async function getReadingDefaults(readingDate?: string): Promise<QueryRes
 export async function getCurrentReadingMonthCompleteness(targetMonthKey?: string): Promise<
   QueryResult<MeterReadingCompletenessSummary | null>
 > {
+  const startedAt = Date.now();
+  const breakdown: CompletenessPerf = {
+    utilityTypeMs: 0,
+    populationUnitsMs: 0,
+    meterReadingsMs: 0,
+    totalMs: 0,
+  };
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: null, error: buildingResult.error };
   if (!buildingResult.data) return { data: null, error: null };
 
   const supabase = await createClient();
+  const utilityTypeStarted = Date.now();
   const utilityType = await getUtilityTypeId(supabase);
+  breakdown.utilityTypeMs = Date.now() - utilityTypeStarted;
   if (utilityType.error) return { data: null, error: utilityType.error };
   if (!utilityType.data) return { data: null, error: "Common Water utility type is missing." };
 
   const targetMonth = targetMonthKey ?? previousMonthKeyFromDate(new Date());
   const monthLabel = monthLabelFromKey(targetMonth);
-  const [unitsResult, readingsResult] = await Promise.all([
-    getCondoUnits(),
-    getCurrentMonthReadingsForBuilding(supabase, buildingResult.data.id, utilityType.data.id, targetMonth),
-  ]);
+  const populationUnitsStarted = Date.now();
+  const unitsResult = await getCondoPopulationFacts();
+  breakdown.populationUnitsMs = Date.now() - populationUnitsStarted;
+  const meterReadingsStarted = Date.now();
+  const readingsResult = await getCurrentMonthReadingsForBuilding(supabase, buildingResult.data.id, utilityType.data.id, targetMonth);
+  breakdown.meterReadingsMs = Date.now() - meterReadingsStarted;
 
   if (unitsResult.error) return { data: null, error: unitsResult.error };
   if (readingsResult.error) return { data: null, error: readingsResult.error };
@@ -347,6 +429,8 @@ export async function getCurrentReadingMonthCompleteness(targetMonthKey?: string
 
   const completedCount = unitsResult.data.filter((unit) => completedUnitIds.has(unit.id)).length;
   const incompleteCount = totalExpectedCount - completedCount;
+  breakdown.totalMs = Date.now() - startedAt;
+  logCompletenessPerf({ month: targetMonth, breakdown });
 
   return {
     data: {
