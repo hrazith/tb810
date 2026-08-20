@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getUnitById } from "@/server/units";
 import type { UnitTypeCode } from "@/server/units/types";
+import { getUnitById } from "@/server/units";
 
 import {
   getCurrentBillingMonth,
@@ -30,28 +30,16 @@ function mapOwnershipRow(row: OwnershipRecord): OwnershipRecord {
   return row;
 }
 
-async function getUnitAccountSummary(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  unitId: string,
-): Promise<QueryResult<UnitAccountSummary | null>> {
-  const { data, error } = await supabase
-    .from("tb810_unit_accounts")
-    .select("id, account_number, status, current_balance, credit_balance")
-    .eq("unit_id", unitId)
-    .order("created_at", { ascending: true })
-    .maybeSingle();
-
-  if (error) return { data: null, error: error.message };
-  return { data: data ?? null, error: null };
-}
-
 async function getOwnerMap(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ownerIds: string[],
-) {
-  if (ownerIds.length === 0) {
-    return { data: new Map<string, OwnershipWithRelations["owner"]>(), error: null };
-  }
+): Promise<QueryResult<Map<string, {
+  id: string;
+  full_name: string;
+  owner_reference: string;
+  active: boolean;
+}> | null>> {
+  if (ownerIds.length === 0) return { data: new Map(), error: null };
 
   const { data, error } = await supabase
     .from("tb810_owners")
@@ -79,50 +67,83 @@ async function getOwnerMap(
 async function getUnitMap(
   supabase: Awaited<ReturnType<typeof createClient>>,
   unitIds: string[],
-) {
-  if (unitIds.length === 0) {
-    return { data: new Map<string, { unit_number: string; unit_type_code: UnitTypeCode; unit_type_name: string }>(), error: null };
-  }
+): Promise<QueryResult<Map<string, {
+  unit_number: string;
+  unit_type_code: UnitTypeCode;
+  unit_type_name: string;
+}> | null>> {
+  if (unitIds.length === 0) return { data: new Map(), error: null };
 
   const { data, error } = await supabase
     .from("tb810_units")
-    .select("id, unit_number, unit_type_id")
+    .select("id, unit_number, tb810_unit_types!tb810_units_unit_type_id_fkey(code, name)")
     .in("id", unitIds);
 
   if (error) return { data: null, error: error.message };
 
-  const unitTypeIds = Array.from(new Set((data ?? []).map((row) => row.unit_type_id)));
-  const { data: unitTypes, error: unitTypeError } = await supabase
-    .from("tb810_unit_types")
-    .select("id, code, name")
-    .in("id", unitTypeIds);
-
-  if (unitTypeError) return { data: null, error: unitTypeError.message };
-
-  const unitTypeMap = new Map(
-    (unitTypes ?? []).map((unitType) => [
-      unitType.id,
-      { code: unitType.code as UnitTypeCode, name: unitType.name },
-    ]),
-  );
-
   return {
     data: new Map(
-      (data ?? []).map((unit) => {
-        const unitType = unitTypeMap.get(unit.unit_type_id);
-        return [
-          unit.id,
-          {
-            unit_number: unit.unit_number,
-            unit_type_code: unitType?.code ?? "condo",
-            unit_type_name: unitType?.name ?? "Unit",
-          },
-        ] as const;
-      }),
+      (data ?? []).map((unit) => [
+        unit.id,
+        {
+          unit_number: unit.unit_number,
+          unit_type_code: ((unit as unknown as { tb810_unit_types?: { code: UnitTypeCode } | null }).tb810_unit_types?.code ?? "condo") as UnitTypeCode,
+          unit_type_name: ((unit as unknown as { tb810_unit_types?: { name: string } | null }).tb810_unit_types?.name ?? "Unit"),
+        },
+      ]),
     ),
     error: null,
   };
 }
+
+type SelectedUnitOwnershipSnapshotFacts = {
+  ownershipRows: Array<
+    OwnershipRecord & {
+      owner: {
+        id: string;
+        full_name: string;
+        owner_reference: string;
+        active: boolean;
+      } | null;
+    }
+  >;
+  unitAccount: UnitAccountSummary | null;
+};
+
+export function buildSelectedUnitOwnershipSnapshotFromFacts(
+  facts: SelectedUnitOwnershipSnapshotFacts,
+  unit: {
+    id: string;
+    unit_number: string;
+    unit_type_code: UnitTypeCode;
+    unit_type_name?: string | null;
+  },
+  currentMonth: string = getCurrentBillingMonth(),
+): UnitOwnershipSnapshot {
+  const ownershipHistory = facts.ownershipRows
+    .map((row) => {
+      if (!row.owner) return null;
+      return mapOwnershipWithRelations(
+        row,
+        row.owner,
+        {
+          unit_number: unit.unit_number,
+          unit_type_code: unit.unit_type_code,
+          unit_type_name: unit.unit_type_name ?? "Unit",
+        },
+        classifyOwnershipRow(row, currentMonth),
+      );
+    })
+    .filter(Boolean) as OwnershipWithRelations[];
+
+  return {
+    currentOwnership: ownershipHistory.find((row) => row.ownership_status === "current") ?? null,
+    scheduledOwnerships: ownershipHistory.filter((row) => row.ownership_status === "scheduled"),
+    ownershipHistory,
+    unitAccount: facts.unitAccount,
+  };
+}
+
 
 function mapOwnershipWithRelations(
   row: OwnershipRecord,
@@ -197,137 +218,79 @@ export async function getOwnershipHistoryForUnit(
   };
 }
 
-export async function getUnitOwnershipSnapshot(
+async function loadSelectedUnitOwnershipSnapshotFacts(
   unitId: string,
-): Promise<QueryResult<UnitOwnershipSnapshot | null>> {
+): Promise<QueryResult<SelectedUnitOwnershipSnapshotFacts | null>> {
   const supabase = await createClient();
-  const [rowsResult, accountResult] = await Promise.all([
-    getOwnershipRowsForUnit(unitId),
-    getUnitAccountSummary(supabase, unitId),
-  ]);
+  const rpc = await (supabase as unknown as {
+    rpc: (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
+  }).rpc("tb810_get_unit_ownership_account_snapshot", {
+    p_unit_id: unitId,
+  });
 
-  if (rowsResult.error) return { data: null, error: rowsResult.error };
-  if (accountResult.error) return { data: null, error: accountResult.error };
-
-  const currentMonth = getCurrentBillingMonth();
-  const { data: ownerMap, error: ownerError } = await getOwnerMap(
-    supabase,
-    [...new Set((rowsResult.data ?? []).map((row) => row.owner_id))],
-  );
-  if (ownerError) return { data: null, error: ownerError };
-
-  const { data: unitMap, error: unitError } = await getUnitMap(supabase, [unitId]);
-  if (unitError) return { data: null, error: unitError };
-  if (!unitMap || !ownerMap) return { data: null, error: null };
-
-  const unit = unitMap.get(unitId);
-  if (!unit) return { data: null, error: null };
-
-  const ownershipHistory = (rowsResult.data ?? [])
-    .map((row) => {
-      const owner = ownerMap.get(row.owner_id);
-      return owner
-        ? mapOwnershipWithRelations(
-            row,
-            owner,
-            unit,
-            classifyOwnershipRow(row, currentMonth),
-          )
-        : null;
-    })
-    .filter(Boolean) as OwnershipWithRelations[];
-
-  const currentOwnership =
-    ownershipHistory.find((row) => row.ownership_status === "current") ?? null;
-  const scheduledOwnerships = ownershipHistory.filter(
-    (row) => row.ownership_status === "scheduled",
-  );
-
-  return {
-    data: {
-      currentOwnership,
-      scheduledOwnerships,
-      ownershipHistory,
-      unitAccount: accountResult.data,
-    },
-    error: null,
-  };
+  if (rpc.error) return { data: null, error: rpc.error.message };
+  const payload = (rpc.data ?? null) as SelectedUnitOwnershipSnapshotFacts | null;
+  if (!payload) return { data: null, error: "Unit ownership/account snapshot unavailable." };
+  return { data: payload, error: null };
 }
 
 export async function getSelectedUnitOwnershipSnapshot(input: {
   unit: {
     id: string;
     unit_number: string;
-    unit_type_id: string;
     unit_type_code: UnitTypeCode;
     unit_type_name?: string | null;
   };
 }): Promise<QueryResult<UnitOwnershipSnapshot | null>> {
-  const startedAt = Date.now();
-  const supabase = await createClient();
-  const [rowsResult, accountResult] = await Promise.all([
-    getOwnershipRowsForUnit(input.unit.id),
-    getUnitAccountSummary(supabase, input.unit.id),
-  ]);
+  const startedAt = process.hrtime.bigint();
+  const factsResult = await loadSelectedUnitOwnershipSnapshotFacts(input.unit.id);
+  if (factsResult.error) return { data: null, error: factsResult.error };
+  if (!factsResult.data) return { data: null, error: "Unit ownership/account snapshot unavailable." };
 
-  if (rowsResult.error) return { data: null, error: rowsResult.error };
-  if (accountResult.error) return { data: null, error: accountResult.error };
-
-  const currentMonth = getCurrentBillingMonth();
-  const { data: ownerMap, error: ownerError } = await getOwnerMap(
-    supabase,
-    [...new Set((rowsResult.data ?? []).map((row) => row.owner_id))],
-  );
-  if (ownerError) return { data: null, error: ownerError };
-  if (!ownerMap) return { data: null, error: null };
-
-  const unit = {
-    unit_number: input.unit.unit_number,
-    unit_type_code: input.unit.unit_type_code,
-    unit_type_name: input.unit.unit_type_name ?? "Unit",
-  };
-
-  const ownershipHistory = (rowsResult.data ?? [])
-    .map((row) => {
-      const owner = ownerMap.get(row.owner_id);
-      return owner
-        ? mapOwnershipWithRelations(
-            row,
-            owner,
-            unit,
-            classifyOwnershipRow(row, currentMonth),
-          )
-        : null;
-    })
-    .filter(Boolean) as OwnershipWithRelations[];
-
-  const currentOwnership =
-    ownershipHistory.find((row) => row.ownership_status === "current") ?? null;
-  const scheduledOwnerships = ownershipHistory.filter(
-    (row) => row.ownership_status === "scheduled",
+  const snapshot = buildSelectedUnitOwnershipSnapshotFromFacts(
+    factsResult.data,
+    input.unit,
   );
 
   if (process.env.NODE_ENV === "development") {
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
     console.info(
       [
         "[SELECTED_UNIT_OWNERSHIP_PERF]",
         `unit=${input.unit.id}`,
-        `data_remote_requests=3`,
-        `elapsed_ms=${Date.now() - startedAt}`,
-        `ownership_rows_ms=0`,
-        `account_ms=0`,
-        `owners_ms=0`,
+        `data_remote_requests=1`,
+        `elapsed_ms=${elapsedMs.toFixed(1)}`,
       ].join(" "),
     );
   }
 
   return {
-    data: {
-      currentOwnership,
-      scheduledOwnerships,
-      ownershipHistory,
-      unitAccount: accountResult.data,
-    },
+    data: snapshot,
+    error: null,
+  };
+}
+
+export async function getUnitOwnershipSnapshot(
+  unitId: string,
+): Promise<QueryResult<UnitOwnershipSnapshot | null>> {
+  const unitResult = await getUnitById(unitId);
+  if (unitResult.error) return { data: null, error: unitResult.error };
+  if (!unitResult.data) return { data: null, error: null };
+
+  const factsResult = await loadSelectedUnitOwnershipSnapshotFacts(unitId);
+  if (factsResult.error) return { data: null, error: factsResult.error };
+  if (!factsResult.data) return { data: null, error: "Unit ownership/account snapshot unavailable." };
+
+  return {
+    data: buildSelectedUnitOwnershipSnapshotFromFacts(factsResult.data, {
+      id: unitResult.data.id,
+      unit_number: unitResult.data.unit_number,
+      unit_type_code: unitResult.data.unit_type_code,
+      unit_type_name: unitResult.data.unit_type_name,
+    }),
     error: null,
   };
 }

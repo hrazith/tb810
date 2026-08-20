@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
-import { createClient } from "@/lib/supabase/server";
 import { TB810_BUILDING_ID, TB810_BUILDING_NAME } from "@/server/building";
 import {
   createOwnerDirectChargeAction,
@@ -20,7 +19,8 @@ import {
 } from "@/server/obligations";
 import { getSelectedUnitOwnershipSnapshot } from "@/server/ownerships";
 import { listOwners } from "@/server/owners";
-import { listUnits } from "@/server/units";
+import { getSelectedUnitTransactionsForUnit } from "@/server/transactions";
+import { listUnitDirectory } from "@/server/units";
 
 type PageProps = {
   searchParams: Promise<{
@@ -29,16 +29,6 @@ type PageProps = {
     unitId?: string;
     error?: string;
   }>;
-};
-
-type FinancialActivity = {
-  id: string;
-  created_at: string;
-  transaction_type: string;
-  amount: number;
-  notes: string | null;
-  reference_type: string | null;
-  reference_id: string | null;
 };
 
 function formatMoney(value: string | number | null) {
@@ -89,37 +79,12 @@ function componentLabel(key: string) {
       return key;
   }
 }
-
-
-async function loadSelectedUnitTransactions(unitAccountId: string) {
-  const startedAt = Date.now();
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("tb810_account_transactions")
-    .select("id, created_at, transaction_type, amount, notes, reference_type, reference_id")
-    .eq("unit_account_id", unitAccountId)
-    .order("created_at", { ascending: false })
-    .limit(10);
-  const elapsedMs = Date.now() - startedAt;
-  if (process.env.NODE_ENV === "development") {
-    console.info(
-      [
-        "[SELECTED_UNIT_TRANSACTIONS_PERF]",
-        `unit_account_id=${unitAccountId}`,
-        `data_remote_requests=1`,
-        `elapsed_ms=${elapsedMs}`,
-      ].join(" "),
-    );
-  }
-  return (data ?? []) as FinancialActivity[];
-}
-
 export default async function ObligationsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const monthKey = await currentMonthKey();
   const mode = params.mode ?? "owners";
 
-  const unitsResult = mode === "units" ? await listUnits() : null;
+  const unitsResult = mode === "units" ? await listUnitDirectory() : null;
   if (unitsResult?.error) throw new Error(unitsResult.error);
   const eligibleUnits = unitsResult?.data.filter((unit) => unit.unit_type_code === "condo") ?? [];
 
@@ -132,6 +97,10 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
   const selectedOwner = mode === "owners" && params.ownerId
     ? ownersResult?.data.find((owner) => owner.id === params.ownerId) ?? null
     : null;
+  const selectedBranchStartedAt = selectedUnit ? process.hrtime.bigint() : null;
+  const selectedTransactionsPromise = selectedUnit
+    ? getSelectedUnitTransactionsForUnit(selectedUnit.id)
+    : Promise.resolve([]);
 
   const selectedObligationPromise = selectedUnit
     ? getUnitMonthlyObligationForBuilding({
@@ -139,9 +108,6 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
           unitId: selectedUnit.id,
           unitNumber: selectedUnit.unit_number,
           unitAccountId: selectedUnit.id,
-          unitTypeCode: selectedUnit.unit_type_code,
-          unitTypeId: selectedUnit.unit_type_id,
-          hasMeter: Boolean(selectedUnit.has_meter),
           participationPercentage: selectedUnit.participation_percentage ?? null,
         },
         obligationMonth: monthKey,
@@ -172,20 +138,19 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
         unit: {
           id: selectedUnit.id,
           unit_number: selectedUnit.unit_number,
-          unit_type_id: selectedUnit.unit_type_id,
           unit_type_code: selectedUnit.unit_type_code,
-          unit_type_name: selectedUnit.unit_type_name,
         },
       })
     : null;
 
-  const [selectedObligation, selectedOwnerObligation, selectedOwnerUpcomingCharges, selectedUnitUpcomingCharges, selectedSnapshot] =
+  const [selectedObligation, selectedOwnerObligation, selectedOwnerUpcomingCharges, selectedUnitUpcomingCharges, selectedSnapshot, transactions] =
     await Promise.all([
       selectedObligationPromise,
       selectedOwnerObligationPromise,
       selectedOwnerUpcomingChargesPromise,
       selectedUnitUpcomingChargesPromise,
       selectedSnapshotPromise,
+      selectedTransactionsPromise,
     ]);
 
   if (selectedObligation?.error) throw new Error(selectedObligation.error);
@@ -194,9 +159,18 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
   if (selectedUnitUpcomingCharges?.error) throw new Error(selectedUnitUpcomingCharges.error);
   if (selectedSnapshot?.error) throw new Error(selectedSnapshot.error);
 
-  let transactions: FinancialActivity[] = [];
-  if (selectedSnapshot?.data?.unitAccount?.id) {
-    transactions = await loadSelectedUnitTransactions(selectedSnapshot.data.unitAccount.id);
+  if (process.env.NODE_ENV === "development" && selectedBranchStartedAt) {
+    const selectedBranchElapsedMs = Number(process.hrtime.bigint() - selectedBranchStartedAt) / 1_000_000;
+    console.info(
+      [
+        "[OBLIGATIONS_SELECTED_BRANCH_PERF]",
+        `unit=${selectedUnit?.unit_number ?? "—"}`,
+        `month=${monthKey}`,
+        `elapsed_ms=${selectedBranchElapsedMs.toFixed(1)}`,
+        `concurrent_helpers=financial,ownership_snapshot,upcoming_charges`,
+        `sequential_waits=none`,
+      ].join(" "),
+    );
   }
 
   const selectedUnitPanel =

@@ -568,6 +568,7 @@ export async function getUpcomingUnitChargesForObligationMonth(
   unitId: string,
   obligationMonth: string,
 ): Promise<QueryResult<ChargeRecord[]>> {
+  const startedAt = process.hrtime.bigint();
   const buildingResult = await getCurrentBuildingId();
   if (buildingResult.error) return { data: [], error: buildingResult.error };
   const supabase = await createClient();
@@ -579,6 +580,18 @@ export async function getUpcomingUnitChargesForObligationMonth(
     .eq("building_id", buildingId)
     .eq("unit_id", unitId);
   if (error) return { data: [], error: error.message };
+  if (process.env.NODE_ENV === "development") {
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+    console.info(
+      [
+        "[UPCOMING_UNIT_CHARGES_PERF]",
+        `unit=${unitId}`,
+        `month=${obligationMonth}`,
+        `data_remote_requests=1`,
+        `elapsed_ms=${elapsedMs.toFixed(1)}`,
+      ].join(" "),
+    );
+  }
   return {
     data: selectUpcomingChargesForTarget((data ?? []) as ChargeRecord[], { unitId }, obligationMonth),
     error: null,

@@ -30,6 +30,15 @@ export type UnitListItem = UnitRecord & {
   current_owner_reference: string | null;
 };
 
+export type UnitDirectoryItem = {
+  id: string;
+  unit_number: string;
+  unit_type_code: UnitTypeCode;
+  current_owner_name: string | null;
+  current_owner_reference: string | null;
+  participation_percentage: number | null;
+};
+
 export type UnitDetail = UnitRecord & {
   unit_type_name: string;
   unit_type_code: UnitTypeCode;

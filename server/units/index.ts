@@ -3,6 +3,7 @@ import { getFixedBuildingIdentity } from "@/server/building";
 
 import type {
   BuildingRecord,
+  UnitDirectoryItem,
   UnitDetail,
   UnitFilters,
   UnitFormDefaults,
@@ -80,6 +81,8 @@ export async function getCurrentBuilding(): Promise<QueryResult<BuildingRecord |
 export async function listUnits(
   filters: UnitFilters = {},
 ): Promise<QueryResult<UnitListItem[]>> {
+  const startedAt = process.hrtime.bigint();
+  const remoteRequests = { count: 0 };
   const supabase = await createClient();
   const query = normalizeText(filters.query).toLowerCase();
 
@@ -93,9 +96,11 @@ export async function listUnits(
     request = request.eq("unit_type_id", filters.unitTypeId);
   }
 
+  remoteRequests.count += 1;
   const { data, error } = await request;
   if (error) return { data: [], error: error.message };
 
+  remoteRequests.count += 1;
   const { data: unitTypes, error: unitTypeError } = await supabase
     .from("tb810_unit_types")
     .select("id, code, name, sort_order");
@@ -121,6 +126,7 @@ export async function listUnits(
   >();
 
   if (unitIds.length > 0) {
+    remoteRequests.count += 1;
     const { data: ownerships, error: ownershipError } = await supabase
       .from("tb810_ownerships")
       .select("unit_id, owner_id")
@@ -133,6 +139,7 @@ export async function listUnits(
 
     const ownerIds = [...new Set((ownerships ?? []).map((row) => row.owner_id))];
     if (ownerIds.length > 0) {
+      remoteRequests.count += 1;
       const { data: owners, error: ownerError } = await supabase
         .from("tb810_owners")
         .select("id, full_name, owner_reference")
@@ -160,6 +167,18 @@ export async function listUnits(
         }
       }
     }
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+    console.info(
+      [
+        "[UNIT_LIST_PERF]",
+        `data_remote_requests=${remoteRequests.count}`,
+        `elapsed_ms=${elapsedMs.toFixed(1)}`,
+        `units=${(data ?? []).length}`,
+      ].join(" "),
+    );
   }
 
   return {
@@ -191,6 +210,62 @@ export async function listUnits(
         };
       })
       .filter(Boolean) as UnitListItem[],
+    error: null,
+  };
+}
+
+export async function listUnitDirectory(): Promise<QueryResult<UnitDirectoryItem[]>> {
+  const startedAt = process.hrtime.bigint();
+  const supabase = await createClient();
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: [], error: buildingResult.error };
+  if (!buildingResult.data) return { data: [], error: "Current building not found." };
+
+  const { data, error } = await supabase
+    .from("tb810_units")
+    .select(
+      "id, unit_number, participation_percentage, tb810_unit_types!tb810_units_unit_type_id_fkey(code), tb810_ownerships!tb810_ownerships_unit_id_fkey(end_date, tb810_owners!tb810_ownerships_owner_id_fkey(full_name, owner_reference))",
+    )
+    .eq("building_id", buildingResult.data.id)
+    .order("display_order", { ascending: true })
+    .order("unit_number", { ascending: true });
+
+  if (error) return { data: [], error: error.message };
+
+  if (process.env.NODE_ENV === "development") {
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+    console.info(
+      [
+        "[UNIT_DIRECTORY_PERF]",
+        `data_remote_requests=1`,
+        `elapsed_ms=${elapsedMs.toFixed(1)}`,
+        `returned_units=${(data ?? []).length}`,
+      ].join(" "),
+    );
+  }
+
+  return {
+    data: (data ?? []).map((row) => {
+      const ownerships = (row as unknown as {
+        tb810_ownerships?: Array<{
+          end_date: string | null;
+          tb810_owners?: { full_name: string; owner_reference: string } | null;
+        }>;
+        tb810_unit_types?: { code: UnitTypeRecord["code"] } | null;
+      }).tb810_ownerships ?? [];
+      const currentOwnership = ownerships.find((ownership) => ownership.end_date === null) ?? null;
+      const currentOwner = currentOwnership?.tb810_owners ?? null;
+      const unitType = (row as unknown as { tb810_unit_types?: { code: UnitTypeRecord["code"] } | null }).tb810_unit_types ?? null;
+
+      return {
+        id: row.id,
+        unit_number: row.unit_number,
+        unit_type_code: unitType?.code ?? "condo",
+        current_owner_name: currentOwner?.full_name ?? null,
+        current_owner_reference: currentOwner?.owner_reference ?? null,
+        participation_percentage: row.participation_percentage ?? null,
+      };
+    }),
     error: null,
   };
 }

@@ -107,9 +107,6 @@ export async function getUnitMonthlyObligationForBuilding({
     unitId: string;
     unitNumber: string;
     unitAccountId: string;
-    unitTypeCode: string;
-    unitTypeId: string;
-    hasMeter: boolean;
     participationPercentage: number | null;
   };
   obligationMonth: string;
@@ -128,6 +125,7 @@ export async function getUnitMonthlyObligationForBuilding({
   if (!buildingFactsResult.data) return { data: null as never, error: "Building month financial facts not found." };
 
   const buildingFacts = buildingFactsResult.data;
+  const selectedUnitFacts = buildingFacts.unitRows.find((row) => row.id === unit.unitId) ?? null;
   const calculationStartedAt = Date.now();
   const fixedAssessmentByUnitId = buildFixedAssessmentMap(buildingFacts.plan, buildingFacts.planYear, [
     {
@@ -141,9 +139,9 @@ export async function getUnitMonthlyObligationForBuilding({
       buildWaterPreviewFromFacts(
         {
           id: unit.unitId,
-          unit_type_id: unit.unitTypeId,
-          unit_type_code: unit.unitTypeCode as "condo" | "parking" | "storage",
-          has_meter: unit.hasMeter,
+          unit_type_id: selectedUnitFacts?.unit_type_id ?? "",
+          unit_type_code: selectedUnitFacts?.unit_type_code ?? "condo",
+          has_meter: selectedUnitFacts?.has_meter ?? false,
         },
         obligationMonth,
         buildingFacts,
@@ -165,8 +163,8 @@ export async function getUnitMonthlyObligationForBuilding({
         unitId: unit.unitId,
         unitNumber: unit.unitNumber,
         unitAccountId: unit.unitAccountId,
-        unitTypeCode: unit.unitTypeCode,
-        hasMeter: unit.hasMeter,
+        unitTypeCode: selectedUnitFacts?.unit_type_code ?? "condo",
+        hasMeter: selectedUnitFacts?.has_meter ?? false,
         participationPercentage: unit.participationPercentage,
       },
     ],
