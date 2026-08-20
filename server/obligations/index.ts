@@ -1,15 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
-import { getMonthlyFixedAssessmentSummary } from "../budget-plans";
 import { getCurrentBuilding, getUnitById, listUnits } from "../units";
-import { getMonthlyGasObligationSummary } from "../gas";
-import { getMonthlyWaterObligationSummary } from "../water";
 import { isChargeEligibleForMonth } from "../charges/month";
 import { composeMonthlyObligation } from "./core";
 import { createMonthlyObligationProviders } from "./providers";
-import {
-  buildMonthlyObligationSummary,
-  type MonthlyObligationSummaryComponent,
-} from "./summary";
+import { buildChargeMap, buildFixedAssessmentMap, buildGasCalculationInputFromFacts, buildWaterPreviewFromFacts, loadBuildingMonthFinancialFacts } from "./owner-facts";
+import { buildMonthlyObligationSummaryFromFacts } from "./summary-facts";
+import { calculateGasCharges } from "../gas/calculation";
 
 export function selectBuildingOwnerDirectCharges(
   charges: Array<{
@@ -102,100 +97,151 @@ export async function getUnitMonthlyObligation({
   return { data: composed, error: null };
 }
 
+export async function getUnitMonthlyObligationForBuilding({
+  unit,
+  obligationMonth,
+  buildingId,
+  buildingName,
+}: {
+  unit: {
+    unitId: string;
+    unitNumber: string;
+    unitAccountId: string;
+    unitTypeCode: string;
+    unitTypeId: string;
+    hasMeter: boolean;
+    participationPercentage: number | null;
+  };
+  obligationMonth: string;
+  buildingId: string;
+  buildingName: string;
+}) {
+  const startedAt = Date.now();
+  const buildingFactsStartedAt = Date.now();
+  const buildingFactsResult = await loadBuildingMonthFinancialFacts({
+    buildingId,
+    obligationMonth,
+  });
+  const buildingMonthFactsMs = Date.now() - buildingFactsStartedAt;
+
+  if (buildingFactsResult.error) return { data: null as never, error: buildingFactsResult.error };
+  if (!buildingFactsResult.data) return { data: null as never, error: "Building month financial facts not found." };
+
+  const buildingFacts = buildingFactsResult.data;
+  const calculationStartedAt = Date.now();
+  const fixedAssessmentByUnitId = buildFixedAssessmentMap(buildingFacts.plan, buildingFacts.planYear, [
+    {
+      id: unit.unitId,
+      participation_percentage: unit.participationPercentage,
+    },
+  ]);
+  const waterByUnitId = new Map([
+    [
+      unit.unitId,
+      buildWaterPreviewFromFacts(
+        {
+          id: unit.unitId,
+          unit_type_id: unit.unitTypeId,
+          unit_type_code: unit.unitTypeCode as "condo" | "parking" | "storage",
+          has_meter: unit.hasMeter,
+        },
+        obligationMonth,
+        buildingFacts,
+      ),
+    ],
+  ]);
+  const gasCalculation = calculateGasCharges(buildGasCalculationInputFromFacts(buildingFacts, obligationMonth));
+  const chargesByUnitId = buildChargeMap(buildingFacts.charges, obligationMonth, [unit.unitId]);
+
+  const compositionStartedAt = Date.now();
+  const composed = await composeMonthlyObligation(
+    {
+      obligationMonth,
+      buildingId,
+      buildingName,
+    },
+    [
+      {
+        unitId: unit.unitId,
+        unitNumber: unit.unitNumber,
+        unitAccountId: unit.unitAccountId,
+        unitTypeCode: unit.unitTypeCode,
+        hasMeter: unit.hasMeter,
+        participationPercentage: unit.participationPercentage,
+      },
+    ],
+    createMonthlyObligationProviders({
+      fixedAssessmentByUnitId,
+      waterByUnitId,
+      gasByUnitId: new Map([
+        [
+          unit.unitId,
+          gasCalculation.blockers.length > 0
+            ? { status: "unavailable", message: gasCalculation.blockers.join(" ") || "Gas lookup data is incomplete." }
+            : {
+                status: "available",
+                data: {
+                  ...gasCalculation,
+                  sourceReadingMonthLabel: buildingFacts.sourceReadingMonth,
+                  billingMonthLabel: obligationMonth,
+                },
+              },
+        ],
+      ]),
+      chargesByUnitId,
+    }),
+  );
+
+  if (process.env.NODE_ENV === "development") {
+    console.info(
+      [
+        "[UNIT_OBLIGATION_PERF]",
+        `unit=${unit.unitNumber}`,
+        `month=${obligationMonth}`,
+        `data_remote_requests=${buildingFactsResult.requestCount}`,
+        `elapsed_ms=${Date.now() - startedAt}`,
+        `building_month_facts_ms=${buildingMonthFactsMs}`,
+        `financial_calculation_ms=${Date.now() - calculationStartedAt}`,
+        `composition_ms=${Date.now() - compositionStartedAt}`,
+      ].join(" "),
+    );
+  }
+
+  return { data: composed, error: null };
+}
+
 export async function getMonthlyObligationSummary({ obligationMonth }: { obligationMonth: string }) {
+  const startedAt = Date.now();
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: null as never, error: buildingResult.error };
   if (!buildingResult.data) return { data: null as never, error: "Current building not found." };
-
-  const unitsResult = await listUnits();
-  if (unitsResult.error) return { data: null as never, error: unitsResult.error };
-
-  const eligibleUnits = unitsResult.data.filter((unit) => unit.unit_type_code === "condo");
-  const [fixedResult, waterResult, gasResult] = await Promise.all([
-    getMonthlyFixedAssessmentSummary({ obligationMonth }),
-    getMonthlyWaterObligationSummary({ obligationMonth }),
-    getMonthlyGasObligationSummary({ obligationMonth }),
-  ]);
-
-  if (fixedResult.error) return { data: null as never, error: fixedResult.error };
-  if (waterResult.metered_water.state === "blocked" && !waterResult.common_water.reason) {
-    return { data: null as never, error: waterResult.metered_water.reason ?? "Water summary unavailable." };
-  }
-  if (gasResult.state === "blocked" && !gasResult.reason) {
-    return { data: null as never, error: gasResult.reason ?? "Gas summary unavailable." };
-  }
-
-  const supabase = await createClient();
-  const { data: charges, error: chargesError } = await supabase
-    .from("tb810_charges")
-    .select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
-    .eq("building_id", buildingResult.data.id);
-  if (chargesError) return { data: null as never, error: chargesError.message };
-
-  const applicableCharges = (charges ?? []).filter((row) => {
-    if (row.owner_id != null || row.unit_id == null) return false;
-    if (!eligibleUnits.some((unit) => unit.id === row.unit_id)) return false;
-    const effectiveFromMonth = row.effective_from_month.slice(0, 7);
-    const effectiveToMonth = row.effective_to_month ? row.effective_to_month.slice(0, 7) : null;
-    return isChargeEligibleForMonth({
-      schedule: row.schedule,
-      effectiveFromMonth,
-      effectiveToMonth,
-      obligationMonth,
-    });
-  });
-
-  const otherChargeAmount = applicableCharges.reduce((total, row) => total + Number(row.amount), 0);
-  const ownerDirectCharges = await getBuildingOwnerDirectChargeSummary({
+  const summaryStartedAt = Date.now();
+  const buildingFactsResult = await loadBuildingMonthFinancialFacts({
     buildingId: buildingResult.data.id,
     obligationMonth,
   });
-  if (ownerDirectCharges.error) return { data: null as never, error: ownerDirectCharges.error };
+  if (buildingFactsResult.error) return { data: null as never, error: buildingFactsResult.error };
+  if (!buildingFactsResult.data) return { data: null as never, error: "Building month facts unavailable." };
 
-  const fixedAssessmentComponent: MonthlyObligationSummaryComponent =
-    fixedResult.data ?? {
-      state: "blocked",
-      amount: null,
-      reason: fixedResult.error ?? "Fixed Monthly Assessment is unavailable.",
-    };
+  const summary = buildMonthlyObligationSummaryFromFacts(buildingFactsResult.data, obligationMonth);
+  const elapsedMs = Date.now() - startedAt;
+  if (process.env.NODE_ENV === "development") {
+    console.info(
+      [
+        "[OBLIGATIONS_SUMMARY_PERF]",
+        `month=${obligationMonth}`,
+        `data_remote_requests=${buildingFactsResult.requestCount}`,
+        `elapsed_ms=${elapsedMs}`,
+        `building_month_facts_ms=${summaryStartedAt - startedAt}`,
+        `summary_projection_ms=${Date.now() - summaryStartedAt}`,
+      ].join(" "),
+    );
+  }
 
   return {
-    data: buildMonthlyObligationSummary({
-      obligationMonth,
-      eligibleUnitCount: eligibleUnits.length,
-      fixedAssessment: fixedAssessmentComponent,
-      meteredWater: waterResult.metered_water,
-      commonWater: waterResult.common_water,
-      gas: gasResult,
-      otherChargeAmount: otherChargeAmount.toFixed(2),
-      otherChargeCount: applicableCharges.length,
-      ownerDirectChargeAmount: ownerDirectCharges.data.amount,
-      ownerDirectChargeCount: ownerDirectCharges.data.count,
-    }),
+    data: summary,
     error: null,
   };
-}
-
-async function getBuildingOwnerDirectChargeSummary({
-  buildingId,
-  obligationMonth,
-}: {
-  buildingId: string;
-  obligationMonth: string;
-}): Promise<{ data: { amount: string; count: number }; error: string | null }> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("tb810_charges")
-    .select("amount, schedule, effective_from_month, effective_to_month, owner_id, unit_id")
-    .eq("building_id", buildingId)
-    .not("owner_id", "is", null)
-    .is("unit_id", null);
-  if (error) return { data: { amount: "0.00", count: 0 }, error: error.message };
-
-  const applicableCharges = selectBuildingOwnerDirectCharges(data ?? [], obligationMonth);
-
-  const amount = applicableCharges.reduce((total, row) => total + Number(row.amount), 0).toFixed(2);
-  return { data: { amount, count: applicableCharges.length }, error: null };
 }
 
 export type {

@@ -11,11 +11,6 @@ import type { OwnershipRecord } from "@/server/ownerships/types";
 import type { OwnerSummary } from "@/server/owners/types";
 import type { UnitTypeCode } from "@/server/units/types";
 
-type QueryResult<T> = {
-  data: T | null;
-  error: string | null;
-};
-
 function withRequestCount<T>(result: { data: T | null; error: string | null }, requestCount: number): { data: T | null; error: string | null; requestCount: number } {
   return { ...result, requestCount };
 }
@@ -105,6 +100,25 @@ export type OwnerMonthResponsibilityResult = {
   requestCount: number;
 };
 
+type BuildingMonthFinancialFactsRpcPayload = {
+  plan?: { currency: string; monthly_operating_budget: number | string } | null;
+  commonWaterType?: { id: string; code: string; name: string } | null;
+  commonWaterBill?: CommonWaterBill | null;
+  unitRows?: Array<{
+    id: string;
+    unit_number: string;
+    unit_type_id: string;
+    unit_type_code: UnitTypeCode;
+    has_meter: boolean;
+    has_gas_service: boolean;
+    participation_percentage: number | null;
+  }>;
+  waterReadings?: BuildingMonthFinancialFacts["waterReadings"];
+  gasBills?: BuildingMonthFinancialFacts["gasBills"];
+  gasReadings?: BuildingMonthFinancialFacts["gasReadings"];
+  charges?: ChargeRecord[];
+};
+
 function monthLabelFromKey(monthKey: string) {
   const parsed = new Date(`${monthKey}-01T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return monthKey;
@@ -113,10 +127,6 @@ function monthLabelFromKey(monthKey: string) {
     year: "numeric",
     timeZone: "UTC",
   }).format(parsed);
-}
-
-function monthKeyToDate(monthKey: string) {
-  return `${monthKey}-01`;
 }
 
 function selectChargeRows(charges: ChargeRecord[], obligationMonth: string) {
@@ -130,6 +140,10 @@ function selectChargeRows(charges: ChargeRecord[], obligationMonth: string) {
         : effectiveFromMonth <= obligationMonth && (effectiveToMonth === null || effectiveToMonth >= obligationMonth);
     return eligible;
   });
+}
+
+export function monthKeyToDate(monthKey: string) {
+  return `${monthKey}-01`;
 }
 
 export function buildWaterPreviewFromFacts(
@@ -255,98 +269,34 @@ export async function loadBuildingMonthFinancialFacts({
   const supabase = await createClient();
   const planYear = Number(obligationMonth.slice(0, 4));
   const sourceReadingMonth = previousMonthKeyFromMonthKey(obligationMonth) ?? "2026-07";
-  const sourceMonthDate = monthKeyToDate(sourceReadingMonth);
-
-  const [planResult, unitsResult, utilityTypeResult] = await Promise.all([
-    supabase.from("tb810_budget_plans").select("id, building_id, plan_year, currency, monthly_operating_budget, created_at, updated_at").eq("building_id", buildingId).eq("plan_year", planYear).maybeSingle(),
-    supabase.from("tb810_units").select("id, unit_number, unit_type_id, participation_percentage, has_meter, has_gas_service, tb810_unit_types!tb810_units_unit_type_id_fkey(id, code, name, sort_order)").eq("building_id", buildingId).order("display_order", { ascending: true }).order("unit_number", { ascending: true }),
-    supabase.from("tb810_utility_types").select("id, code, name").eq("code", "common_water").maybeSingle(),
-  ]);
-
-  if (planResult.error) return withRequestCount({ data: null, error: planResult.error.message }, 9);
-  if (unitsResult.error) return withRequestCount({ data: null, error: unitsResult.error.message }, 9);
-  if (utilityTypeResult.error) return withRequestCount({ data: null, error: utilityTypeResult.error.message }, 9);
-  if (!utilityTypeResult.data) return withRequestCount({ data: null, error: "Common water utility type not found." }, 9);
-
-  const [billingPeriodResult, waterReadingsResult, gasBillsResult, gasReadingsResult, chargesResult] = await Promise.all([
-    supabase.from("tb810_billing_periods").select("id, status, period_year, period_month").eq("building_id", buildingId).eq("period_year", Number(sourceReadingMonth.slice(0, 4))).eq("period_month", Number(sourceReadingMonth.slice(5, 7))).maybeSingle(),
-    supabase.from("tb810_meter_readings").select("unit_id, reading_end, consumption, reading_date, created_at").eq("building_id", buildingId).eq("utility_type_id", utilityTypeResult.data.id).eq("reading_month", sourceMonthDate),
-    supabase.from("tb810_gas_bills").select("id, amount, processed_at, invoice_date").eq("building_id", buildingId).order("invoice_date", { ascending: false }).order("created_at", { ascending: false }),
-    supabase.from("tb810_gas_readings").select("unit_id, reading_month, current_reading, previous_reading, consumption").eq("building_id", buildingId).eq("reading_month", sourceMonthDate),
-    supabase.from("tb810_charges").select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at").eq("building_id", buildingId),
-  ]);
-
-  if (billingPeriodResult.error) return withRequestCount({ data: null, error: billingPeriodResult.error.message }, 9);
-  if (waterReadingsResult.error) return withRequestCount({ data: null, error: waterReadingsResult.error.message }, 9);
-  if (gasBillsResult.error) return withRequestCount({ data: null, error: gasBillsResult.error.message }, 9);
-  if (gasReadingsResult.error) return withRequestCount({ data: null, error: gasReadingsResult.error.message }, 9);
-  if (chargesResult.error) return withRequestCount({ data: null, error: chargesResult.error.message }, 9);
-
-  const commonWaterBill: QueryResult<CommonWaterBill> = billingPeriodResult.data
-    ? await supabase
-        .from("tb810_utility_bills")
-        .select("id, building_id, utility_type_id, billing_period_id, supplier_id, bill_date, amount, description, attachment_document_id, status, notes, previous_reading, current_reading, total_consumption, unit_cost, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
-        .eq("building_id", buildingId)
-        .eq("billing_period_id", billingPeriodResult.data.id)
-        .maybeSingle()
-        .then(({ data, error }) =>
-          error
-            ? { error: error.message, data: null }
-            : {
-                error: null,
-                data: data ? ({ ...data } as unknown as CommonWaterBill) : null,
-              },
-        )
-    : { error: null, data: null };
-
-  if (!commonWaterBill.data) return withRequestCount({ data: null, error: "Common water bill not found." }, 9);
-  const resolvedCommonWaterBill = commonWaterBill.data;
-
-  if (commonWaterBill.error) return withRequestCount({ data: null, error: commonWaterBill.error }, 9);
-
-  const unitRows = (unitsResult.data ?? []).map((row) => {
-    const unitType = (row as unknown as { tb810_unit_types?: { id: string; code: UnitTypeCode; name: string } | null }).tb810_unit_types ?? null;
-    return {
-      id: row.id,
-      unit_number: row.unit_number,
-      unit_type_id: row.unit_type_id,
-      unit_type_code: unitType?.code ?? "condo",
-      has_meter: Boolean(row.has_meter),
-      has_gas_service: Boolean(row.has_gas_service),
-      participation_percentage: row.participation_percentage ?? null,
-    };
+  const rpc = await (supabase as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> }).rpc("tb810_get_building_month_financial_facts", {
+    p_building_id: buildingId,
+    p_plan_year: planYear,
+    p_reading_month: monthKeyToDate(sourceReadingMonth),
   });
+  if (rpc.error) return withRequestCount({ data: null, error: rpc.error.message }, 1);
+  if (!rpc.data) return withRequestCount({ data: null, error: "Building month facts not found." }, 1);
+
+  const payload = rpc.data as BuildingMonthFinancialFactsRpcPayload;
+  const commonWaterBill = payload.commonWaterBill ?? null;
+  if (!commonWaterBill) return withRequestCount({ data: null, error: "Common water bill not found." }, 1);
 
   return {
-      data: {
-        obligationMonth,
-        sourceReadingMonth,
-        planYear,
-        plan: planResult.data
-          ? { currency: planResult.data.currency, monthly_operating_budget: String(planResult.data.monthly_operating_budget) }
-          : null,
-        commonWaterType: utilityTypeResult.data,
-        commonWaterBill: resolvedCommonWaterBill,
-        unitRows,
-        waterReadings: (waterReadingsResult.data ?? []).map((row) => ({
-          unit_id: row.unit_id,
-          reading_end: row.reading_end,
-          consumption: row.consumption,
-          reading_date: row.reading_date,
-          created_at: row.created_at,
-        })),
-        gasBills: (gasBillsResult.data ?? []).map((row) => ({ id: row.id, amount: row.amount, processed_at: row.processed_at, invoice_date: row.invoice_date })),
-        gasReadings: (gasReadingsResult.data ?? []).map((row) => ({
-          unit_id: row.unit_id,
-          reading_month: row.reading_month,
-          current_reading: row.current_reading,
-          previous_reading: row.previous_reading,
-          consumption: row.consumption,
-        })),
-        charges: (chargesResult.data ?? []) as ChargeRecord[],
+    data: {
+      obligationMonth,
+      sourceReadingMonth,
+      planYear,
+      plan: payload.plan ? { currency: String(payload.plan.currency), monthly_operating_budget: String(payload.plan.monthly_operating_budget) } : null,
+      commonWaterType: payload.commonWaterType ?? null,
+      commonWaterBill,
+      unitRows: payload.unitRows ?? [],
+      waterReadings: payload.waterReadings ?? [],
+      gasBills: payload.gasBills ?? [],
+      gasReadings: payload.gasReadings ?? [],
+      charges: payload.charges ?? [],
     },
     error: null,
-    requestCount: 9,
+    requestCount: 1,
   };
 }
 

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
 import { createClient } from "@/lib/supabase/server";
+import { TB810_BUILDING_ID, TB810_BUILDING_NAME } from "@/server/building";
 import {
   createOwnerDirectChargeAction,
   createUnitChargeAction,
@@ -12,8 +13,12 @@ import {
 } from "@/server/charges/actions";
 import { getUpcomingOwnerDirectChargesForObligationMonth, getUpcomingUnitChargesForObligationMonth } from "@/server/charges";
 import { currentMonthKey, monthLabel, nextMonthKey } from "@/server/charges/month";
-import { getMonthlyObligationSummary, getOwnerMonthlyObligation, getUnitMonthlyObligation } from "@/server/obligations";
-import { getUnitOwnershipSnapshot } from "@/server/ownerships";
+import {
+  getMonthlyObligationSummary,
+  getOwnerMonthlyObligation,
+  getUnitMonthlyObligationForBuilding,
+} from "@/server/obligations";
+import { getSelectedUnitOwnershipSnapshot } from "@/server/ownerships";
 import { listOwners } from "@/server/owners";
 import { listUnits } from "@/server/units";
 
@@ -85,6 +90,30 @@ function componentLabel(key: string) {
   }
 }
 
+
+async function loadSelectedUnitTransactions(unitAccountId: string) {
+  const startedAt = Date.now();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("tb810_account_transactions")
+    .select("id, created_at, transaction_type, amount, notes, reference_type, reference_id")
+    .eq("unit_account_id", unitAccountId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  const elapsedMs = Date.now() - startedAt;
+  if (process.env.NODE_ENV === "development") {
+    console.info(
+      [
+        "[SELECTED_UNIT_TRANSACTIONS_PERF]",
+        `unit_account_id=${unitAccountId}`,
+        `data_remote_requests=1`,
+        `elapsed_ms=${elapsedMs}`,
+      ].join(" "),
+    );
+  }
+  return (data ?? []) as FinancialActivity[];
+}
+
 export default async function ObligationsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const monthKey = await currentMonthKey();
@@ -104,44 +133,70 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
     ? ownersResult?.data.find((owner) => owner.id === params.ownerId) ?? null
     : null;
 
-  const selectedObligation = selectedUnit
-    ? await getUnitMonthlyObligation({ unitId: selectedUnit.id, obligationMonth: monthKey })
+  const selectedObligationPromise = selectedUnit
+    ? getUnitMonthlyObligationForBuilding({
+        unit: {
+          unitId: selectedUnit.id,
+          unitNumber: selectedUnit.unit_number,
+          unitAccountId: selectedUnit.id,
+          unitTypeCode: selectedUnit.unit_type_code,
+          unitTypeId: selectedUnit.unit_type_id,
+          hasMeter: Boolean(selectedUnit.has_meter),
+          participationPercentage: selectedUnit.participation_percentage ?? null,
+        },
+        obligationMonth: monthKey,
+        buildingId: TB810_BUILDING_ID,
+        buildingName: TB810_BUILDING_NAME,
+      })
     : null;
-  if (selectedObligation?.error) throw new Error(selectedObligation.error);
 
-  const selectedOwnerObligation = selectedOwner
-    ? await getOwnerMonthlyObligation({ ownerId: selectedOwner.id, obligationMonth: monthKey })
+  const selectedOwnerObligationPromise = selectedOwner
+    ? getOwnerMonthlyObligation({ ownerId: selectedOwner.id, obligationMonth: monthKey })
     : null;
-  if (selectedOwnerObligation?.error) throw new Error(selectedOwnerObligation.error);
 
-  const selectedOwnerUpcomingCharges = selectedOwner
-    ? await getUpcomingOwnerDirectChargesForObligationMonth(selectedOwner.id, monthKey)
+  const selectedOwnerUpcomingChargesPromise = selectedOwner
+    ? getUpcomingOwnerDirectChargesForObligationMonth(selectedOwner.id, monthKey)
     : null;
-  if (selectedOwnerUpcomingCharges?.error) throw new Error(selectedOwnerUpcomingCharges.error);
 
-  const selectedUnitUpcomingCharges = selectedUnit
-    ? await getUpcomingUnitChargesForObligationMonth(selectedUnit.id, monthKey)
+  const selectedUnitUpcomingChargesPromise = selectedUnit
+    ? getUpcomingUnitChargesForObligationMonth(selectedUnit.id, monthKey)
     : null;
-  if (selectedUnitUpcomingCharges?.error) throw new Error(selectedUnitUpcomingCharges.error);
 
   const monthlySummary = !selectedUnit && !selectedOwner
     ? await getMonthlyObligationSummary({ obligationMonth: monthKey })
     : null;
   if (monthlySummary?.error) throw new Error(monthlySummary.error);
 
-  const selectedSnapshot = selectedUnit ? await getUnitOwnershipSnapshot(selectedUnit.id) : null;
+  const selectedSnapshotPromise = selectedUnit
+    ? getSelectedUnitOwnershipSnapshot({
+        unit: {
+          id: selectedUnit.id,
+          unit_number: selectedUnit.unit_number,
+          unit_type_id: selectedUnit.unit_type_id,
+          unit_type_code: selectedUnit.unit_type_code,
+          unit_type_name: selectedUnit.unit_type_name,
+        },
+      })
+    : null;
+
+  const [selectedObligation, selectedOwnerObligation, selectedOwnerUpcomingCharges, selectedUnitUpcomingCharges, selectedSnapshot] =
+    await Promise.all([
+      selectedObligationPromise,
+      selectedOwnerObligationPromise,
+      selectedOwnerUpcomingChargesPromise,
+      selectedUnitUpcomingChargesPromise,
+      selectedSnapshotPromise,
+    ]);
+
+  if (selectedObligation?.error) throw new Error(selectedObligation.error);
+  if (selectedOwnerObligation?.error) throw new Error(selectedOwnerObligation.error);
+  if (selectedOwnerUpcomingCharges?.error) throw new Error(selectedOwnerUpcomingCharges.error);
+  if (selectedUnitUpcomingCharges?.error) throw new Error(selectedUnitUpcomingCharges.error);
   if (selectedSnapshot?.error) throw new Error(selectedSnapshot.error);
 
   let transactions: FinancialActivity[] = [];
   if (selectedSnapshot?.data?.unitAccount?.id) {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("tb810_account_transactions")
-      .select("id, created_at, transaction_type, amount, notes, reference_type, reference_id")
-      .eq("unit_account_id", selectedSnapshot.data.unitAccount.id)
-      .order("created_at", { ascending: false })
-      .limit(10);
-    transactions = (data ?? []) as FinancialActivity[];
+    transactions = await loadSelectedUnitTransactions(selectedSnapshot.data.unitAccount.id);
   }
 
   const selectedUnitPanel =

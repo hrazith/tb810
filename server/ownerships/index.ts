@@ -254,6 +254,84 @@ export async function getUnitOwnershipSnapshot(
   };
 }
 
+export async function getSelectedUnitOwnershipSnapshot(input: {
+  unit: {
+    id: string;
+    unit_number: string;
+    unit_type_id: string;
+    unit_type_code: UnitTypeCode;
+    unit_type_name?: string | null;
+  };
+}): Promise<QueryResult<UnitOwnershipSnapshot | null>> {
+  const startedAt = Date.now();
+  const supabase = await createClient();
+  const [rowsResult, accountResult] = await Promise.all([
+    getOwnershipRowsForUnit(input.unit.id),
+    getUnitAccountSummary(supabase, input.unit.id),
+  ]);
+
+  if (rowsResult.error) return { data: null, error: rowsResult.error };
+  if (accountResult.error) return { data: null, error: accountResult.error };
+
+  const currentMonth = getCurrentBillingMonth();
+  const { data: ownerMap, error: ownerError } = await getOwnerMap(
+    supabase,
+    [...new Set((rowsResult.data ?? []).map((row) => row.owner_id))],
+  );
+  if (ownerError) return { data: null, error: ownerError };
+  if (!ownerMap) return { data: null, error: null };
+
+  const unit = {
+    unit_number: input.unit.unit_number,
+    unit_type_code: input.unit.unit_type_code,
+    unit_type_name: input.unit.unit_type_name ?? "Unit",
+  };
+
+  const ownershipHistory = (rowsResult.data ?? [])
+    .map((row) => {
+      const owner = ownerMap.get(row.owner_id);
+      return owner
+        ? mapOwnershipWithRelations(
+            row,
+            owner,
+            unit,
+            classifyOwnershipRow(row, currentMonth),
+          )
+        : null;
+    })
+    .filter(Boolean) as OwnershipWithRelations[];
+
+  const currentOwnership =
+    ownershipHistory.find((row) => row.ownership_status === "current") ?? null;
+  const scheduledOwnerships = ownershipHistory.filter(
+    (row) => row.ownership_status === "scheduled",
+  );
+
+  if (process.env.NODE_ENV === "development") {
+    console.info(
+      [
+        "[SELECTED_UNIT_OWNERSHIP_PERF]",
+        `unit=${input.unit.id}`,
+        `data_remote_requests=3`,
+        `elapsed_ms=${Date.now() - startedAt}`,
+        `ownership_rows_ms=0`,
+        `account_ms=0`,
+        `owners_ms=0`,
+      ].join(" "),
+    );
+  }
+
+  return {
+    data: {
+      currentOwnership,
+      scheduledOwnerships,
+      ownershipHistory,
+      unitAccount: accountResult.data,
+    },
+    error: null,
+  };
+}
+
 export async function getCurrentUnitsForOwner(
   ownerId: string,
 ): Promise<QueryResult<OwnerUnitSummary[]>> {
