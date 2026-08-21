@@ -21,6 +21,7 @@ import { getSelectedUnitOwnershipSnapshot } from "@/server/ownerships";
 import { listOwners } from "@/server/owners";
 import { getSelectedUnitTransactionsForUnit } from "@/server/transactions";
 import { listUnitDirectory } from "@/server/units";
+import { ObligationsNavigationShell } from "./_components/obligations-navigation-shell";
 
 type PageProps = {
   searchParams: Promise<{
@@ -45,22 +46,6 @@ function formatMoney(value: string | number | null) {
 
 function formatComponentValue(status: string, amount: string | null) {
   return status === "available" ? formatMoney(amount) : status === "not_applicable" ? "—" : status;
-}
-
-function buildQuery(params: Record<string, string | undefined>) {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value) search.set(key, value);
-  }
-  return `/obligations${search.toString() ? `?${search.toString()}` : ""}`;
-}
-
-function buildUnitHref(unitId: string, mode: "units" | "owners", error?: string) {
-  return buildQuery({ mode, unitId, error });
-}
-
-function buildOwnerHref(ownerId: string, error?: string) {
-  return buildQuery({ mode: "owners", ownerId, error });
 }
 
 function componentLabel(key: string) {
@@ -207,118 +192,15 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
     : [];
 
   return (
-    <section className="space-y-6 xl:w-[calc(100vw-3rem)] xl:max-w-none xl:-ml-[calc(50vw-50%-1.5rem)] test">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Obligations</h1>
-      </div>
-
-      {params.error ? (
-        <Panel padding="compact" className="border-red-200 bg-red-50 text-sm text-red-800">
-          {params.error}
-        </Panel>
-      ) : null}
-
-      <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <Panel className="space-y-6">
-          <div className="rounded-[28px] bg-zinc-100 p-1">
-            <div className="grid grid-cols-2 gap-1">
-              <Link
-                href={buildQuery({ mode: "owners", ownerId: selectedOwner?.id, unitId: undefined })}
-                className={[
-                  "rounded-2xl px-6 py-4 text-center text-xl font-semibold transition",
-                  mode === "owners" ? "bg-zinc-950 text-white shadow-sm ring-2 ring-sky-500" : "text-zinc-500",
-                ].join(" ")}
-              >
-                Owners
-              </Link>
-              <Link
-                href={buildQuery({ mode: "units", unitId: selectedUnit?.id, ownerId: undefined })}
-                className={[
-                  "rounded-2xl px-6 py-4 text-center text-xl font-semibold transition",
-                  mode === "units" ? "bg-zinc-950 text-white shadow-sm ring-2 ring-sky-500" : "text-zinc-500",
-                ].join(" ")}
-              >
-                Units
-              </Link>
-            </div>
-          </div>
-
-          <div className="max-h-[calc(100vh-18rem)] overflow-y-auto pr-1">
-            {mode === "owners" ? (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-                {ownersResult?.data.map((owner) => {
-                  const active = owner.id === selectedOwner?.id;
-                  return (
-                    <Link
-                      key={owner.id}
-                      href={buildOwnerHref(owner.id, params.error)}
-                      className={[
-                        "block rounded-[28px] border px-6 py-6 shadow-[0_1px_0_rgba(15,23,42,0.05)] transition",
-                        active
-                          ? "border-zinc-950 bg-zinc-950 text-white"
-                          : "border-zinc-200 bg-white text-zinc-950 hover:border-zinc-300 hover:bg-zinc-50",
-                      ].join(" ")}
-                    >
-                      <div className="space-y-8">
-                        <div className="space-y-2">
-                          <div className={["text-2xl font-semibold tracking-tight", active ? "text-white" : "text-zinc-950"].join(" ")}>
-                            {owner.full_name}
-                          </div>
-                          <div className={["text-sm", active ? "text-zinc-300" : "text-zinc-600"].join(" ")}>
-                            {owner.owner_reference}
-                          </div>
-                        </div>
-                        <div className={["text-sm font-medium", active ? "text-zinc-400" : "text-zinc-500"].join(" ")}>
-                          {owner.unit_count} Units
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-                {eligibleUnits.map((unit) => {
-                  const active = unit.id === selectedUnit?.id;
-                  return (
-                    <Link
-                      key={unit.id}
-                      href={buildUnitHref(unit.id, "units", params.error)}
-                      className={[
-                        "block rounded-[28px] border px-6 py-6 shadow-[0_1px_0_rgba(15,23,42,0.05)] transition",
-                        active
-                          ? "border-zinc-950 bg-zinc-950 text-white"
-                          : "border-zinc-200 bg-white text-zinc-950 hover:border-zinc-300 hover:bg-zinc-50",
-                      ].join(" ")}
-                    >
-                      <div className="space-y-8">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="space-y-2">
-                            <div className={["text-3xl font-semibold tracking-tight", active ? "text-white" : "text-zinc-950"].join(" ")}>
-                              {unit.unit_number}
-                            </div>
-                            <div className={["text-lg", active ? "text-zinc-300" : "text-zinc-700"].join(" ")}>
-                              {unit.current_owner_name ?? "No owner"}
-                            </div>
-                          </div>
-                          <div className={["text-sm font-medium", active ? "text-zinc-400" : "text-zinc-500"].join(" ")}>
-                            {unit.participation_percentage ? `${unit.participation_percentage.toFixed(3)}%` : "—"}
-                          </div>
-                        </div>
-
-                        <div className={["text-sm", active ? "text-zinc-400" : "text-zinc-500"].join(" ")}>
-                          {unit.current_owner_reference ?? "Current owner"}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </Panel>
-
-        <Panel className="space-y-8">
+    <ObligationsNavigationShell
+      mode={mode}
+      owners={ownersResult?.data ?? null}
+      units={eligibleUnits}
+      selectedOwnerId={selectedOwner?.id ?? null}
+      selectedUnitId={selectedUnit?.id ?? null}
+      error={params.error}
+    >
+      <Panel className="space-y-8">
           {!selectedOwner && !selectedUnit ? (
             <div className="space-y-8">
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -900,8 +782,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
               </div>
             </div>
           )}
-        </Panel>
-      </div>
-    </section>
+      </Panel>
+    </ObligationsNavigationShell>
   );
 }
