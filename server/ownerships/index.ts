@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { UnitTypeCode } from "@/server/units/types";
 import { getUnitById } from "@/server/units";
+import { invalidateUnitDirectoryCache } from "@/server/units/cache";
 
 import {
   getCurrentBillingMonth,
@@ -571,6 +572,7 @@ export async function transferOwnership(
       };
     }
 
+    invalidateUnitDirectoryCache();
     return { data: data as OwnershipRecord, error: null };
   } catch (error) {
     console.error("Ownership transfer RPC exception", {

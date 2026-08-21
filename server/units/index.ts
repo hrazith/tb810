@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getFixedBuildingIdentity } from "@/server/building";
+import { getCachedUnitDirectory, invalidateUnitDirectoryCache, setCachedUnitDirectory } from "./cache";
 
 import type {
   BuildingRecord,
@@ -221,6 +222,23 @@ export async function listUnitDirectory(): Promise<QueryResult<UnitDirectoryItem
   if (buildingResult.error) return { data: [], error: buildingResult.error };
   if (!buildingResult.data) return { data: [], error: "Current building not found." };
 
+  const cached = getCachedUnitDirectory(buildingResult.data.id);
+  if (cached) {
+    if (process.env.NODE_ENV === "development") {
+      console.info(
+        [
+          "[UNIT_DIRECTORY_PERF]",
+          `data_remote_requests=0`,
+          `elapsed_ms=${cached.elapsedMs.toFixed(1)}`,
+          `returned_units=${cached.data.length}`,
+          `source=cached`,
+        ].join(" "),
+      );
+    }
+
+    return { data: cached.data as UnitDirectoryItem[], error: null };
+  }
+
   const { data, error } = await supabase
     .from("tb810_units")
     .select(
@@ -240,12 +258,12 @@ export async function listUnitDirectory(): Promise<QueryResult<UnitDirectoryItem
         `data_remote_requests=1`,
         `elapsed_ms=${elapsedMs.toFixed(1)}`,
         `returned_units=${(data ?? []).length}`,
+        `source=remote`,
       ].join(" "),
     );
   }
 
-  return {
-    data: (data ?? []).map((row) => {
+  const directory = (data ?? []).map((row) => {
       const ownerships = (row as unknown as {
         tb810_ownerships?: Array<{
           end_date: string | null;
@@ -265,7 +283,12 @@ export async function listUnitDirectory(): Promise<QueryResult<UnitDirectoryItem
         current_owner_reference: currentOwner?.owner_reference ?? null,
         participation_percentage: row.participation_percentage ?? null,
       };
-    }),
+    });
+
+  setCachedUnitDirectory(buildingResult.data.id, directory, Number(process.hrtime.bigint() - startedAt) / 1_000_000);
+
+  return {
+    data: directory,
     error: null,
   };
 }
@@ -393,6 +416,7 @@ export async function updateUnit(
     .single();
 
   if (error) return { data: null as never, error: error.message };
+  invalidateUnitDirectoryCache(payload.building_id);
   return { data, error: null };
 }
 
@@ -436,6 +460,7 @@ export async function createUnit(
     .single();
 
   if (error) return { data: null as never, error: error.message };
+  invalidateUnitDirectoryCache(payload.building_id);
   return { data, error: null };
 }
 

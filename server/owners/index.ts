@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { invalidateUnitDirectoryCache } from "@/server/units/cache";
 
 import type {
   OwnerFilters,
@@ -171,6 +172,8 @@ export async function createOwner(
     return { data: null as never, error: error.message };
   }
 
+  invalidateUnitDirectoryCache();
+
   return { data, error: null };
 }
 
@@ -205,6 +208,8 @@ export async function updateOwner(
     return { data: null as never, error: error.message };
   }
 
+  invalidateUnitDirectoryCache();
+
   return { data, error: null };
 }
 
@@ -223,6 +228,8 @@ export async function archiveOwner(
   if (error) {
     return { data: null as never, error: error.message };
   }
+
+  invalidateUnitDirectoryCache();
 
   return { data, error: null };
 }
