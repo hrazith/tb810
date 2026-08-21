@@ -10,12 +10,43 @@ export default async function StaffLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const staffStartedAt = process.hrtime.bigint();
+  const clientCreatedAt = process.hrtime.bigint();
   const supabase = await createClient();
+  const clientCreationMs = Number(process.hrtime.bigint() - clientCreatedAt) / 1_000_000;
+  const getUserStartedAt = process.hrtime.bigint();
   const { data } = await supabase.auth.getUser();
+  const getUserMs = Number(process.hrtime.bigint() - getUserStartedAt) / 1_000_000;
   const user = data.user;
+  const postAuthStartedAt = process.hrtime.bigint();
 
   if (!user) {
+    if (process.env.NODE_ENV === "development") {
+      const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
+      console.info(
+        [
+          "[STAFF_AUTH_PERF]",
+          `client_creation_ms=${clientCreationMs.toFixed(1)}`,
+          `get_user_ms=${getUserMs.toFixed(1)}`,
+          `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
+          `total_ms=${Number(process.hrtime.bigint() - staffStartedAt).toFixed(1)}`,
+        ].join(" "),
+      );
+    }
     redirect("/login");
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
+    console.info(
+      [
+        "[STAFF_AUTH_PERF]",
+        `client_creation_ms=${clientCreationMs.toFixed(1)}`,
+        `get_user_ms=${getUserMs.toFixed(1)}`,
+        `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
+        `total_ms=${Number(process.hrtime.bigint() - staffStartedAt).toFixed(1)}`,
+      ].join(" "),
+    );
   }
 
   return (

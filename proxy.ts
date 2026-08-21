@@ -26,6 +26,7 @@ function createProxySupabase(request: NextRequest, response: NextResponse) {
 }
 
 export async function proxy(request: NextRequest) {
+  const proxyStartedAt = process.hrtime.bigint();
   const { pathname } = request.nextUrl;
 
   if (
@@ -45,24 +46,93 @@ export async function proxy(request: NextRequest) {
     },
   });
 
+  const clientCreatedAt = process.hrtime.bigint();
   const supabase = createProxySupabase(request, response);
+  const clientCreationMs = Number(process.hrtime.bigint() - clientCreatedAt) / 1_000_000;
+
+  const getUserStartedAt = process.hrtime.bigint();
   const { data } = await supabase.auth.getUser();
+  const getUserMs = Number(process.hrtime.bigint() - getUserStartedAt) / 1_000_000;
   const user = data.user;
+  const postAuthStartedAt = process.hrtime.bigint();
 
   if (pathname === "/login") {
     if (user) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      const responseAfterRedirect = NextResponse.redirect(new URL("/dashboard", request.url));
+      if (process.env.NODE_ENV === "development") {
+        const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
+        console.info(
+          [
+            "[PROXY_AUTH_PERF]",
+            `client_creation_ms=${clientCreationMs.toFixed(1)}`,
+            `get_user_ms=${getUserMs.toFixed(1)}`,
+            `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
+            `total_ms=${Number(process.hrtime.bigint() - proxyStartedAt).toFixed(1)}`,
+          ].join(" "),
+        );
+      }
+      return responseAfterRedirect;
     }
 
+    if (process.env.NODE_ENV === "development") {
+      const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
+      console.info(
+        [
+          "[PROXY_AUTH_PERF]",
+          `client_creation_ms=${clientCreationMs.toFixed(1)}`,
+          `get_user_ms=${getUserMs.toFixed(1)}`,
+          `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
+          `total_ms=${Number(process.hrtime.bigint() - proxyStartedAt).toFixed(1)}`,
+        ].join(" "),
+      );
+    }
     return response;
   }
 
   if (pathname === "/auth/callback") {
+    if (process.env.NODE_ENV === "development") {
+      const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
+      console.info(
+        [
+          "[PROXY_AUTH_PERF]",
+          `client_creation_ms=${clientCreationMs.toFixed(1)}`,
+          `get_user_ms=${getUserMs.toFixed(1)}`,
+          `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
+          `total_ms=${Number(process.hrtime.bigint() - proxyStartedAt).toFixed(1)}`,
+        ].join(" "),
+      );
+    }
     return response;
   }
 
   if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const responseAfterRedirect = NextResponse.redirect(new URL("/login", request.url));
+    if (process.env.NODE_ENV === "development") {
+      const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
+      console.info(
+        [
+          "[PROXY_AUTH_PERF]",
+          `client_creation_ms=${clientCreationMs.toFixed(1)}`,
+          `get_user_ms=${getUserMs.toFixed(1)}`,
+          `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
+          `total_ms=${Number(process.hrtime.bigint() - proxyStartedAt).toFixed(1)}`,
+        ].join(" "),
+      );
+    }
+    return responseAfterRedirect;
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
+    console.info(
+      [
+        "[PROXY_AUTH_PERF]",
+        `client_creation_ms=${clientCreationMs.toFixed(1)}`,
+        `get_user_ms=${getUserMs.toFixed(1)}`,
+        `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
+        `total_ms=${Number(process.hrtime.bigint() - proxyStartedAt).toFixed(1)}`,
+      ].join(" "),
+    );
   }
 
   return response;
