@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentBuilding } from "@/server/units";
 import { invalidateUnitDirectoryCache } from "@/server/units/cache";
+import { invalidateOwnerDirectoryCache, getCachedOwnerDirectory, setCachedOwnerDirectory } from "@/server/owners/cache";
 
 import type {
   OwnerFilters,
@@ -50,9 +52,34 @@ const OWNER_SELECT =
 export async function listOwners(
   filters: OwnerFilters = {},
 ): Promise<QueryResult<OwnerSummary[]>> {
+  const startedAt = process.hrtime.bigint();
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: [], error: buildingResult.error };
+  if (!buildingResult.data) return { data: [], error: "Current building not found." };
+
   const supabase = await createClient();
   const query = normalizeText(filters.query).toLowerCase();
   const status = normalizeStatusFilter(filters.status);
+
+  const canUseCache = !query && status === "active";
+  if (canUseCache) {
+    const cached = getCachedOwnerDirectory(buildingResult.data.id);
+    if (cached) {
+      if (process.env.NODE_ENV === "development") {
+        console.info(
+          [
+            "[OWNER_DIRECTORY_PERF]",
+            `data_remote_requests=0`,
+            `elapsed_ms=${cached.elapsedMs.toFixed(1)}`,
+            `returned_owners=${cached.data.length}`,
+            `source=cached`,
+          ].join(" "),
+        );
+      }
+
+      return { data: cached.data as OwnerSummary[], error: null };
+    }
+  }
 
   let request = supabase
     .from("tb810_owners")
@@ -97,13 +124,31 @@ export async function listOwners(
     }
   }
 
-  return {
+  const result = {
     data: owners.map((owner) => ({
       ...mapOwnerRow(owner),
       unit_count: unitCounts.get(owner.id) ?? 0,
     })),
     error: null,
   };
+
+  if (canUseCache) {
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+    setCachedOwnerDirectory(buildingResult.data.id, result.data, elapsedMs);
+    if (process.env.NODE_ENV === "development") {
+      console.info(
+        [
+          "[OWNER_DIRECTORY_PERF]",
+          `data_remote_requests=${ownerIds.length > 0 ? 2 : 1}`,
+          `elapsed_ms=${elapsedMs.toFixed(1)}`,
+          `returned_owners=${result.data.length}`,
+          `source=remote`,
+        ].join(" "),
+      );
+    }
+  }
+
+  return result;
 }
 
 export async function getOwnerById(
@@ -173,6 +218,7 @@ export async function createOwner(
   }
 
   invalidateUnitDirectoryCache();
+  invalidateOwnerDirectoryCache();
 
   return { data, error: null };
 }
@@ -209,6 +255,7 @@ export async function updateOwner(
   }
 
   invalidateUnitDirectoryCache();
+  invalidateOwnerDirectoryCache();
 
   return { data, error: null };
 }
@@ -230,6 +277,7 @@ export async function archiveOwner(
   }
 
   invalidateUnitDirectoryCache();
+  invalidateOwnerDirectoryCache();
 
   return { data, error: null };
 }
