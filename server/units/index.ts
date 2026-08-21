@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getFixedBuildingIdentity } from "@/server/building";
+import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 import { getCachedUnitDirectory, invalidateUnitDirectoryCache, setCachedUnitDirectory } from "./cache";
 
 import type {
@@ -417,6 +418,7 @@ export async function updateUnit(
 
   if (error) return { data: null as never, error: error.message };
   invalidateUnitDirectoryCache(payload.building_id);
+  invalidateBuildingMonthFinancialFactsCache(payload.building_id);
   return { data, error: null };
 }
 
@@ -461,6 +463,7 @@ export async function createUnit(
 
   if (error) return { data: null as never, error: error.message };
   invalidateUnitDirectoryCache(payload.building_id);
+  invalidateBuildingMonthFinancialFactsCache(payload.building_id);
   return { data, error: null };
 }
 

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBuilding, listUnits } from "@/server/units";
+import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 import { parseGasWorkbook, type GasImportPreflight } from "./import";
 
 import type {
@@ -107,6 +108,7 @@ export async function createGasBill(input: GasBillInput): Promise<QueryResult<Ga
     .select(GAS_BILL_SELECT)
     .single();
   if (error) return { data: null as never, error: error.message };
+  invalidateBuildingMonthFinancialFactsCache(building.data.id);
   return { data, error: null };
 }
 
@@ -127,6 +129,7 @@ export async function updateGasBill(id: string, input: GasBillInput): Promise<Qu
     .select(GAS_BILL_SELECT)
     .single();
   if (error) return { data: null as never, error: error.message };
+  invalidateBuildingMonthFinancialFactsCache(building.data.id);
   return { data, error: null };
 }
 
@@ -138,6 +141,7 @@ export async function deleteGasBill(id: string): Promise<QueryResult<{ id: strin
   if (bill.data.processed_at) return { data: null as never, error: "Processed bills cannot be deleted." };
   const { error } = await supabase.from("tb810_gas_bills").delete().eq("id", id);
   if (error) return { data: null as never, error: error.message };
+  invalidateBuildingMonthFinancialFactsCache();
   return { data: { id }, error: null };
 }
 
@@ -202,6 +206,7 @@ export async function createGasReading(input: GasReadingInput): Promise<QueryRes
   };
   const { data, error } = await supabase.from("tb810_gas_readings").insert(payload).select(GAS_READING_SELECT).single();
   if (error) return { data: null as never, error: error.message };
+  invalidateBuildingMonthFinancialFactsCache(building.data.id);
   return { data, error: null };
 }
 
@@ -239,6 +244,7 @@ export async function updateGasReading(id: string, input: GasReadingInput): Prom
     .select(GAS_READING_SELECT)
     .single();
   if (error) return { data: null as never, error: error.message };
+  invalidateBuildingMonthFinancialFactsCache(building.data.id);
   return { data, error: null };
 }
 
@@ -246,6 +252,7 @@ export async function deleteGasReading(id: string): Promise<QueryResult<{ id: st
   const supabase = await createClient();
   const { error } = await supabase.from("tb810_gas_readings").delete().eq("id", id);
   if (error) return { data: null as never, error: error.message };
+  invalidateBuildingMonthFinancialFactsCache();
   return { data: { id }, error: null };
 }
 

@@ -4,6 +4,7 @@ import {
   isRecordCreatedByActiveDevTestSession,
   recordDevTestMutation,
 } from "@/server/dev-test-session";
+import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 import { getCurrentBuilding } from "@/server/units";
 
 type QueryResult<T> = {
@@ -670,6 +671,7 @@ export async function createUnitMeterReading(
     operation: "create",
     recordIdentity: data.id,
   });
+  invalidateBuildingMonthFinancialFactsCache(buildingResult.data.id);
   return { data, error: null };
 }
 
@@ -742,6 +744,7 @@ export async function updateUnitMeterReading(
     .select(READING_SELECT)
     .single();
   if (error) return { data: null as never, error: error.message };
+  invalidateBuildingMonthFinancialFactsCache(buildingResult.data.id);
   return { data, error: null };
 }
 
@@ -819,6 +822,7 @@ export async function deleteUnitMeterReading(
     .eq("utility_type_id", utilityType.data.id);
 
   if (error) return { data: null as never, error: error.message };
+  invalidateBuildingMonthFinancialFactsCache(buildingResult.data.id);
   return {
     data: { reading: reading as UnitMeterReadingRecord, readingMonthKey: active.key, unit_number: unit.unit_number },
     error: null,

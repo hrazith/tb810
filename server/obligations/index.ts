@@ -119,7 +119,7 @@ export async function getUnitMonthlyObligationForBuilding({
     buildingId,
     obligationMonth,
   });
-  const buildingMonthFactsMs = Date.now() - buildingFactsStartedAt;
+  const buildingMonthFactsMs = buildingFactsResult.elapsedMs ?? (Date.now() - buildingFactsStartedAt);
 
   if (buildingFactsResult.error) return { data: null as never, error: buildingFactsResult.error };
   if (!buildingFactsResult.data) return { data: null as never, error: "Building month financial facts not found." };
@@ -197,6 +197,7 @@ export async function getUnitMonthlyObligationForBuilding({
         `unit=${unit.unitNumber}`,
         `month=${obligationMonth}`,
         `data_remote_requests=${buildingFactsResult.requestCount}`,
+        `building_month_facts_source=${buildingFactsResult.source ?? "remote"}`,
         `elapsed_ms=${Date.now() - startedAt}`,
         `building_month_facts_ms=${buildingMonthFactsMs}`,
         `financial_calculation_ms=${Date.now() - calculationStartedAt}`,
@@ -229,8 +230,9 @@ export async function getMonthlyObligationSummary({ obligationMonth }: { obligat
         "[OBLIGATIONS_SUMMARY_PERF]",
         `month=${obligationMonth}`,
         `data_remote_requests=${buildingFactsResult.requestCount}`,
+        `building_month_facts_source=${buildingFactsResult.source ?? "remote"}`,
         `elapsed_ms=${elapsedMs}`,
-        `building_month_facts_ms=${summaryStartedAt - startedAt}`,
+        `building_month_facts_ms=${buildingFactsResult.elapsedMs ?? summaryStartedAt - startedAt}`,
         `summary_projection_ms=${Date.now() - summaryStartedAt}`,
       ].join(" "),
     );

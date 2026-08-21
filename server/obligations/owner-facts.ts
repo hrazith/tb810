@@ -10,6 +10,10 @@ import { classifyOwnershipRow } from "@/server/ownerships/classification";
 import type { OwnershipRecord } from "@/server/ownerships/types";
 import type { OwnerSummary } from "@/server/owners/types";
 import type { UnitTypeCode } from "@/server/units/types";
+import {
+  getCachedBuildingMonthFinancialFacts,
+  setCachedBuildingMonthFinancialFacts,
+} from "./building-month-cache";
 
 function withRequestCount<T>(result: { data: T | null; error: string | null }, requestCount: number): { data: T | null; error: string | null; requestCount: number } {
   return { ...result, requestCount };
@@ -55,6 +59,8 @@ export type BuildingMonthFinancialFactsResult = {
   data: BuildingMonthFinancialFacts | null;
   error: string | null;
   requestCount: number;
+  source?: "remote" | "cached";
+  elapsedMs?: number;
 };
 
 export type OwnerMonthResponsibility = {
@@ -266,22 +272,59 @@ export async function loadBuildingMonthFinancialFacts({
   buildingId: string;
   obligationMonth: string;
 }): Promise<BuildingMonthFinancialFactsResult> {
+  const cachedStartedAt = process.hrtime.bigint();
+  const cached = getCachedBuildingMonthFinancialFacts(buildingId, obligationMonth);
+  if (cached) {
+    const elapsedMs = Number(process.hrtime.bigint() - cachedStartedAt) / 1_000_000;
+    return {
+      data: cached.data,
+      error: null,
+      requestCount: 0,
+      source: "cached",
+      elapsedMs,
+    };
+  }
+
+  const startedAt = process.hrtime.bigint();
   const supabase = await createClient();
   const planYear = Number(obligationMonth.slice(0, 4));
   const sourceReadingMonth = previousMonthKeyFromMonthKey(obligationMonth) ?? "2026-07";
-  const rpc = await (supabase as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> }).rpc("tb810_get_building_month_financial_facts", {
+  const rpc = await (supabase as unknown as {
+    rpc: (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
+  }).rpc("tb810_get_building_month_financial_facts", {
     p_building_id: buildingId,
     p_plan_year: planYear,
     p_reading_month: monthKeyToDate(sourceReadingMonth),
   });
-  if (rpc.error) return withRequestCount({ data: null, error: rpc.error.message }, 1);
-  if (!rpc.data) return withRequestCount({ data: null, error: "Building month facts not found." }, 1);
+  if (rpc.error) {
+    return {
+      ...withRequestCount({ data: null, error: rpc.error.message }, 1),
+      source: "remote",
+      elapsedMs: Number(process.hrtime.bigint() - startedAt) / 1_000_000,
+    };
+  }
+  if (!rpc.data) {
+    return {
+      ...withRequestCount({ data: null, error: "Building month facts not found." }, 1),
+      source: "remote",
+      elapsedMs: Number(process.hrtime.bigint() - startedAt) / 1_000_000,
+    };
+  }
 
   const payload = rpc.data as BuildingMonthFinancialFactsRpcPayload;
   const commonWaterBill = payload.commonWaterBill ?? null;
-  if (!commonWaterBill) return withRequestCount({ data: null, error: "Common water bill not found." }, 1);
+  if (!commonWaterBill) {
+    return {
+      ...withRequestCount({ data: null, error: "Common water bill not found." }, 1),
+      source: "remote",
+      elapsedMs: Number(process.hrtime.bigint() - startedAt) / 1_000_000,
+    };
+  }
 
-  return {
+  const facts = {
     data: {
       obligationMonth,
       sourceReadingMonth,
@@ -297,7 +340,12 @@ export async function loadBuildingMonthFinancialFacts({
     },
     error: null,
     requestCount: 1,
+    source: "remote" as const,
+    elapsedMs: Number(process.hrtime.bigint() - startedAt) / 1_000_000,
   };
+
+  setCachedBuildingMonthFinancialFacts(buildingId, obligationMonth, facts.data, facts.elapsedMs ?? 0);
+  return facts;
 }
 
 export async function loadOwnerMonthResponsibility({

@@ -87,7 +87,7 @@ export async function getOwnerMonthlyObligationForBuilding({
   const responsibilityPromise = loadOwnerMonthResponsibility({ ownerId, obligationMonth, buildingId });
 
   const [buildingFactsResult, responsibilityResult] = await Promise.all([buildingFactsPromise, responsibilityPromise]);
-  breakdown.buildingMonthFactsMs = Date.now() - buildingFactsStarted;
+  breakdown.buildingMonthFactsMs = buildingFactsResult.elapsedMs ?? (Date.now() - buildingFactsStarted);
   breakdown.ownerResponsibilityMs = 0;
   if (buildingFactsResult.error) return { data: null, error: buildingFactsResult.error };
   if (responsibilityResult.error) return { data: null, error: responsibilityResult.error };

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBuilding } from "@/server/units";
+import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 
 import type {
   BudgetPlanInput,
@@ -217,6 +218,7 @@ export async function upsertBudgetPlan(input: {
 
   if (error) return { data: null as never, error: error.message };
 
+  invalidateBuildingMonthFinancialFactsCache(buildingResult.data.id);
   return { data: toBudgetPlanRecord(data), error: null };
 }
 

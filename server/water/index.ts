@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { listUnits } from "@/server/units";
 import { getCurrentBuilding } from "@/server/units";
 import { getCurrentReadingMonthCompleteness } from "@/server/water/unit-meter-readings";
+import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 import { previousMonthKeyFromMonthKey } from "./month-utils";
 
 import type {
@@ -1089,6 +1090,7 @@ export async function createCommonWaterBill(
     return { data: null as never, error: error.message };
   }
 
+  invalidateBuildingMonthFinancialFactsCache(buildingResult.data.id);
   return { data, error: null };
 }
 
@@ -1262,6 +1264,7 @@ export async function updateCommonWaterBill(
     return { data: null as never, error: error.message };
   }
 
+  invalidateBuildingMonthFinancialFactsCache(buildingResult.data.id);
   return { data, error: null };
 }
 
