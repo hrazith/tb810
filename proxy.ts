@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import type { Database } from "@/lib/supabase/database.types";
+import { isPerfLoggingEnabled } from "@/server/perf";
 
 function createProxySupabase(request: NextRequest, response: NextResponse) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -59,7 +60,7 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/login") {
     if (user) {
       const responseAfterRedirect = NextResponse.redirect(new URL("/dashboard", request.url));
-      if (process.env.NODE_ENV === "development") {
+      if (isPerfLoggingEnabled()) {
         const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
         console.info(
           [
@@ -67,14 +68,14 @@ export async function proxy(request: NextRequest) {
             `client_creation_ms=${clientCreationMs.toFixed(1)}`,
             `get_user_ms=${getUserMs.toFixed(1)}`,
             `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
-            `total_ms=${Number(process.hrtime.bigint() - proxyStartedAt).toFixed(1)}`,
+            `total_ms=${(Number(process.hrtime.bigint() - proxyStartedAt) / 1_000_000).toFixed(1)}`,
           ].join(" "),
         );
       }
       return responseAfterRedirect;
     }
 
-    if (process.env.NODE_ENV === "development") {
+    if (isPerfLoggingEnabled()) {
       const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
       console.info(
         [
@@ -82,7 +83,7 @@ export async function proxy(request: NextRequest) {
           `client_creation_ms=${clientCreationMs.toFixed(1)}`,
           `get_user_ms=${getUserMs.toFixed(1)}`,
           `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
-          `total_ms=${Number(process.hrtime.bigint() - proxyStartedAt).toFixed(1)}`,
+          `total_ms=${(Number(process.hrtime.bigint() - proxyStartedAt) / 1_000_000).toFixed(1)}`,
         ].join(" "),
       );
     }
@@ -90,7 +91,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (pathname === "/auth/callback") {
-    if (process.env.NODE_ENV === "development") {
+    if (isPerfLoggingEnabled()) {
       const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
       console.info(
         [
@@ -98,7 +99,7 @@ export async function proxy(request: NextRequest) {
           `client_creation_ms=${clientCreationMs.toFixed(1)}`,
           `get_user_ms=${getUserMs.toFixed(1)}`,
           `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
-          `total_ms=${Number(process.hrtime.bigint() - proxyStartedAt).toFixed(1)}`,
+          `total_ms=${(Number(process.hrtime.bigint() - proxyStartedAt) / 1_000_000).toFixed(1)}`,
         ].join(" "),
       );
     }
@@ -107,7 +108,7 @@ export async function proxy(request: NextRequest) {
 
   if (!user) {
     const responseAfterRedirect = NextResponse.redirect(new URL("/login", request.url));
-    if (process.env.NODE_ENV === "development") {
+    if (isPerfLoggingEnabled()) {
       const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
       console.info(
         [
@@ -115,14 +116,14 @@ export async function proxy(request: NextRequest) {
           `client_creation_ms=${clientCreationMs.toFixed(1)}`,
           `get_user_ms=${getUserMs.toFixed(1)}`,
           `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
-          `total_ms=${Number(process.hrtime.bigint() - proxyStartedAt).toFixed(1)}`,
+          `total_ms=${(Number(process.hrtime.bigint() - proxyStartedAt) / 1_000_000).toFixed(1)}`,
         ].join(" "),
       );
     }
     return responseAfterRedirect;
   }
 
-  if (process.env.NODE_ENV === "development") {
+  if (isPerfLoggingEnabled()) {
     const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
     console.info(
       [
@@ -130,7 +131,7 @@ export async function proxy(request: NextRequest) {
         `client_creation_ms=${clientCreationMs.toFixed(1)}`,
         `get_user_ms=${getUserMs.toFixed(1)}`,
         `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
-        `total_ms=${Number(process.hrtime.bigint() - proxyStartedAt).toFixed(1)}`,
+        `total_ms=${(Number(process.hrtime.bigint() - proxyStartedAt) / 1_000_000).toFixed(1)}`,
       ].join(" "),
     );
   }

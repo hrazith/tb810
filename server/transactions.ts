@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isPerfLoggingEnabled } from "@/server/perf";
 
 type FinancialActivity = {
   id: string;
@@ -25,7 +26,7 @@ export async function getSelectedUnitTransactionsForUnit(
     .limit(10);
 
   const elapsedMs = Date.now() - startedAt;
-  if (process.env.NODE_ENV === "development") {
+  if (isPerfLoggingEnabled()) {
     console.info(
       [
         "[SELECTED_UNIT_TRANSACTIONS_PERF]",

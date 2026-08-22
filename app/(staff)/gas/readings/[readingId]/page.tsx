@@ -18,11 +18,13 @@ type PageProps = {
 
 export default async function GasReadingDetailPage({ params }: PageProps) {
   const { readingId } = await params;
-  const [result, unitsResult, readingsResult] = await Promise.all([getGasReadingById(readingId), listUnits(), listGasReadings()]);
+  const [result, unitsResult] = await Promise.all([getGasReadingById(readingId), listUnits()]);
   if (result.error) throw new Error(result.error);
   if (unitsResult.error) throw new Error(unitsResult.error);
-  if (readingsResult.error) throw new Error(readingsResult.error);
   if (!result.data) notFound();
+
+  const readingsResult = await listGasReadings(unitsResult.data);
+  if (readingsResult.error) throw new Error(readingsResult.error);
 
   return (
     <section className="space-y-6">

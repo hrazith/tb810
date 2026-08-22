@@ -5,6 +5,7 @@ import { createMonthlyObligationProviders } from "./providers";
 import { buildChargeMap, buildFixedAssessmentMap, buildGasCalculationInputFromFacts, buildWaterPreviewFromFacts, loadBuildingMonthFinancialFacts } from "./owner-facts";
 import { buildMonthlyObligationSummaryFromFacts } from "./summary-facts";
 import { calculateGasCharges } from "../gas/calculation";
+import { isPerfLoggingEnabled } from "@/server/perf";
 
 export function selectBuildingOwnerDirectCharges(
   charges: Array<{
@@ -190,7 +191,7 @@ export async function getUnitMonthlyObligationForBuilding({
     }),
   );
 
-  if (process.env.NODE_ENV === "development") {
+  if (isPerfLoggingEnabled()) {
     console.info(
       [
         "[UNIT_OBLIGATION_PERF]",
@@ -224,7 +225,7 @@ export async function getMonthlyObligationSummary({ obligationMonth }: { obligat
 
   const summary = buildMonthlyObligationSummaryFromFacts(buildingFactsResult.data, obligationMonth);
   const elapsedMs = Date.now() - startedAt;
-  if (process.env.NODE_ENV === "development") {
+  if (isPerfLoggingEnabled()) {
     console.info(
       [
         "[OBLIGATIONS_SUMMARY_PERF]",

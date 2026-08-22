@@ -145,15 +145,14 @@ export async function deleteGasBill(id: string): Promise<QueryResult<{ id: strin
   return { data: { id }, error: null };
 }
 
-export async function listGasReadings(): Promise<QueryResult<GasReadingSummary[]>> {
+export async function listGasReadings(units?: Awaited<ReturnType<typeof listUnits>>["data"]): Promise<QueryResult<GasReadingSummary[]>> {
   const building = await getCurrentBuilding();
   if (building.error) return { data: [], error: building.error };
   if (!building.data) return { data: [], error: null };
   const supabase = await createClient();
-  const [{ data: readings, error }, unitsResult] = await Promise.all([
-    supabase.from("tb810_gas_readings").select(GAS_READING_SELECT).eq("building_id", building.data.id).order("reading_month", { ascending: false }),
-    listUnits(),
-  ]);
+  const readingsResult = await supabase.from("tb810_gas_readings").select(GAS_READING_SELECT).eq("building_id", building.data.id).order("reading_month", { ascending: false });
+  const unitsResult = units ? { data: units, error: null as string | null } : await listUnits();
+  const { data: readings, error } = readingsResult;
   if (error) return { data: [], error: error.message };
   if (unitsResult.error) return { data: [], error: unitsResult.error };
   const unitById = new Map(unitsResult.data.filter((unit) => isCondoUnit(unit.unit_type_code) && unit.has_gas_service).map((unit) => [unit.id, unit]));

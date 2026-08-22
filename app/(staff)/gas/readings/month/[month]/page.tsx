@@ -42,15 +42,16 @@ export default async function GasReadingMonthPage({ params }: PageProps) {
     redirect(`/gas/readings/month/${selectedMonthKey}`);
   }
 
-  const [buildingResult, unitsResult, readingsResult] = await Promise.all([
+  const [buildingResult, unitsResult] = await Promise.all([
     getCurrentBuilding(),
     listUnits(),
-    listGasReadings(),
   ]);
   if (buildingResult.error) throw new Error(buildingResult.error);
   if (unitsResult.error) throw new Error(unitsResult.error);
-  if (readingsResult.error) throw new Error(readingsResult.error);
   if (!buildingResult.data) notFound();
+
+  const readingsResult = await listGasReadings(unitsResult.data);
+  if (readingsResult.error) throw new Error(readingsResult.error);
 
   const activeMonthKey = currentMonthKey();
   const monthKeys = new Set<string>([activeMonthKey, selectedMonthKey]);

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isPerfLoggingEnabled } from "@/server/perf";
 import {
   getActiveDevTestSessionId,
   isRecordCreatedByActiveDevTestSession,
@@ -177,7 +178,7 @@ function readingToText(value: number | null) {
 }
 
 function logCompletenessPerf(input: { month: string; breakdown: CompletenessPerf }) {
-  if (process.env.NODE_ENV !== "development") return;
+  if (!isPerfLoggingEnabled()) return;
   console.info(
     [
       "[WATER_COMPLETENESS_PERF]",
@@ -256,6 +257,10 @@ async function getCondoUnits(): Promise<QueryResult<UnitOption[]>> {
       })),
     error: null,
   };
+}
+
+export async function getWaterReadingUnits(): Promise<QueryResult<UnitOption[]>> {
+  return getCondoUnits();
 }
 
 async function getCondoPopulationFacts(): Promise<QueryResult<PopulationUnit[]>> {
@@ -452,6 +457,7 @@ export async function getUnitOptions(): Promise<QueryResult<UnitOption[]>> {
 
 export async function listUnitMeterReadings(
   filters: UnitMeterReadingFilters = {},
+  preloadedUnits?: UnitOption[],
 ): Promise<QueryResult<UnitMeterReadingRow[]>> {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: [], error: buildingResult.error };
@@ -459,10 +465,11 @@ export async function listUnitMeterReadings(
 
   const supabase = await createClient();
   const utilityType = await getUtilityTypeId(supabase);
-  const unitResult = await getCondoUnits();
   if (utilityType.error) return { data: [], error: utilityType.error };
-  if (unitResult.error) return { data: [], error: unitResult.error };
   if (!utilityType.data) return { data: [], error: "Common Water utility type is missing." };
+
+  const unitResult = preloadedUnits ? { data: preloadedUnits, error: null } : await getCondoUnits();
+  if (unitResult.error) return { data: [], error: unitResult.error };
 
   let request = supabase
     .from("tb810_meter_readings")

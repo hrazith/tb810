@@ -69,20 +69,13 @@ export function ObligationsNavigationShell({
         : null;
 
   return (
-    <section className="space-y-6 xl:w-[calc(100vw-3rem)] xl:max-w-none xl:-ml-[calc(50vw-50%-1.5rem)] test">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Obligations</h1>
-      </div>
-
-      {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <div className="space-y-6">
-          <div className="rounded-[28px] bg-zinc-100 p-1">
+    <section className="space-y-6 xl:w-[calc(100vw-3rem)] xl:max-w-none xl:-ml-[calc(50vw-50%-1.5rem)]">
+      <div className="space-y-2 test">
+        
+        <h1 className="whitespace-nowrap text-2xl text-center font-semibold tracking-tight text-zinc-950">
+          Obligations
+        </h1>
+        <div className="rounded-[28px] bg-zinc-100 p-1 ">
             <div className="grid grid-cols-2 gap-1">
               <Link
                 href={buildQuery({ mode: "owners", ownerId: selectedOwnerId ?? undefined })}
@@ -112,6 +105,17 @@ export function ObligationsNavigationShell({
               </Link>
             </div>
           </div>
+      </div>
+
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(320px,1fr)] test ">
+        <div className="space-y-6">
+          
 
           <div className="max-h-[calc(100vh-18rem)] overflow-y-auto pr-1">
             {mode === "owners" ? (

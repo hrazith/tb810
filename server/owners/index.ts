@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBuilding } from "@/server/units";
+import { isPerfLoggingEnabled } from "@/server/perf";
 import { invalidateUnitDirectoryCache } from "@/server/units/cache";
 import { invalidateOwnerDirectoryCache, getCachedOwnerDirectory, setCachedOwnerDirectory } from "@/server/owners/cache";
 
@@ -65,7 +66,7 @@ export async function listOwners(
   if (canUseCache) {
     const cached = getCachedOwnerDirectory(buildingResult.data.id);
     if (cached) {
-      if (process.env.NODE_ENV === "development") {
+      if (isPerfLoggingEnabled()) {
         console.info(
           [
             "[OWNER_DIRECTORY_PERF]",
@@ -135,7 +136,7 @@ export async function listOwners(
   if (canUseCache) {
     const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
     setCachedOwnerDirectory(buildingResult.data.id, result.data, elapsedMs);
-    if (process.env.NODE_ENV === "development") {
+    if (isPerfLoggingEnabled()) {
       console.info(
         [
           "[OWNER_DIRECTORY_PERF]",

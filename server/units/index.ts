@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getFixedBuildingIdentity } from "@/server/building";
+import { isPerfLoggingEnabled } from "@/server/perf";
 import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 import { getCachedUnitDirectory, invalidateUnitDirectoryCache, setCachedUnitDirectory } from "./cache";
 
@@ -171,7 +172,7 @@ export async function listUnits(
     }
   }
 
-  if (process.env.NODE_ENV === "development") {
+  if (isPerfLoggingEnabled()) {
     const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
     console.info(
       [
@@ -225,7 +226,7 @@ export async function listUnitDirectory(): Promise<QueryResult<UnitDirectoryItem
 
   const cached = getCachedUnitDirectory(buildingResult.data.id);
   if (cached) {
-    if (process.env.NODE_ENV === "development") {
+    if (isPerfLoggingEnabled()) {
       console.info(
         [
           "[UNIT_DIRECTORY_PERF]",
@@ -251,7 +252,7 @@ export async function listUnitDirectory(): Promise<QueryResult<UnitDirectoryItem
 
   if (error) return { data: [], error: error.message };
 
-  if (process.env.NODE_ENV === "development") {
+  if (isPerfLoggingEnabled()) {
     const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
     console.info(
       [

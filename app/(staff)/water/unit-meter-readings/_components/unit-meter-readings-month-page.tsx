@@ -1,8 +1,9 @@
 import { Panel } from "@/components/ui/panel";
 import { Input } from "@/components/ui/input";
+import { isPerfLoggingEnabled } from "@/server/perf";
 import {
   getActiveReadingMonth,
-  getUnitOptions,
+  getWaterReadingUnits,
   listUnitMeterReadingMonths,
   listUnitMeterReadings,
 } from "@/server/water/unit-meter-readings";
@@ -28,11 +29,29 @@ type Props = {
 
 export async function UnitMeterReadingsMonthPage({ month, query, deleted, historicalEditingAvailable }: Props) {
   const activeMonth = getActiveReadingMonth();
-  const [result, units] = await Promise.all([
-    listUnitMeterReadings({ query, month }),
-    getUnitOptions(),
-  ]);
-  const monthsResult = await listUnitMeterReadingMonths();
+  const pageStartedAt = process.hrtime.bigint();
+  const populationPromise = (async () => {
+    const startedAt = process.hrtime.bigint();
+    const result = await getWaterReadingUnits();
+    return { result, elapsedMs: Number(process.hrtime.bigint() - startedAt) / 1_000_000 };
+  })();
+
+  const monthsPromise = (async () => {
+    const startedAt = process.hrtime.bigint();
+    const result = await listUnitMeterReadingMonths();
+    return { result, elapsedMs: Number(process.hrtime.bigint() - startedAt) / 1_000_000 };
+  })();
+
+  const resultPromise = populationPromise.then(async ({ result: populationResult }) => {
+    if (populationResult.error) return { result: { data: [], error: populationResult.error }, elapsedMs: 0 };
+    const startedAt = process.hrtime.bigint();
+    const result = await listUnitMeterReadings({ query, month }, populationResult.data ?? []);
+    return { result, elapsedMs: Number(process.hrtime.bigint() - startedAt) / 1_000_000 };
+  });
+
+  const [{ result: units, elapsedMs: populationElapsedMs }, { result, elapsedMs: readingsElapsedMs }, { result: monthsResult, elapsedMs: monthsElapsedMs }] =
+    await Promise.all([populationPromise, resultPromise, monthsPromise]);
+  const pageElapsedMs = Number(process.hrtime.bigint() - pageStartedAt) / 1_000_000;
   const monthOptions = monthsResult.error
     ? [{ key: activeMonth.key, label: activeMonth.label }]
     : monthsResult.data;
@@ -48,6 +67,20 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
       },
     ]),
   );
+
+  if (isPerfLoggingEnabled()) {
+    console.info(
+      [
+        "[UNIT_METER_READINGS_PERF]",
+        `month=${month}`,
+        `data_remote_requests=5`,
+        `elapsed_ms=${pageElapsedMs.toFixed(1)}`,
+        `population_ms=${populationElapsedMs.toFixed(1)}`,
+        `readings_ms=${readingsElapsedMs.toFixed(1)}`,
+        `months_ms=${monthsElapsedMs.toFixed(1)}`,
+      ].join(" "),
+    );
+  }
 
   return (
     <section className="space-y-6 ">

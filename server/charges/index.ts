@@ -5,6 +5,7 @@ import {
   recordDevTestMutation,
 } from "@/server/dev-test-session";
 import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
+import { isPerfLoggingEnabled } from "@/server/perf";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 import { getOwnerById } from "@/server/owners";
 import { getOwnerUnitsForBillingMonth } from "@/server/ownerships";
@@ -586,7 +587,7 @@ export async function getUpcomingUnitChargesForObligationMonth(
     .eq("building_id", buildingId)
     .eq("unit_id", unitId);
   if (error) return { data: [], error: error.message };
-  if (process.env.NODE_ENV === "development") {
+  if (isPerfLoggingEnabled()) {
     const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
     console.info(
       [

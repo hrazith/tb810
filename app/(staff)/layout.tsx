@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { Header } from "@/components/header";
+import { isPerfLoggingEnabled } from "@/server/perf";
 
 import { signOut } from "./actions";
 
@@ -21,7 +22,7 @@ export default async function StaffLayout({
   const postAuthStartedAt = process.hrtime.bigint();
 
   if (!user) {
-    if (process.env.NODE_ENV === "development") {
+    if (isPerfLoggingEnabled()) {
       const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
       console.info(
         [
@@ -29,14 +30,14 @@ export default async function StaffLayout({
           `client_creation_ms=${clientCreationMs.toFixed(1)}`,
           `get_user_ms=${getUserMs.toFixed(1)}`,
           `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
-          `total_ms=${Number(process.hrtime.bigint() - staffStartedAt).toFixed(1)}`,
+          `total_ms=${(Number(process.hrtime.bigint() - staffStartedAt) / 1_000_000).toFixed(1)}`,
         ].join(" "),
       );
     }
     redirect("/login");
   }
 
-  if (process.env.NODE_ENV === "development") {
+  if (isPerfLoggingEnabled()) {
     const postAuthProcessingMs = Number(process.hrtime.bigint() - postAuthStartedAt) / 1_000_000;
     console.info(
       [
@@ -44,7 +45,7 @@ export default async function StaffLayout({
         `client_creation_ms=${clientCreationMs.toFixed(1)}`,
         `get_user_ms=${getUserMs.toFixed(1)}`,
         `post_auth_processing_ms=${postAuthProcessingMs.toFixed(1)}`,
-        `total_ms=${Number(process.hrtime.bigint() - staffStartedAt).toFixed(1)}`,
+        `total_ms=${(Number(process.hrtime.bigint() - staffStartedAt) / 1_000_000).toFixed(1)}`,
       ].join(" "),
     );
   }

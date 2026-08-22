@@ -1,5 +1,6 @@
 import { getCurrentBuilding } from "@/server/units";
 import type { OwnerSummary } from "@/server/owners/types";
+import { isPerfLoggingEnabled } from "@/server/perf";
 import { composeMonthlyObligation } from "./core";
 import { createMonthlyObligationProviders } from "./providers";
 import { composeOwnerMonthlyObligation, type OwnerMonthlyObligationComposition } from "./owner-composition";
@@ -45,7 +46,7 @@ function logOwnerObligationPerf(input: {
   elapsedMs: number;
   breakdown: OwnerPerfBreakdown;
 }) {
-  if (process.env.NODE_ENV !== "development") return;
+  if (!isPerfLoggingEnabled()) return;
   console.info(
     [
       "[OWNER_OBLIGATION_PERF]",

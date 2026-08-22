@@ -19,6 +19,7 @@ import {
 } from "@/server/obligations";
 import { getSelectedUnitOwnershipSnapshot } from "@/server/ownerships";
 import { listOwners } from "@/server/owners";
+import { isPerfLoggingEnabled } from "@/server/perf";
 import { getSelectedUnitTransactionsForUnit } from "@/server/transactions";
 import { listUnitDirectory } from "@/server/units";
 import { ObligationsNavigationShell } from "./_components/obligations-navigation-shell";
@@ -144,7 +145,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
   if (selectedUnitUpcomingCharges?.error) throw new Error(selectedUnitUpcomingCharges.error);
   if (selectedSnapshot?.error) throw new Error(selectedSnapshot.error);
 
-  if (process.env.NODE_ENV === "development" && selectedBranchStartedAt) {
+  if (isPerfLoggingEnabled() && selectedBranchStartedAt) {
     const selectedBranchElapsedMs = Number(process.hrtime.bigint() - selectedBranchStartedAt) / 1_000_000;
     console.info(
       [
@@ -206,11 +207,11 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="text-4xl font-semibold tracking-tight text-zinc-950">{monthLabel(monthKey)}</div>
-                </div>
+                </div>ƒ
               </div>
 
               <div className="space-y-6">
-                <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
                   <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">
                     Monthly obligations
                   </div>

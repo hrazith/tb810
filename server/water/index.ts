@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isPerfLoggingEnabled } from "@/server/perf";
 import { listUnits } from "@/server/units";
 import { getCurrentBuilding } from "@/server/units";
 import { getCurrentReadingMonthCompleteness } from "@/server/water/unit-meter-readings";
@@ -221,7 +222,7 @@ function logWaterPerf(input: {
   obligationMonth: string;
   breakdown: WaterPerfBreakdown;
 }) {
-  if (process.env.NODE_ENV !== "development") return;
+  if (!isPerfLoggingEnabled()) return;
   console.info(
     [
       "[WATER_PERF]",
@@ -247,7 +248,7 @@ function logWaterBillLookupPerf(input: {
   obligationMonth: string;
   breakdown: WaterBillLookupPerf;
 }) {
-  if (process.env.NODE_ENV !== "development") return;
+  if (!isPerfLoggingEnabled()) return;
   console.info(
     [
       "[WATER_BILL_PERF]",
@@ -868,27 +869,23 @@ async function getCommonWaterReadingContext(
 export async function listCommonWaterBills(): Promise<
   QueryResult<WaterBillSummary[]>
 > {
+  const startedAt = process.hrtime.bigint();
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { data: [], error: buildingResult.error };
   if (!buildingResult.data) return { data: [], error: null };
 
   const supabase = await createClient();
-  const { data: utilityType, error: utilityTypeError } =
-    await getCommonWaterUtilityTypeId(supabase);
-
-  if (utilityTypeError) {
-    return { data: [], error: utilityTypeError };
-  }
-
-  if (!utilityType) {
-    return { data: [], error: "Common Water utility type is missing." };
-  }
-
   const { data, error } = await supabase
     .from("tb810_utility_bills")
-    .select(WATER_BILL_SELECT)
+    .select(
+      [
+        WATER_BILL_SELECT,
+        "tb810_utility_types!tb810_utility_bills_utility_type_id_fkey(code, name)",
+        "tb810_billing_periods!tb810_utility_bills_billing_period_id_fkey(status)",
+      ].join(", "),
+    )
     .eq("building_id", buildingResult.data.id)
-    .eq("utility_type_id", utilityType.id)
+    .eq("tb810_utility_types.code", "common_water")
     .order("bill_date", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -896,23 +893,37 @@ export async function listCommonWaterBills(): Promise<
     return { data: [], error: error.message };
   }
 
-  const rows = data ?? [];
-  const billingPeriodIds = [
-    ...new Set(rows.map((row) => row.billing_period_id).filter(Boolean)),
-  ] as string[];
-  const billingPeriodById = new Map<string, { status: string }>();
-
-  for (const billingPeriodId of billingPeriodIds) {
-    const billingPeriod = await getBillingPeriodStatus(supabase, billingPeriodId);
-    if (billingPeriod.error) {
-      return { data: [], error: billingPeriod.error };
+  const rows = (data ?? []) as unknown as Array<
+    WaterBillRecord & {
+      tb810_utility_types?: { code: string; name: string } | null;
+      tb810_billing_periods?: { status: string } | null;
     }
-
-    if (billingPeriod.data) {
-      billingPeriodById.set(billingPeriodId, {
-        status: billingPeriod.data.status,
+  >;
+  const utilityType = rows[0]
+    ? (rows[0] as unknown as {
+        tb810_utility_types?: { code: string; name: string } | null;
+      }).tb810_utility_types ?? null
+    : null;
+  const billingPeriodById = new Map<string, { status: string }>();
+  for (const row of rows) {
+    if (row.billing_period_id && row.tb810_billing_periods) {
+      billingPeriodById.set(row.billing_period_id, {
+        status: row.tb810_billing_periods.status,
       });
     }
+  }
+
+  if (isPerfLoggingEnabled()) {
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+    console.info(
+      [
+        "[SEDAPAL_LEDGER_PERF]",
+        `data_remote_requests=1`,
+        `elapsed_ms=${elapsedMs.toFixed(1)}`,
+        `bills=${rows.length}`,
+        `source=remote`,
+      ].join(" "),
+    );
   }
 
   return {
@@ -920,7 +931,7 @@ export async function listCommonWaterBills(): Promise<
       const billingPeriod = billingPeriodById.get(row.billing_period_id ?? "");
       return {
         ...toBillRecord(row),
-        utility_type_name: utilityType.name,
+        utility_type_name: utilityType?.name ?? "Common Water",
         billing_period_status: billingPeriod?.status ?? null,
         is_editable: isBillEditable(billingPeriod?.status),
       };
@@ -1436,7 +1447,7 @@ export async function getWaterChargePreviewsForUnit(
 
   const calculationStarted = Date.now();
   const result = calculateWaterChargePreviewsForUnit(contextResult.data);
-  if (process.env.NODE_ENV === "development") {
+  if (isPerfLoggingEnabled()) {
     console.info(
       [
         "[WATER_CALC_PERF]",

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isPerfLoggingEnabled } from "@/server/perf";
 import type { UnitTypeCode } from "@/server/units/types";
 import { getUnitById } from "@/server/units";
 import { invalidateUnitDirectoryCache } from "@/server/units/cache";
@@ -257,7 +258,7 @@ export async function getSelectedUnitOwnershipSnapshot(input: {
     input.unit,
   );
 
-  if (process.env.NODE_ENV === "development") {
+  if (isPerfLoggingEnabled()) {
     const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
     console.info(
       [
