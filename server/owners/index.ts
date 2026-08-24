@@ -39,7 +39,8 @@ function mapOwnerRow(row: {
   active: boolean;
   created_at: string;
   updated_at: string;
-}): OwnerRecord {
+  unit_count: number;
+}): OwnerSummary {
   return row;
 }
 
@@ -82,61 +83,26 @@ export async function listOwners(
     }
   }
 
-  const ownersQueryStartedAt = process.hrtime.bigint();
-  let request = supabase
-    .from("tb810_owners")
-    .select(OWNER_SELECT)
-    .order("full_name", { ascending: true });
-
-  if (status === "active") {
-    request = request.eq("active", true);
-  } else if (status === "archived") {
-    request = request.eq("active", false);
-  }
-
-  if (query) {
-    request = request.or(
-      `full_name.ilike.%${query}%,owner_reference.ilike.%${query}%,email.ilike.%${query}%,phone_number.ilike.%${query}%`,
-    );
-  }
-
-  const { data: owners, error } = await request;
-  const ownersQueryMs = Number(process.hrtime.bigint() - ownersQueryStartedAt) / 1_000_000;
+  const directoryQueryStartedAt = process.hrtime.bigint();
+  const { data: owners, error } = await (supabase as unknown as {
+    rpc: (
+      name: "tb810_get_owner_directory",
+      args: {
+        p_status: string;
+        p_query: string | null;
+      },
+    ) => Promise<{ data: OwnerSummary[] | null; error: { message: string } | null }>;
+  }).rpc("tb810_get_owner_directory", {
+    p_status: status,
+    p_query: query || null,
+  });
+  const directoryQueryMs = Number(process.hrtime.bigint() - directoryQueryStartedAt) / 1_000_000;
   if (error) {
     return { data: [], error: error.message };
   }
 
-  const ownerIds = owners.map((owner) => owner.id);
-  const unitCounts = new Map<string, number>();
-  let ownershipsQueryMs = 0;
-  let ownershipRowsCount = 0;
-
-  if (ownerIds.length > 0) {
-    const ownershipsQueryStartedAt = process.hrtime.bigint();
-    const { data: ownerships, error: ownershipError } = await supabase
-      .from("tb810_ownerships")
-      .select("owner_id")
-      .in("owner_id", ownerIds);
-    ownershipsQueryMs = Number(process.hrtime.bigint() - ownershipsQueryStartedAt) / 1_000_000;
-    ownershipRowsCount = ownerships?.length ?? 0;
-
-    if (ownershipError) {
-      return { data: [], error: ownershipError.message };
-    }
-
-    for (const ownership of ownerships ?? []) {
-      unitCounts.set(
-        ownership.owner_id,
-        (unitCounts.get(ownership.owner_id) ?? 0) + 1,
-      );
-    }
-  }
-
   const result = {
-    data: owners.map((owner) => ({
-      ...mapOwnerRow(owner),
-      unit_count: unitCounts.get(owner.id) ?? 0,
-    })),
+    data: (owners ?? []).map((owner) => mapOwnerRow(owner)),
     error: null,
   };
 
@@ -147,11 +113,9 @@ export async function listOwners(
       console.info(
         [
           "[OWNER_DIRECTORY_PERF]",
-          `data_remote_requests=${ownerIds.length > 0 ? 2 : 1}`,
+          `data_remote_requests=1`,
           `elapsed_ms=${elapsedMs.toFixed(1)}`,
-          `owners_query_ms=${ownersQueryMs.toFixed(1)}`,
-          `ownerships_query_ms=${ownershipsQueryMs.toFixed(1)}`,
-          `ownership_rows=${ownershipRowsCount}`,
+          `owner_directory_query_ms=${directoryQueryMs.toFixed(1)}`,
           `returned_owners=${result.data.length}`,
           `source=remote`,
         ].join(" "),
