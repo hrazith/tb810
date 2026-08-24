@@ -258,20 +258,15 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
       error={params.error}
     >
       <Panel className="space-y-8">
-          {!selectedOwner && !selectedUnit ? (
-            <div className="space-y-8">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="text-4xl font-semibold tracking-tight text-zinc-950">{monthLabel(monthKey)}</div>
-                </div>ƒ
-              </div>
+        {!selectedOwner && !selectedUnit ? (
+          <div className="space-y-8">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="text-3xl font-semibold tracking-tight text-zinc-950">{monthLabel(monthKey)}</div>
+            </div>
 
-              <div className="space-y-6">
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-                  <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-                    Monthly obligations
-                  </div>
-                  <div className="space-y-3 text-sm text-zinc-600">
+            <div className="space-y-6">
+              <h3 className="mb-4 text-sm font-semibold uppercase text-zinc-500">Obligations</h3>
+              <div className="space-y-3 text-sm text-zinc-600">
                     <div className="flex items-center justify-between gap-4">
                       <span>Fixed assessments</span>
                       <span>{formatComponentValue(monthlySummary?.data?.components.fixed_assessment.state ?? "available", monthlySummary?.data?.components.fixed_assessment.amount ?? null)}</span>
@@ -296,14 +291,13 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                       <span>Owner-direct charges</span>
                       <span>{formatComponentValue(monthlySummary?.data?.components.owner_direct_charge.state ?? "available", monthlySummary?.data?.components.owner_direct_charge.amount ?? null)}</span>
                     </div>
-                    <div className="flex items-center justify-between gap-4 border-t border-zinc-200 pt-3 text-zinc-950">
-                      <span className="font-medium">Total</span>
-                      <span>{monthlySummary?.data?.total ? `S/ ${monthlySummary.data.total}` : "S/ —"}</span>
-                    </div>
-                  </div>
+                <div className="flex items-center justify-between gap-4 border-t border-zinc-200 pt-3 text-zinc-950">
+                  <span className="font-medium">Total</span>
+                  <span>{monthlySummary?.data?.total ? `S/ ${monthlySummary.data.total}` : "S/ —"}</span>
                 </div>
+              </div>
 
-                <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
+              <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
                   <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Invoices</div>
                   <div className="text-sm text-zinc-600">Coming soon</div>
                   <div className="mt-4">
@@ -311,9 +305,9 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                       Download all
                     </Button>
                   </div>
-                </div>
+              </div>
 
-                <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
+              <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
                   <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Other charges</div>
                   {monthlySummary?.data?.components.other_charge.amount ? (
                     <div className="flex items-center justify-between gap-4 text-sm text-zinc-600">
@@ -331,10 +325,10 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                         : "—"}
                     </span>
                   </div>
-                </div>
               </div>
+            </div>
 
-              <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-600">
+            <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-600">
                 Select an Owner or Unit to inspect its Monthly Obligation.
               </div>
             </div>

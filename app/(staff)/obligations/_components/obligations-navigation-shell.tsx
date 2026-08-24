@@ -113,13 +113,13 @@ export function ObligationsNavigationShell({
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(320px,1fr)] test ">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(320px,1fr)]  ">
         <div className="space-y-6">
           
 
           <div className="max-h-[calc(100vh-18rem)] overflow-y-auto pr-1">
             {mode === "owners" ? (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4 ">
                 {(owners ?? []).map((owner) => {
                   const active = owner.id === visualSelectionId;
                   return (
@@ -134,13 +134,14 @@ export function ObligationsNavigationShell({
                         });
                       }}
                       className={[
-                        "block rounded-[28px] border px-6 py-6 shadow-[0_1px_0_rgba(15,23,42,0.05)] transition",
+                        "block  rounded-3xl border px-6 py-6  shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition",
                         active
                           ? "border-zinc-950 bg-zinc-950 text-white"
                           : "border-zinc-200 bg-white text-zinc-950 hover:border-zinc-300 hover:bg-zinc-50",
                         isPending && pendingSelectionId === owner.id ? "ring-2 ring-sky-400" : "",
                       ].join(" ")}
                     >
+
                       <div className="space-y-8">
                         <div className="space-y-2">
                           <div className={["text-2xl font-semibold tracking-tight", active ? "text-white" : "text-zinc-950"].join(" ")}>
@@ -159,7 +160,7 @@ export function ObligationsNavigationShell({
                 })}
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 ">
                 {(units ?? []).map((unit) => {
                   const active = unit.id === visualSelectionId;
                   return (
@@ -208,9 +209,9 @@ export function ObligationsNavigationShell({
           </div>
         </div>
 
-        <div className="space-y-8 rounded-[24px] border border-zinc-200 bg-white p-5">
+        <div className="space-y-8 rounded-2xl border border-zinc-200 bg-white p-5  ">
           {showPendingDetail ? (
-            <div className="flex min-h-[28rem] items-center justify-center rounded-[24px] border border-zinc-200 bg-zinc-50 px-6 py-10">
+            <div className="flex min-h-[28rem] items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 px-6 py-10 test">
               <div className="flex flex-col items-center gap-4 text-center">
                 <div
                   aria-hidden="true"
