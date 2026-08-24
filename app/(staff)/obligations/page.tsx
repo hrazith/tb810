@@ -22,6 +22,7 @@ import { listOwners } from "@/server/owners";
 import { isPerfLoggingEnabled } from "@/server/perf";
 import { getSelectedUnitTransactionsForUnit } from "@/server/transactions";
 import { listUnitDirectory } from "@/server/units";
+import { measure, type TimedResult } from "@/server/perf/timing";
 import { ObligationsNavigationShell } from "./_components/obligations-navigation-shell";
 
 type PageProps = {
@@ -65,16 +66,20 @@ function componentLabel(key: string) {
       return key;
   }
 }
+
 export default async function ObligationsPage({ searchParams }: PageProps) {
+  const pageStartedAt = process.hrtime.bigint();
   const params = await searchParams;
   const monthKey = await currentMonthKey();
   const mode = params.mode ?? "owners";
 
-  const unitsResult = mode === "units" ? await listUnitDirectory() : null;
+  const unitsMeasurement = mode === "units" ? await measure(listUnitDirectory()) : null;
+  const unitsResult = unitsMeasurement?.result ?? null;
   if (unitsResult?.error) throw new Error(unitsResult.error);
   const eligibleUnits = unitsResult?.data.filter((unit) => unit.unit_type_code === "condo") ?? [];
 
-  const ownersResult = mode === "owners" ? await listOwners({ status: "active" }) : null;
+  const ownersMeasurement = mode === "owners" ? await measure(listOwners({ status: "active" })) : null;
+  const ownersResult = ownersMeasurement?.result ?? null;
   if (ownersResult?.error) throw new Error(ownersResult.error);
 
   const selectedUnit = mode === "units" && params.unitId
@@ -84,12 +89,13 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
     ? ownersResult?.data.find((owner) => owner.id === params.ownerId) ?? null
     : null;
   const selectedBranchStartedAt = selectedUnit ? process.hrtime.bigint() : null;
-  const selectedTransactionsPromise = selectedUnit
-    ? getSelectedUnitTransactionsForUnit(selectedUnit.id)
-    : Promise.resolve([]);
+  const selectedTransactionsMeasurementPromise: Promise<TimedResult<Awaited<ReturnType<typeof getSelectedUnitTransactionsForUnit>>> | null> = selectedUnit
+    ? measure(getSelectedUnitTransactionsForUnit(selectedUnit.id))
+    : Promise.resolve(null);
 
-  const selectedObligationPromise = selectedUnit
-    ? getUnitMonthlyObligationForBuilding({
+  const selectedObligationMeasurementPromise: Promise<TimedResult<Awaited<ReturnType<typeof getUnitMonthlyObligationForBuilding>>> | null> = selectedUnit
+    ? measure(
+        getUnitMonthlyObligationForBuilding({
         unit: {
           unitId: selectedUnit.id,
           unitNumber: selectedUnit.unit_number,
@@ -99,45 +105,68 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
         obligationMonth: monthKey,
         buildingId: TB810_BUILDING_ID,
         buildingName: TB810_BUILDING_NAME,
-      })
-    : null;
+        }),
+      )
+    : Promise.resolve(null);
 
-  const selectedOwnerObligationPromise = selectedOwner
-    ? getOwnerMonthlyObligation({ ownerId: selectedOwner.id, obligationMonth: monthKey })
-    : null;
+  const selectedOwnerObligationMeasurementPromise: Promise<TimedResult<Awaited<ReturnType<typeof getOwnerMonthlyObligation>>> | null> = selectedOwner
+    ? measure(getOwnerMonthlyObligation({ ownerId: selectedOwner.id, obligationMonth: monthKey }))
+    : Promise.resolve(null);
 
-  const selectedOwnerUpcomingChargesPromise = selectedOwner
-    ? getUpcomingOwnerDirectChargesForObligationMonth(selectedOwner.id, monthKey)
-    : null;
+  const selectedOwnerUpcomingChargesMeasurementPromise: Promise<
+    TimedResult<Awaited<ReturnType<typeof getUpcomingOwnerDirectChargesForObligationMonth>>> | null
+  > = selectedOwner
+    ? measure(getUpcomingOwnerDirectChargesForObligationMonth(selectedOwner.id, monthKey))
+    : Promise.resolve(null);
 
-  const selectedUnitUpcomingChargesPromise = selectedUnit
-    ? getUpcomingUnitChargesForObligationMonth(selectedUnit.id, monthKey)
-    : null;
+  const selectedUnitUpcomingChargesMeasurementPromise: Promise<
+    TimedResult<Awaited<ReturnType<typeof getUpcomingUnitChargesForObligationMonth>>> | null
+  > = selectedUnit
+    ? measure(getUpcomingUnitChargesForObligationMonth(selectedUnit.id, monthKey))
+    : Promise.resolve(null);
 
-  const monthlySummary = !selectedUnit && !selectedOwner
-    ? await getMonthlyObligationSummary({ obligationMonth: monthKey })
+  const monthlySummaryMeasurement = !selectedUnit && !selectedOwner
+    ? await measure(getMonthlyObligationSummary({ obligationMonth: monthKey }))
     : null;
+  const monthlySummary = monthlySummaryMeasurement?.result ?? null;
   if (monthlySummary?.error) throw new Error(monthlySummary.error);
 
-  const selectedSnapshotPromise = selectedUnit
-    ? getSelectedUnitOwnershipSnapshot({
+  const selectedSnapshotMeasurementPromise: Promise<
+    TimedResult<Awaited<ReturnType<typeof getSelectedUnitOwnershipSnapshot>>> | null
+  > = selectedUnit
+    ? measure(
+        getSelectedUnitOwnershipSnapshot({
         unit: {
           id: selectedUnit.id,
           unit_number: selectedUnit.unit_number,
           unit_type_code: selectedUnit.unit_type_code,
         },
-      })
-    : null;
+        }),
+      )
+    : Promise.resolve(null);
 
-  const [selectedObligation, selectedOwnerObligation, selectedOwnerUpcomingCharges, selectedUnitUpcomingCharges, selectedSnapshot, transactions] =
-    await Promise.all([
-      selectedObligationPromise,
-      selectedOwnerObligationPromise,
-      selectedOwnerUpcomingChargesPromise,
-      selectedUnitUpcomingChargesPromise,
-      selectedSnapshotPromise,
-      selectedTransactionsPromise,
-    ]);
+  const [
+    selectedObligationMeasurement,
+    selectedOwnerObligationMeasurement,
+    selectedOwnerUpcomingChargesMeasurement,
+    selectedUnitUpcomingChargesMeasurement,
+    selectedSnapshotMeasurement,
+    transactionsMeasurement,
+  ] = await Promise.all([
+    selectedObligationMeasurementPromise,
+    selectedOwnerObligationMeasurementPromise,
+    selectedOwnerUpcomingChargesMeasurementPromise,
+    selectedUnitUpcomingChargesMeasurementPromise,
+    selectedSnapshotMeasurementPromise,
+    selectedTransactionsMeasurementPromise,
+  ]);
+
+  const selectedObligation = selectedObligationMeasurement?.result ?? null;
+  const selectedOwnerObligation = selectedOwnerObligationMeasurement?.result ?? null;
+  const selectedOwnerUpcomingCharges = selectedOwnerUpcomingChargesMeasurement?.result ?? null;
+  const selectedUnitUpcomingCharges = selectedUnitUpcomingChargesMeasurement?.result ?? null;
+  const selectedSnapshot = selectedSnapshotMeasurement?.result ?? null;
+  const transactions = transactionsMeasurement?.result ?? [];
 
   if (selectedObligation?.error) throw new Error(selectedObligation.error);
   if (selectedOwnerObligation?.error) throw new Error(selectedOwnerObligation.error);
@@ -155,6 +184,27 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
         `elapsed_ms=${selectedBranchElapsedMs.toFixed(1)}`,
         `concurrent_helpers=financial,ownership_snapshot,upcoming_charges`,
         `sequential_waits=none`,
+      ].join(" "),
+    );
+  }
+
+  if (isPerfLoggingEnabled()) {
+    const pageElapsedMs = Number(process.hrtime.bigint() - pageStartedAt) / 1_000_000;
+    console.info(
+      [
+        "[OBLIGATIONS_PAGE_PERF]",
+        `mode=${mode}`,
+        `month=${monthKey}`,
+        `total_ms=${pageElapsedMs.toFixed(1)}`,
+        `unit_directory_ms=${unitsMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
+        `owner_directory_ms=${ownersMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
+        `monthly_summary_ms=${monthlySummaryMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
+        `selected_obligation_ms=${selectedObligationMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
+        `selected_owner_obligation_ms=${selectedOwnerObligationMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
+        `selected_owner_upcoming_charges_ms=${selectedOwnerUpcomingChargesMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
+        `selected_unit_upcoming_charges_ms=${selectedUnitUpcomingChargesMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
+        `selected_snapshot_ms=${selectedSnapshotMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
+        `selected_transactions_ms=${transactionsMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
       ].join(" "),
     );
   }
