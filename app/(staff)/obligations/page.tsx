@@ -78,7 +78,16 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
   if (unitsResult?.error) throw new Error(unitsResult.error);
   const eligibleUnits = unitsResult?.data.filter((unit) => unit.unit_type_code === "condo") ?? [];
 
-  const ownersMeasurement = mode === "owners" ? await measure(listOwners({ status: "active" })) : null;
+  const ownersMeasurementPromise = mode === "owners" ? measure(listOwners({ status: "active" })) : null;
+  const monthlySummaryMeasurementPromise = mode === "owners"
+    ? measure(getMonthlyObligationSummary({ obligationMonth: monthKey }))
+    : null;
+
+  const [ownersMeasurement, monthlySummaryMeasurement] = await Promise.all([
+    ownersMeasurementPromise,
+    monthlySummaryMeasurementPromise,
+  ]);
+
   const ownersResult = ownersMeasurement?.result ?? null;
   if (ownersResult?.error) throw new Error(ownersResult.error);
 
@@ -125,9 +134,6 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
     ? measure(getUpcomingUnitChargesForObligationMonth(selectedUnit.id, monthKey))
     : Promise.resolve(null);
 
-  const monthlySummaryMeasurement = !selectedUnit && !selectedOwner
-    ? await measure(getMonthlyObligationSummary({ obligationMonth: monthKey }))
-    : null;
   const monthlySummary = monthlySummaryMeasurement?.result ?? null;
   if (monthlySummary?.error) throw new Error(monthlySummary.error);
 
