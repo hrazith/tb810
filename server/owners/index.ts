@@ -82,6 +82,7 @@ export async function listOwners(
     }
   }
 
+  const ownersQueryStartedAt = process.hrtime.bigint();
   let request = supabase
     .from("tb810_owners")
     .select(OWNER_SELECT)
@@ -100,18 +101,24 @@ export async function listOwners(
   }
 
   const { data: owners, error } = await request;
+  const ownersQueryMs = Number(process.hrtime.bigint() - ownersQueryStartedAt) / 1_000_000;
   if (error) {
     return { data: [], error: error.message };
   }
 
   const ownerIds = owners.map((owner) => owner.id);
   const unitCounts = new Map<string, number>();
+  let ownershipsQueryMs = 0;
+  let ownershipRowsCount = 0;
 
   if (ownerIds.length > 0) {
+    const ownershipsQueryStartedAt = process.hrtime.bigint();
     const { data: ownerships, error: ownershipError } = await supabase
       .from("tb810_ownerships")
       .select("owner_id")
       .in("owner_id", ownerIds);
+    ownershipsQueryMs = Number(process.hrtime.bigint() - ownershipsQueryStartedAt) / 1_000_000;
+    ownershipRowsCount = ownerships?.length ?? 0;
 
     if (ownershipError) {
       return { data: [], error: ownershipError.message };
@@ -142,6 +149,9 @@ export async function listOwners(
           "[OWNER_DIRECTORY_PERF]",
           `data_remote_requests=${ownerIds.length > 0 ? 2 : 1}`,
           `elapsed_ms=${elapsedMs.toFixed(1)}`,
+          `owners_query_ms=${ownersQueryMs.toFixed(1)}`,
+          `ownerships_query_ms=${ownershipsQueryMs.toFixed(1)}`,
+          `ownership_rows=${ownershipRowsCount}`,
           `returned_owners=${result.data.length}`,
           `source=remote`,
         ].join(" "),
