@@ -70,13 +70,13 @@ export function ObligationsNavigationShell({
 
   return (
     <section className="space-y-6 xl:w-[calc(100vw-3rem)] xl:max-w-none xl:-ml-[calc(50vw-50%-1.5rem)]">
-      <div className="space-y-2 test">
+      <div className="space-y-2 ">
         
-        <h1 className="whitespace-nowrap text-2xl text-center font-semibold tracking-tight text-zinc-950">
+        <h1 className="whitespace-nowrap text-3xl text-center font-semibold tracking-tight text-zinc-950 mb-6">
           Obligations
         </h1>
-        <div className="rounded-[28px] bg-zinc-100 p-1 ">
-            <div className="grid grid-cols-2 gap-1">
+        <div className=" p-12  ">
+            <div className="grid grid-cols-2 gap-1  mx-auto w-lg bg-gray-200 rounded-xl">
               <Link
                 href={buildQuery({ mode: "owners", ownerId: selectedOwnerId ?? undefined })}
                 onClick={(event) => {
@@ -144,7 +144,7 @@ export function ObligationsNavigationShell({
 
                       <div className="space-y-8">
                         <div className="space-y-2">
-                          <div className={["text-2xl font-semibold tracking-tight", active ? "text-white" : "text-zinc-950"].join(" ")}>
+                          <div className={["text-xl font-semibold tracking-tight", active ? "text-white" : "text-zinc-950"].join(" ")}>
                             {owner.full_name}
                           </div>
                           <div className={["text-sm", active ? "text-zinc-300" : "text-zinc-600"].join(" ")}>
