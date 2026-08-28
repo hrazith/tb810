@@ -14,15 +14,18 @@ type HeaderProps = {
   signOutAction: () => Promise<void>;
 };
 
-export function Header({ userEmail, signOutAction }: HeaderProps) {
+export function Header({ userEmail, primaryRoleKey, signOutAction }: HeaderProps) {
   const pathname = usePathname();
-  const [openMenu, setOpenMenu] = useState<"water" | "gas" | null>(null);
+  const [openMenu, setOpenMenu] = useState<"water" | "gas" | "menu" | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeSection = useMemo(() => {
     if (pathname === "/obligations") return "obligations";
     if (pathname.startsWith("/water/")) return "water";
     if (pathname.startsWith("/gas/")) return "gas";
+    if (pathname.startsWith("/finance/budget-plans/")) return "menu";
+    if (pathname.startsWith("/owners")) return "menu";
+    if (pathname.startsWith("/units")) return "menu";
     return null;
   }, [pathname]);
 
@@ -52,6 +55,11 @@ export function Header({ userEmail, signOutAction }: HeaderProps) {
   function openCategory(menu: "water" | "gas") {
     cancelClose();
     setOpenMenu(menu);
+  }
+
+  function openUtilityMenu() {
+    cancelClose();
+    setOpenMenu("menu");
   }
 
   return (
@@ -175,6 +183,84 @@ export function Header({ userEmail, signOutAction }: HeaderProps) {
             >
               Obligations
             </Link>
+            {primaryRoleKey === "super_admin" ? (
+              <div
+                className="group relative"
+                onMouseEnter={openUtilityMenu}
+                onMouseLeave={scheduleClose}
+              >
+                <button
+                  type="button"
+                  className={[
+                    "inline-flex items-center gap-2 transition hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2",
+                    activeSection === "menu" ? "underline decoration-2 underline-offset-8" : "",
+                  ].join(" ")}
+                  aria-haspopup="menu"
+                  aria-expanded={openMenu === "menu"}
+                  onFocus={openUtilityMenu}
+                  onClick={() => setOpenMenu((current) => (current === "menu" ? null : "menu"))}
+                >
+                  Menu
+                </button>
+                <div
+                  className={[
+                    "absolute left-0 top-full z-30 pt-3 transition",
+                    openMenu === "menu"
+                      ? "pointer-events-auto opacity-100"
+                      : "pointer-events-none opacity-0",
+                  ].join(" ")}
+                  onMouseEnter={cancelClose}
+                  onMouseLeave={scheduleClose}
+                >
+                  <div className="min-w-60 rounded-2xl border border-zinc-200 bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.08)]">
+                    <Link
+                      href="/finance/budget-plans/2027"
+                      className={[
+                        "flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-medium transition hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950",
+                        pathname.startsWith("/finance/budget-plans/")
+                          ? "underline decoration-2 underline-offset-4 text-zinc-950"
+                          : "text-zinc-700",
+                      ].join(" ")}
+                    >
+                      Budget
+                    </Link>
+                    <Link
+                      href="/owners"
+                      className={[
+                        "flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-medium transition hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950",
+                        pathname.startsWith("/owners")
+                          ? "underline decoration-2 underline-offset-4 text-zinc-950"
+                          : "text-zinc-700",
+                      ].join(" ")}
+                    >
+                      Owners
+                    </Link>
+                    <Link
+                      href="/units"
+                      className={[
+                        "flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-medium transition hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950",
+                        pathname.startsWith("/units")
+                          ? "underline decoration-2 underline-offset-4 text-zinc-950"
+                          : "text-zinc-700",
+                      ].join(" ")}
+                    >
+                      Units
+                    </Link>
+                    <div className="mt-2 border-t border-zinc-100 pt-2">
+                      <form action={signOutAction}>
+                        <button
+                          type="submit"
+                          className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 hover:text-zinc-950"
+                        >
+                          <SignOut aria-hidden size={16} />
+                          Sign out
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </nav>
         </div>
 
