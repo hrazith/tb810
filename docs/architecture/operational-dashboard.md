@@ -47,6 +47,16 @@ Users should not have to mentally reconcile multiple source periods on the dashb
 Some calculations may consume facts from another service period.
 That precision belongs inside the relevant domain workspace, not on the dashboard.
 
+At month close, Guliana's dashboard intentionally spans two related temporal contexts:
+
+- the current operating/source month
+- the upcoming obligation month
+
+The dashboard may answer both:
+
+- whether the source work feeding the upcoming obligation cycle is complete or blocked
+- what obligation set those source facts are progressively producing for Carlos to review
+
 The dashboard should communicate:
 
 - "What is the state of August?"
@@ -57,6 +67,7 @@ rather than:
 
 Avoid competing month labels on the dashboard.
 The dashboard should speak primarily in terms of the current operating month.
+Do not collapse source month and obligation month into one "current month" concept when the dashboard is intentionally previewing the next obligation cycle.
 
 ## 3. Domain Workspace Boundaries
 
@@ -140,6 +151,9 @@ Once normal work is complete, it should consume less dashboard attention.
 Completed normal work should compress.
 Exceptions should expand.
 
+At the end of the month, the dashboard may also surface source-fact preparation for the next obligation month.
+That is a month-close boundary for real upstream inputs, not a generic "day X" warning rule.
+
 ### Mid-month
 
 Operational emphasis may shift toward expenses and other exceptions.
@@ -187,6 +201,9 @@ Timing matters.
 Sedapal and water meter activity normally becomes relevant during the first week of the month.
 Normal and not-yet-due work must not be represented as an exception.
 
+When the operating month closes, the dashboard may show whether the source facts that feed the next obligation month are ready, blocked, or still in progress.
+That is a genuine close/posting boundary, not a manufactured overdue state.
+
 Gas supplier bills are different: they can arrive throughout the month.
 Therefore "Upload supplier bill" is an ongoing intake action and should remain available even when no supplier bill is currently expected.
 
@@ -209,6 +226,8 @@ Quick Actions must not carry fake pending or needs-attention state merely becaus
 
 Current Work is surfaced because of operating-cycle timing or state.
 Quick Actions are persistent intake actions.
+
+Read-only overdue receivable awareness may be shown as secondary situational context, but it is not a Guliana Collections workflow and does not make Collections a primary Guliana responsibility.
 
 ## 9. Completed Work
 

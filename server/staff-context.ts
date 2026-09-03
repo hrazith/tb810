@@ -26,7 +26,13 @@ export type StaffContext = {
   primaryRoleKey: string | null;
 };
 
-const ROLE_PRIORITY = ["super_admin", "building_manager", "reconciliation_specialist", "building_staff", "viewer"] as const;
+const ROLE_PRIORITY = [
+  "super_admin",
+  "building_manager",
+  "reconciliation_specialist",
+  "building_staff",
+  "viewer",
+] as const;
 
 function pickPrimaryRole(roleKeys: string[]) {
   for (const roleKey of ROLE_PRIORITY) {

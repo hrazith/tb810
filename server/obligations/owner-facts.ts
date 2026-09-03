@@ -27,7 +27,7 @@ export type BuildingMonthFinancialFacts = {
   planYear: number;
   plan: { currency: string; monthly_operating_budget: string } | null;
   commonWaterType: { id: string; code: string; name: string } | null;
-  commonWaterBill: CommonWaterBill;
+  commonWaterBill: CommonWaterBill | null;
   unitRows: Array<{
     id: string;
     unit_number: string;
@@ -316,14 +316,6 @@ export async function loadBuildingMonthFinancialFacts({
 
   const payload = rpc.data as BuildingMonthFinancialFactsRpcPayload;
   const commonWaterBill = payload.commonWaterBill ?? null;
-  if (!commonWaterBill) {
-    return {
-      ...withRequestCount({ data: null, error: "Common water bill not found." }, 1),
-      source: "remote",
-      elapsedMs: Number(process.hrtime.bigint() - startedAt) / 1_000_000,
-    };
-  }
-
   const facts = {
     data: {
       obligationMonth,

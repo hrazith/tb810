@@ -98,6 +98,18 @@ After finalization, the Monthly Obligation becomes an immutable historical finan
 Corrections must not silently rewrite the finalized month.
 Late or incorrect charges should be adjusted in a future Monthly Obligation, typically the following month.
 
+Carlos does not manually create Monthly Obligations.
+The system derives them automatically as underlying financial facts become available.
+
+Carlos's approval is the accountability boundary.
+The point of approval is when the current calculated Monthly Obligation becomes the approved historical snapshot for downstream use.
+
+This approved snapshot must preserve the financial facts Carlos reviewed so later source-data changes do not silently change what was approved.
+
+The dashboard may preview the next obligation month before that approval boundary is reached.
+That preview remains live and unapproved until Carlos explicitly approves the resulting Monthly Obligation snapshot.
+Month close is therefore a preparation boundary, not a freeze boundary.
+
 ## 5. Component Contract
 
 Each component in a Monthly Obligation must include:
@@ -150,6 +162,7 @@ For example:
 - Common Water may be sourced from the Sedapal bill and the completed set of meter readings.
 
 The Monthly Obligation is the composition layer that aligns those facts into one month-level result.
+Source month and obligation month must remain distinct, especially when the dashboard is previewing the next obligation cycle at month close.
 
 ## 7. Source-Domain Boundaries
 
@@ -168,6 +181,7 @@ The Obligations domain owns the composed monthly result.
 It does not own the formulas that produced the upstream facts.
 
 Owner-direct charges do not contribute to Monthly Obligations and are handled in the Owner Account path instead.
+The Monthly Obligation read model may therefore be progressive and incomplete while upstream source facts are still arriving.
 
 ## 8. Read-Service Contract
 
@@ -213,14 +227,20 @@ The system never decides when invoices should be generated.
 
 There are:
 
-- no readiness rules
+- no automated readiness rules
 - no required component rules
-- no approval workflow
+- no automatic approval workflow
 - no blocking workflow
 - no automatic generation
 
 Carlos decides.
 The system presents truth.
+
+Month-close source-fact collection, such as late-entered water or gas inputs that feed the next obligation month, is a preparation boundary only.
+It does not itself mean the obligation has been approved, finalized, or dispatched.
+
+Carlos's approval is the accountability checkpoint for the obligation snapshot.
+That approval does not itself mean the obligation has been dispatched.
 
 ## 11. Invoice Philosophy
 
@@ -238,6 +258,16 @@ Invoices can be generated:
 - as a batch
 - grouped for an Owner
 
+The exact invoice/PDF/dispatch architecture remains intentionally deferred.
+When that workflow is built, "ready for dispatch" must mean that Carlos has approved the obligations and the outward dispatch artifacts have been generated and are available for Guliana to send.
+Approval and dispatch are separate concerns.
+
+If a required source fact is missing, the canonical component should be representable as blocked or incomplete rather than forcing the entire building-month read to disappear.
+That missing-source state must surface to consuming read models instead of being flattened into zero.
+
+Carlos approves the financial obligation snapshot.
+Guliana performs the later operational dispatch action.
+
 Owner grouping is packaging only.
 It does not change accounting identity.
 
@@ -253,7 +283,18 @@ If a charge is discovered late or entered incorrectly it should be adjusted in a
 
 Historical invoices remain historical communication.
 
-## 13. Workspace Responsibilities
+## 13. Role Boundary
+
+Carlos reviews the calculated monthly obligations and deliberately approves them.
+That approval is the accountability boundary for the approved financial record.
+
+Guliana does not approve the financial obligation set.
+She handles the later operational dispatch workflow once the approved artifacts are ready.
+
+This document does not define the final invoice-generation, PDF-bundle, dispatch-tracking, or Collections implementation.
+Those downstream details remain intentionally open until their dedicated workflows are designed.
+
+## 14. Workspace Responsibilities
 
 Monthly Obligations allows Carlos to:
 
