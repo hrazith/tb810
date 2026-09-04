@@ -147,9 +147,15 @@ function countChargeRows(financialFacts: BuildingMonthFinancialFacts, obligation
   };
 }
 
-function deriveExceptions(facts: UpcomingFacts["obligations"]): DashboardException[] {
+function deriveExceptions(
+  sourceWork: SourceWorkFacts,
+  facts: UpcomingFacts["obligations"],
+): DashboardException[] {
   const seen = new Set<string>();
   const exceptions: DashboardException[] = [];
+  if (sourceWork.water.meterReadingExpectedCount > 0 && sourceWork.water.meterReadingCompleteCount < sourceWork.water.meterReadingExpectedCount) {
+    exceptions.push({ source: "water", message: "Required water readings are missing." });
+  }
   for (const message of [
     facts.components.fixed_assessment.reason,
     facts.components.metered_water.reason,
@@ -245,7 +251,7 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
     water,
     gas,
     obligations,
-    exceptions: deriveExceptions(monthFacts.upcoming.obligations),
+    exceptions: deriveExceptions(sourceWork, monthFacts.upcoming.obligations),
     completed: deriveCompleted(sourceWork, monthFacts.upcoming.obligations),
     quickActions: [
       "upload_sedapal_bill",

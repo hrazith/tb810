@@ -87,7 +87,7 @@ test("A month open stays calm and produces no manufactured exceptions", () => {
   assert.deepEqual(projection.exceptions, []);
 });
 
-test("B early month with partial water work becomes active, not exceptional", () => {
+test("B early month with partial water work surfaces a water attention item", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
     sourceWork: {
       water: {
@@ -102,7 +102,36 @@ test("B early month with partial water work becomes active, not exceptional", ()
   assert.equal(projection.water.state, "active");
   assert.equal(projection.water.completion, "incomplete");
   assert.equal(projection.water.emphasis, "normal");
-  assert.deepEqual(projection.exceptions, []);
+  assert.deepEqual(projection.exceptions, [
+    { source: "water", message: "Required water readings are missing." },
+  ]);
+});
+
+test("B2 incomplete required water readings surface a water attention item", () => {
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    sourceWork: {
+      water: {
+        commonWaterBillPresent: false,
+        meterReadingCount: 1,
+        meterReadingExpectedCount: 64,
+        meterReadingCompleteCount: 1,
+      },
+    },
+    upcoming: {
+      obligations: {
+        components: {
+          common_water: { state: "blocked", amount: null, reason: "Sedapal water bill has not been entered yet." },
+        },
+      },
+    },
+  }));
+
+  assert.equal(projection.water.state, "blocked");
+  assert.equal(projection.water.emphasis, "attention");
+  assert.deepEqual(projection.exceptions, [
+    { source: "water", message: "Required water readings are missing." },
+    { source: "obligations", message: "Sedapal water bill has not been entered yet." },
+  ]);
 });
 
 test("C complete water work compresses", () => {
@@ -119,6 +148,7 @@ test("C complete water work compresses", () => {
 
   assert.equal(projection.water.state, "complete");
   assert.equal(projection.water.emphasis, "compressed");
+  assert.deepEqual(projection.exceptions, []);
 });
 
 test("D late month without Sedapal bill does not become an exception", () => {
