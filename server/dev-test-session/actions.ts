@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { getFixedBuildingIdentity } from "@/server/building";
+import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 
 import { getDevTestSessionCookieName, startDevTestSession } from "../dev-test-session";
 
@@ -23,8 +25,10 @@ export async function startDevTestSessionAction(formData: FormData) {
 export async function resetDevTestSessionAction(formData: FormData) {
   const returnTo = returnToValue(formData);
   const sessionId = String(formData.get("session_id") ?? "").trim();
+  const buildingId = getFixedBuildingIdentity().id;
   const supabase = await createClient();
   if (!sessionId) {
+    invalidateBuildingMonthFinancialFactsCache(buildingId);
     redirect(returnTo);
   }
 
@@ -47,6 +51,7 @@ export async function resetDevTestSessionAction(formData: FormData) {
     redirect(`${returnTo}?error=${encodeURIComponent(error.message)}`);
   }
 
+  invalidateBuildingMonthFinancialFactsCache(buildingId);
   const cookieStore = await cookies();
   cookieStore.set(getDevTestSessionCookieName(), "", { path: "/", expires: new Date(0) });
   redirect(returnTo);
