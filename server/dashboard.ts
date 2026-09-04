@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { getBusinessNow } from "@/server/business-date";
 import { getFixedBuildingIdentity } from "@/server/building";
 import { nextMonthKey } from "@/server/charges/month";
@@ -307,7 +309,7 @@ export function deriveGulianaDashboardMonths(businessNow: Date) {
   return { operatingMonth, upcomingObligationMonth };
 }
 
-export async function getGulianaDashboardFacts(): Promise<QueryResult<GulianaDashboardFacts>> {
+export const getGulianaDashboardFacts = cache(async (): Promise<QueryResult<GulianaDashboardFacts>> => {
   const businessNow = await getBusinessNow();
   const { operatingMonth, upcomingObligationMonth } = deriveGulianaDashboardMonths(businessNow);
   const building = getFixedBuildingIdentity();
@@ -336,7 +338,7 @@ export async function getGulianaDashboardFacts(): Promise<QueryResult<GulianaDas
     },
     error: null,
   };
-}
+});
 
 export async function getDashboardMonthFacts() {
   return getGulianaDashboardFacts();

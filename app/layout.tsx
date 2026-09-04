@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { brandConfig, gothamSans } from "@/brand";
 import { DevToolsProvider, DevToolsToolbar } from "@/components/dev-tools";
 import { getBusinessDateCookieName, parseBusinessDateCookieValue } from "@/server/business-date";
+import { getGulianaDashboardFacts } from "@/server/dashboard";
 import { getActiveDevTestSessionSummary } from "@/server/dev-test-session";
 import "./globals.css";
 
@@ -31,6 +32,8 @@ export default async function RootLayout({
       ? parseBusinessDateCookieValue((await cookies()).get(getBusinessDateCookieName())?.value)
       : null;
   const devTestSession = await getActiveDevTestSessionSummary();
+  const devDashboardFacts =
+    process.env.NODE_ENV === "development" ? (await getGulianaDashboardFacts()).data : null;
 
   return (
     <html lang={brandConfig.defaultLocale} className={`${gothamSans.variable} h-full antialiased`}>
@@ -49,7 +52,7 @@ export default async function RootLayout({
       >
         <DevToolsProvider>
           {children}
-          <DevToolsToolbar />
+          <DevToolsToolbar dashboardFacts={devDashboardFacts} />
         </DevToolsProvider>
       </body>
     </html>

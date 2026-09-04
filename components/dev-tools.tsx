@@ -1,9 +1,17 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, useSyncExternalStore, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { clearDevBusinessDateAction, setDevBusinessDateAction } from "@/server/business-date/actions";
+import type { GulianaDashboardFacts } from "@/server/dashboard";
 import { resetDevTestSessionAction, startDevTestSessionAction } from "@/server/dev-test-session/actions";
 
 const STORAGE_KEYS = {
@@ -138,6 +146,7 @@ function initializeStore() {
     document.body.setAttribute("data-dev-test-session-id", snapshot.testSessionId);
     document.body.setAttribute("data-dev-test-session-mutations", String(snapshot.testSessionMutations));
   }
+  notify();
 }
 
 function readSnapshot() {
@@ -149,10 +158,79 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
+function isCanonicalDateKey(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+}
+
+function formatCanonicalDateKey(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
+}
+
+function formatMonthYearKey(value: string) {
+  const parsed = new Date(`${value}-01T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(parsed);
+}
+
+function readBodySnapshot() {
+  if (typeof document === "undefined") return null;
+
+  const bodyOutline = document.body.dataset.devOutline === "1";
+  const bodyHistoricalEditingAvailable =
+    document.body.dataset.devHistoricalEditingAvailable === "1";
+  const bodyBusinessDateActive = document.body.dataset.devBusinessDateActive === "1";
+  const bodyBusinessDate = document.body.dataset.devBusinessDate ?? "";
+  const bodyTestSessionActive = document.body.dataset.devTestSessionActive === "1";
+  const bodyTestSessionId = document.body.dataset.devTestSessionId ?? "";
+  const bodyTestSessionMutations = Number(document.body.dataset.devTestSessionMutations ?? "0");
+
+  return {
+    outline: readStoredFlag(STORAGE_KEYS.outline) || bodyOutline,
+    historicalEditingEnabled:
+      bodyHistoricalEditingAvailable && readStoredFlag(STORAGE_KEYS.historicalEditing),
+    historicalEditingAvailable: bodyHistoricalEditingAvailable,
+    businessDateActive: bodyBusinessDateActive,
+    businessDateValue: bodyBusinessDate,
+    testSessionActive: bodyTestSessionActive,
+    testSessionId: bodyTestSessionId,
+    testSessionMutations: Number.isFinite(bodyTestSessionMutations) ? bodyTestSessionMutations : 0,
+  } satisfies DevToolsSnapshot;
+}
+
+function syncStoreFromDocument() {
+  const next = readBodySnapshot();
+  if (!next) return;
+
+  const changed =
+    snapshot.outline !== next.outline ||
+    snapshot.historicalEditingEnabled !== next.historicalEditingEnabled ||
+    snapshot.historicalEditingAvailable !== next.historicalEditingAvailable ||
+    snapshot.businessDateActive !== next.businessDateActive ||
+    snapshot.businessDateValue !== next.businessDateValue ||
+    snapshot.testSessionActive !== next.testSessionActive ||
+    snapshot.testSessionId !== next.testSessionId ||
+    snapshot.testSessionMutations !== next.testSessionMutations;
+
+  if (!changed) return;
+
+  snapshot = next;
+  notify();
+}
+
 export function DevToolsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     initializeStore();
-  }, []);
+    syncStoreFromDocument();
+  });
 
   return <>{children}</>;
 }
@@ -177,11 +255,17 @@ export function useDevTools() {
   } as DevToolsStore;
 }
 
-export function DevToolsToolbar() {
+export function DevToolsToolbar({ dashboardFacts }: { dashboardFacts?: GulianaDashboardFacts | null }) {
+  return <DevToolsToolbarInner dashboardFacts={dashboardFacts} />;
+}
+
+function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDashboardFacts | null }) {
   const state = useDevTools();
   const pathname = usePathname();
   const showToolbar = process.env.NODE_ENV === "development";
   const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
+  const dateFormRef = useRef<HTMLFormElement | null>(null);
   const dragStateRef = useRef<{
     pointerId: number;
     startX: number;
@@ -190,6 +274,11 @@ export function DevToolsToolbar() {
     startTop: number;
   } | null>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
+  const [activeTab, setActiveTab] = useState<"time" | "data" | "style">("time");
+  const businessDateKey = isCanonicalDateKey(state.businessDateValue) ? state.businessDateValue : "";
+  const businessDateLabel = businessDateKey ? formatCanonicalDateKey(businessDateKey) : null;
+  const dataMonthLabel = dashboardFacts ? formatMonthYearKey(dashboardFacts.operatingMonth) : null;
+  const upcomingMonthLabel = dashboardFacts ? formatMonthYearKey(dashboardFacts.upcomingObligationMonth) : null;
 
   const items = useMemo(
     () => [
@@ -235,108 +324,233 @@ export function DevToolsToolbar() {
     }
   };
 
+  const openBusinessDatePicker = () => {
+    const input = dateInputRef.current;
+    if (!input) return;
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+      return;
+    }
+    input.click();
+  };
+
   return (
     <>
       <div
         ref={toolbarRef}
-        className="fixed z-[10000] w-72 rounded-xl border border-white/10 bg-black/70 p-3 text-xs text-white shadow-xl backdrop-blur"
+        className="fixed z-[10000] w-[24rem] max-w-[calc(100vw-24px)] rounded-xl border border-white/10 bg-black/75 p-3 text-xs text-white shadow-xl backdrop-blur"
         style={{ left: position.left, top: position.top }}
       >
-        <button
-          type="button"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          className="mb-2 flex w-full cursor-grab items-center justify-between rounded-lg px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/80 active:cursor-grabbing"
-          aria-label="Drag DEV toolbar"
-          title="Drag to move"
-        >
-          <span>Dev only</span>
-          <span className="text-[10px] font-normal text-white/50">Drag</span>
-        </button>
-        <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-2 text-[11px] text-white/80">
-          <div className="flex items-center justify-between gap-2">
-            <span>Business date</span>
-            <span className="font-medium text-emerald-300">{state.businessDateValue}</span>
-          </div>
-          {state.businessDateActive ? (
-            <form action={clearDevBusinessDateAction} className="mt-2">
-              <input type="hidden" name="return_to" value={pathname} />
-              <button
-                type="submit"
-                className="w-full rounded-md border border-white/15 px-2 py-1.5 text-white"
-              >
-                Reset to today
-              </button>
-            </form>
-          ) : null}
-          <form action={setDevBusinessDateAction} className="mt-2 space-y-2">
-            <input type="hidden" name="return_to" value={pathname} />
-            <label className="block space-y-1">
-              <span className="text-[11px] text-white/70">Change business date</span>
-              <input
-                name="business_date"
-                type="date"
-                defaultValue={state.businessDateValue}
-                className="h-9 w-full rounded-md border border-white/15 bg-black/40 px-2 text-white"
-              />
-            </label>
-            <button
-              type="submit"
-              className="w-full rounded-md bg-white px-2 py-1.5 font-medium text-black"
-            >
-              Set date
-            </button>
-          </form>
-        </div>
-        <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-2 text-[11px] text-white/80">
-          {state.testSessionActive ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span>Test session</span>
-                <span className="font-medium text-emerald-300">Active</span>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium text-emerald-300">{state.testSessionMutations} mutations</span>
-              </div>
-              <form action={resetDevTestSessionAction} className="space-y-2">
-                <input type="hidden" name="return_to" value={pathname} />
-                <input type="hidden" name="session_id" value={state.testSessionId} />
-                <button type="submit" className="w-full rounded-md border border-white/15 px-2 py-1.5 text-white">
-                  Reset test session
-                </button>
-              </form>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span>Test session</span>
-                <span className="font-medium text-white/70">Not active</span>
-              </div>
-              <form action={startDevTestSessionAction}>
-                <input type="hidden" name="return_to" value={pathname} />
-                <button type="submit" className="w-full rounded-md border border-white/15 px-2 py-1.5 text-white">
-                  Start test session
-                </button>
-              </form>
-            </div>
-          )}
-        </div>
-        {items.map(([label, checked, setChecked]) => (
-          <label
-            key={label}
-            className="mt-2 flex cursor-pointer items-center justify-between gap-2 first:mt-0"
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            className="flex cursor-grab items-center gap-2 rounded-md px-1 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80 active:cursor-grabbing"
+            aria-label="Drag DEV toolbar"
+            title="Drag to move"
           >
-            <span className="text-white/90">{label}</span>
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-red-500"
-              checked={checked}
-              onChange={(event) => setChecked(event.target.checked)}
-            />
-          </label>
-        ))}
+            <span>Dev only</span>
+            <span className="text-[10px] font-normal text-white/45">Drag</span>
+          </button>
+        </div>
+
+        <div className="mt-2 flex items-center gap-4 border-b border-white/10 text-[11px]">
+          {(["time", "data", "style"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={
+                activeTab === tab
+                  ? "border-b-2 border-white pb-2 font-semibold text-white"
+                  : "pb-2 text-white/55 hover:text-white/80"
+              }
+            >
+              {tab === "time" ? "Time" : tab === "data" ? "Data" : "Style"}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-3">
+          {activeTab === "time" ? (
+            <div className="space-y-3">
+              <form ref={dateFormRef} action={setDevBusinessDateAction} className="space-y-2">
+                <input type="hidden" name="return_to" value={pathname} />
+                <input
+                  ref={dateInputRef}
+                  name="business_date"
+                  type="date"
+                  defaultValue={businessDateKey}
+                  className="sr-only"
+                  aria-label="Business date"
+                  onChange={(event) => {
+                    if (event.currentTarget.value) {
+                      dateFormRef.current?.requestSubmit();
+                    }
+                  }}
+                />
+                <button type="button" onClick={openBusinessDatePicker} className="flex items-start gap-2 text-left">
+                  <span className={state.businessDateActive ? "text-red-300" : "text-emerald-300"}>📅</span>
+                  {businessDateLabel ? (
+                    <span className={state.businessDateActive ? "block text-base font-medium text-red-300" : "block text-base font-medium text-emerald-300"}>
+                      {businessDateLabel}
+                    </span>
+                  ) : (
+                    <span className="block text-base font-medium text-white/40">Loading date…</span>
+                  )}
+                </button>
+                {state.businessDateActive ? (
+                  <button
+                    type="submit"
+                    formAction={clearDevBusinessDateAction}
+                    className="text-[11px] text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
+                  >
+                    Reset to today
+                  </button>
+                ) : null}
+              </form>
+            </div>
+          ) : null}
+
+          {activeTab === "data" ? (
+            <div className="space-y-4 text-[11px] text-white/80">
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                  TEST DATA · {dataMonthLabel ? dataMonthLabel.toUpperCase() : "—"}
+                </p>
+
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium text-white/90">Water</p>
+                  <div className="space-y-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span>Sedapal bill</span>
+                      <span className="text-white/90">
+                        {dashboardFacts?.sourceWork.water.commonWaterBillPresent
+                          ? "Present"
+                          : "Missing"}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span>Meter readings</span>
+                      <span className="text-white/90">
+                        {dashboardFacts
+                          ? `${dashboardFacts.sourceWork.water.meterReadingCount} / ${dashboardFacts.sourceWork.water.meterReadingExpectedCount}`
+                          : "—"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium text-white/90">Gas</p>
+                  <div className="space-y-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span>Supplier bills</span>
+                      <span className="text-white/90">
+                        {dashboardFacts
+                          ? `${dashboardFacts.upcoming.gas.supplierBillCount} · ${dashboardFacts.upcoming.gas.supplierBillTotal}`
+                          : "—"}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span>Meter readings</span>
+                      <span className="text-white/90">
+                        {dashboardFacts
+                          ? `${dashboardFacts.sourceWork.gas.gasReadingCount} / ${dashboardFacts.sourceWork.gas.gasUnitCount}`
+                          : "—"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium text-white/90">September</p>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span>Unit charges</span>
+                    <span className="text-white/90">
+                      {dashboardFacts ? dashboardFacts.upcoming.charges.unitChargeCount : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 pt-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-white/90">Test session</span>
+                  <span className={state.testSessionActive ? "text-emerald-300" : "text-white/55"}>
+                    {state.testSessionActive ? `Active · ${state.testSessionMutations} changes` : "Not active"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    disabled
+                    className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
+                  >
+                    + Add test bill
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
+                  >
+                    + Complete
+                  </button>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    disabled
+                    className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
+                  >
+                    + Add test charge
+                  </button>
+                  {state.testSessionActive ? (
+                    <form action={resetDevTestSessionAction}>
+                      <input type="hidden" name="return_to" value={pathname} />
+                      <input type="hidden" name="session_id" value={state.testSessionId} />
+                      <button type="submit" className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white">
+                        Reset session
+                      </button>
+                    </form>
+                  ) : (
+                    <form action={startDevTestSessionAction}>
+                      <input type="hidden" name="return_to" value={pathname} />
+                      <button type="submit" className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white">
+                        Start session
+                      </button>
+                    </form>
+                  )}
+                </div>
+                {upcomingMonthLabel ? (
+                  <p className="text-[11px] text-white/45">Upcoming month preview: {upcomingMonthLabel}</p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {activeTab === "style" ? (
+            <div className="space-y-2 text-[11px] text-white/80">
+              {items.map(([label, checked, setChecked]) => (
+                <label
+                  key={label}
+                  className="flex cursor-pointer items-center justify-between gap-3"
+                >
+                  <span className="text-white/90">{label}</span>
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-red-500"
+                    checked={checked}
+                    onChange={(event) => setChecked(event.target.checked)}
+                  />
+                </label>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
     </>
   );
