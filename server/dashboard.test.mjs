@@ -84,10 +84,10 @@ test("A month open stays calm and produces no manufactured exceptions", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts());
   assert.equal(projection.water.state, "waiting");
   assert.equal(projection.gas.state, "waiting");
-  assert.deepEqual(projection.exceptions, []);
+  assert.deepEqual(projection.attentions, []);
 });
 
-test("B early month with partial water work surfaces a water attention item", () => {
+test("B early month with partial water work surfaces only the water-readings attention", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
     sourceWork: {
       water: {
@@ -102,12 +102,16 @@ test("B early month with partial water work surfaces a water attention item", ()
   assert.equal(projection.water.state, "active");
   assert.equal(projection.water.completion, "incomplete");
   assert.equal(projection.water.emphasis, "normal");
-  assert.deepEqual(projection.exceptions, [
-    { source: "water", message: "Required water readings are missing." },
+  assert.deepEqual(projection.attentions, [
+    {
+      source: "water",
+      happened: "2 of 4 water readings are missing.",
+      impact: "September water obligations cannot be completed.",
+    },
   ]);
 });
 
-test("B2 incomplete required water readings surface a water attention item", () => {
+test("B2 missing Sedapal plus incomplete water readings surfaces two water attentions", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
     sourceWork: {
       water: {
@@ -128,9 +132,17 @@ test("B2 incomplete required water readings surface a water attention item", () 
 
   assert.equal(projection.water.state, "blocked");
   assert.equal(projection.water.emphasis, "attention");
-  assert.deepEqual(projection.exceptions, [
-    { source: "water", message: "Required water readings are missing." },
-    { source: "obligations", message: "Sedapal water bill has not been entered yet." },
+  assert.deepEqual(projection.attentions, [
+    {
+      source: "water",
+      happened: "Sedapal bill is missing for August.",
+      impact: "September water obligations cannot be completed.",
+    },
+    {
+      source: "water",
+      happened: "63 of 64 water readings are missing.",
+      impact: "September water obligations cannot be completed.",
+    },
   ]);
 });
 
@@ -148,7 +160,7 @@ test("C complete water work compresses", () => {
 
   assert.equal(projection.water.state, "complete");
   assert.equal(projection.water.emphasis, "compressed");
-  assert.deepEqual(projection.exceptions, []);
+  assert.deepEqual(projection.attentions, []);
 });
 
 test("D late month without Sedapal bill does not become an exception", () => {
@@ -158,7 +170,7 @@ test("D late month without Sedapal bill does not become an exception", () => {
 
   assert.equal(projection.water.state, "waiting");
   assert.equal(projection.water.emphasis, "normal");
-  assert.deepEqual(projection.exceptions, []);
+  assert.deepEqual(projection.attentions, []);
 });
 
 test("E late month without gas supplier bill does not become an exception", () => {
@@ -168,7 +180,7 @@ test("E late month without gas supplier bill does not become an exception", () =
 
   assert.equal(projection.gas.state, "waiting");
   assert.equal(projection.gas.emphasis, "normal");
-  assert.deepEqual(projection.exceptions, []);
+  assert.deepEqual(projection.attentions, []);
 });
 
 test("F a real canonical blocker surfaces regardless of date", () => {
@@ -177,17 +189,21 @@ test("F a real canonical blocker surfaces regardless of date", () => {
     upcoming: {
       obligations: {
         components: {
-          common_water: { state: "blocked", amount: null, reason: "Sedapal water bill has not been entered yet." },
+          fixed_assessment: { state: "blocked", amount: null, reason: "Budget plan has not been entered yet." },
         },
       },
     },
   }));
 
-  assert.deepEqual(projection.exceptions, [
-    { source: "obligations", message: "Sedapal water bill has not been entered yet." },
+  assert.deepEqual(projection.attentions, [
+    {
+      source: "obligations",
+      happened: "Budget plan has not been entered yet.",
+      impact: "September obligations cannot be completed.",
+    },
   ]);
-  assert.equal(projection.water.state, "blocked");
-  assert.equal(projection.water.emphasis, "attention");
+  assert.equal(projection.obligations.state, "blocked");
+  assert.equal(projection.obligations.emphasis, "attention");
 });
 
 test("G completed obligations stay informational and do not invent approval states", () => {
@@ -203,7 +219,7 @@ test("G completed obligations stay informational and do not invent approval stat
   assert.equal(projection.obligations.state, "complete");
   assert.equal(projection.obligations.ready, true);
   assert.equal(projection.obligations.blocked, false);
-  assert.deepEqual(projection.exceptions, []);
+  assert.deepEqual(projection.attentions, []);
   assert.equal("approved" in projection.obligations, false);
   assert.equal("readyForDispatch" in projection.obligations, false);
   assert.equal("dispatched" in projection.obligations, false);
@@ -224,6 +240,13 @@ test("H partial gas work stays active and normal", () => {
   assert.equal(projection.gas.state, "active");
   assert.equal(projection.gas.emphasis, "normal");
   assert.equal(projection.gas.completion, "incomplete");
+  assert.deepEqual(projection.attentions, [
+    {
+      source: "gas",
+      happened: "2 of 4 gas readings are missing.",
+      impact: "September gas obligations cannot be completed.",
+    },
+  ]);
 });
 
 test("I complete gas work compresses", () => {
@@ -240,6 +263,7 @@ test("I complete gas work compresses", () => {
 
   assert.equal(projection.gas.state, "complete");
   assert.equal(projection.gas.emphasis, "compressed");
+  assert.deepEqual(projection.attentions, []);
 });
 
 test("J month derivation advances from the canonical business month", () => {
@@ -355,6 +379,14 @@ test("K dashboard facts read uses exactly one bounded month read", async () => {
 
 test("L duplicate canonical exceptions are deduplicated deterministically", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
+    sourceWork: {
+      water: {
+        commonWaterBillPresent: false,
+        meterReadingCount: 1,
+        meterReadingExpectedCount: 64,
+        meterReadingCompleteCount: 1,
+      },
+    },
     upcoming: {
       obligations: {
         components: {
@@ -365,7 +397,16 @@ test("L duplicate canonical exceptions are deduplicated deterministically", () =
     },
   }));
 
-  assert.deepEqual(projection.exceptions, [
-    { source: "obligations", message: "Sedapal water bill has not been entered yet." },
+  assert.deepEqual(projection.attentions, [
+    {
+      source: "water",
+      happened: "Sedapal bill is missing for August.",
+      impact: "September water obligations cannot be completed.",
+    },
+    {
+      source: "water",
+      happened: "63 of 64 water readings are missing.",
+      impact: "September water obligations cannot be completed.",
+    },
   ]);
 });

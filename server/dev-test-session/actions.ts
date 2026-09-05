@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
@@ -19,6 +20,7 @@ export async function startDevTestSessionAction(formData: FormData) {
   if (result.error) {
     redirect(`${returnTo}?error=${encodeURIComponent(result.error)}`);
   }
+  revalidatePath("/", "layout");
   redirect(returnTo);
 }
 
@@ -29,6 +31,7 @@ export async function resetDevTestSessionAction(formData: FormData) {
   const supabase = await createClient();
   if (!sessionId) {
     invalidateBuildingMonthFinancialFactsCache(buildingId);
+    revalidatePath("/", "layout");
     redirect(returnTo);
   }
 
@@ -41,6 +44,7 @@ export async function resetDevTestSessionAction(formData: FormData) {
   if (!session) {
     const cookieStore = await cookies();
     cookieStore.set(getDevTestSessionCookieName(), "", { path: "/", expires: new Date(0) });
+    revalidatePath("/", "layout");
     redirect(returnTo);
   }
 
@@ -52,6 +56,7 @@ export async function resetDevTestSessionAction(formData: FormData) {
   }
 
   invalidateBuildingMonthFinancialFactsCache(buildingId);
+  revalidatePath("/", "layout");
   const cookieStore = await cookies();
   cookieStore.set(getDevTestSessionCookieName(), "", { path: "/", expires: new Date(0) });
   redirect(returnTo);

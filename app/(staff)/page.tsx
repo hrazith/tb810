@@ -79,14 +79,10 @@ export default async function DashboardPage() {
   }
 
   const projection = projectGulianaDashboard(result.data);
-  const hasBlockers = projection.exceptions.length > 0;
+  const attentionCount = projection.attentions.length;
   const operatingMonthLabel = formatMonthLabel(result.data.operatingMonth);
   const upcomingMonthLabel = formatMonthLabel(result.data.upcomingObligationMonth);
   const waterBill = result.data.upcoming.commonWaterBill;
-  const waterBlocker = result.data.upcoming.obligations.components.common_water.reason
-    ?? result.data.upcoming.obligations.components.metered_water.reason
-    ?? null;
-  const gasBlocker = result.data.upcoming.obligations.components.gas.reason ?? null;
 
   const quickActions = [
     {
@@ -135,23 +131,23 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {hasBlockers ? (
-        <Panel className="space-y-4 border-red-200 bg-red-50">
+      {attentionCount > 0 ? (
+        <Panel className="space-y-4 border-zinc-200 bg-white">
           <div className="space-y-1">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700">
-              Needs Attention
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">
+              {attentionCount} {attentionCount === 1 ? "item" : "items"} need attention
             </p>
-            <h2 className="text-2xl font-semibold tracking-tight text-red-950">
-              Canonical blocker(s) are preventing the preview from fully completing.
-            </h2>
           </div>
           <div className="space-y-3">
-            {projection.exceptions.map((exception, index) => (
-              <div key={`${exception.source}:${exception.message}:${index}`} className="rounded-2xl border border-red-200 bg-white px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
-                  {exception.source}
+            {projection.attentions.map((attention, index) => (
+              <div key={`${attention.source}:${attention.happened}:${index}`} className="rounded-2xl border border-zinc-200 bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  {attention.source}
                 </p>
-                <p className="mt-1 text-sm leading-6 text-red-950">{exception.message}</p>
+                <div className="mt-2 space-y-1">
+                  <p className="text-sm font-medium leading-6 text-zinc-950">{attention.happened}</p>
+                  <p className="text-sm leading-6 text-zinc-600">{attention.impact}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -182,7 +178,7 @@ export default async function DashboardPage() {
                 </p>
               ) : (
                 <p className="mt-1 text-sm text-zinc-600">
-                  {waterBlocker ?? "Sedapal bill has not been entered yet."}
+              {waterBill ? "Sedapal bill is present." : "Sedapal bill has not been entered yet."}
                 </p>
               )}
             </div>
@@ -232,11 +228,6 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {gasBlocker ? (
-            <div className="rounded-2xl border border-red-200 bg-white p-4 text-sm text-red-950">
-              {gasBlocker}
-            </div>
-          ) : null}
         </Panel>
       </div>
 

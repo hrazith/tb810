@@ -59,9 +59,10 @@ export type DashboardQuickActionKey =
   | "upload_gas_supplier_bill"
   | "upload_gas_readings";
 
-export type DashboardException = {
+export type DashboardAttention = {
   source: "obligations" | "water" | "gas";
-  message: string;
+  happened: string;
+  impact: string;
 };
 
 export type GulianaDashboardProjection = {
@@ -87,7 +88,7 @@ export type GulianaDashboardProjection = {
     ready: boolean;
     blocked: boolean;
   };
-  exceptions: DashboardException[];
+  attentions: DashboardAttention[];
   completed: Array<{
     key: "water" | "gas" | "obligations";
     state: "complete" | "compressed";
@@ -147,28 +148,67 @@ function countChargeRows(financialFacts: BuildingMonthFinancialFacts, obligation
   };
 }
 
-function deriveExceptions(
+function monthLabelFromMonthKey(monthKey: string) {
+  const parsed = new Date(`${monthKey}-01T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return monthKey;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    timeZone: "UTC",
+  }).format(parsed);
+}
+
+function deriveAttentions(
   sourceWork: SourceWorkFacts,
   facts: UpcomingFacts["obligations"],
-): DashboardException[] {
-  const seen = new Set<string>();
-  const exceptions: DashboardException[] = [];
-  if (sourceWork.water.meterReadingExpectedCount > 0 && sourceWork.water.meterReadingCompleteCount < sourceWork.water.meterReadingExpectedCount) {
-    exceptions.push({ source: "water", message: "Required water readings are missing." });
+  operatingMonth: string,
+  upcomingObligationMonth: string,
+): DashboardAttention[] {
+  const attentions: DashboardAttention[] = [];
+  const sourceMonthLabel = monthLabelFromMonthKey(operatingMonth);
+  const upcomingMonthLabel = monthLabelFromMonthKey(upcomingObligationMonth);
+  const waterMissingCount = Math.max(sourceWork.water.meterReadingExpectedCount - sourceWork.water.meterReadingCompleteCount, 0);
+  const gasMissingCount = Math.max(sourceWork.gas.gasUnitCount - sourceWork.gas.gasReadingCount, 0);
+
+  if (!sourceWork.water.commonWaterBillPresent && (sourceWork.water.meterReadingExpectedCount > 0 || sourceWork.water.meterReadingCount > 0)) {
+    attentions.push({
+      source: "water",
+      happened: `Sedapal bill is missing for ${sourceMonthLabel}.`,
+      impact: `${upcomingMonthLabel} water obligations cannot be completed.`,
+    });
   }
+
+  if (waterMissingCount > 0) {
+    attentions.push({
+      source: "water",
+      happened: `${waterMissingCount} of ${sourceWork.water.meterReadingExpectedCount} water readings are missing.`,
+      impact: `${upcomingMonthLabel} water obligations cannot be completed.`,
+    });
+  }
+
+  if (gasMissingCount > 0) {
+    attentions.push({
+      source: "gas",
+      happened: `${gasMissingCount} of ${sourceWork.gas.gasUnitCount} gas readings are missing.`,
+      impact: `${upcomingMonthLabel} gas obligations cannot be completed.`,
+    });
+  }
+
+  const suppressWaterDownstream = !sourceWork.water.commonWaterBillPresent || waterMissingCount > 0;
+  const suppressGasDownstream = gasMissingCount > 0;
   for (const message of [
     facts.components.fixed_assessment.reason,
-    facts.components.metered_water.reason,
-    facts.components.common_water.reason,
-    facts.components.gas.reason,
+    suppressWaterDownstream ? null : facts.components.metered_water.reason,
+    suppressWaterDownstream ? null : facts.components.common_water.reason,
+    suppressGasDownstream ? null : facts.components.gas.reason,
   ]) {
     if (!message) continue;
-    const key = `obligations:${message}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    exceptions.push({ source: "obligations", message });
+    attentions.push({
+      source: "obligations",
+      happened: message,
+      impact: `${upcomingMonthLabel} obligations cannot be completed.`,
+    });
   }
-  return exceptions;
+  return attentions;
 }
 
 function deriveWaterState(
@@ -251,7 +291,7 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
     water,
     gas,
     obligations,
-    exceptions: deriveExceptions(sourceWork, monthFacts.upcoming.obligations),
+    attentions: deriveAttentions(sourceWork, monthFacts.upcoming.obligations, monthFacts.operatingMonth, monthFacts.upcomingObligationMonth),
     completed: deriveCompleted(sourceWork, monthFacts.upcoming.obligations),
     quickActions: [
       "upload_sedapal_bill",

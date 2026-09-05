@@ -1,8 +1,11 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import {
+  completeMissingGasReadingsForCurrentBusinessMonth,
   createGasBill,
   createGasReading,
   deleteGasBill,
@@ -11,6 +14,7 @@ import {
   updateGasBill,
   updateGasReading,
 } from "./index";
+import { addGasSupplierBillForCurrentBusinessMonth } from "./dev-bill";
 import type { GasImportPreflight } from "./import";
 import { gasBillInputSchema, gasReadingInputSchema } from "./validation";
 
@@ -148,4 +152,24 @@ export async function importGasWorkbookAction(_prev: GasFormState, formData: For
     };
   }
   return { success: `Imported ${result.data.importedBillCount} bills and ${result.data.importedReadingCount} readings from ${file.name}.` };
+}
+
+export async function completeGasReadingsAction(formData: FormData): Promise<void> {
+  const returnTo = String(formData.get("return_to") ?? "/").trim() || "/";
+  const result = await completeMissingGasReadingsForCurrentBusinessMonth();
+  if (result.error) {
+    redirect(`${returnTo}?error=${encodeURIComponent(result.error)}`);
+  }
+  revalidatePath("/", "layout");
+  redirect(returnTo);
+}
+
+export async function addGasSupplierBillAction(formData: FormData): Promise<void> {
+  const returnTo = String(formData.get("return_to") ?? "/").trim() || "/";
+  const result = await addGasSupplierBillForCurrentBusinessMonth();
+  if (result.error) {
+    redirect(`${returnTo}?error=${encodeURIComponent(result.error)}`);
+  }
+  revalidatePath("/", "layout");
+  redirect(returnTo);
 }

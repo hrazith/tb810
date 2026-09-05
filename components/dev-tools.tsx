@@ -12,6 +12,9 @@ import {
 
 import { clearDevBusinessDateAction, setDevBusinessDateAction } from "@/server/business-date/actions";
 import type { GulianaDashboardFacts } from "@/server/dashboard";
+import { completeGasReadingsAction } from "@/server/gas/actions";
+import { addCommonWaterBillAction, completeWaterReadingsAction } from "@/server/water/actions";
+import { addGasSupplierBillAction } from "@/server/gas/actions";
 import { resetDevTestSessionAction, startDevTestSessionAction } from "@/server/dev-test-session/actions";
 
 const STORAGE_KEYS = {
@@ -22,6 +25,8 @@ const STORAGE_KEYS = {
   historicalEditing: "tb810-dev-historical-editing",
 };
 
+const ACTIVE_TAB_STORAGE_KEY = "tb810-dev-active-tab";
+
 type DevToolsSnapshot = {
   outline: boolean;
   historicalEditingEnabled: boolean;
@@ -31,11 +36,13 @@ type DevToolsSnapshot = {
   testSessionActive: boolean;
   testSessionId: string;
   testSessionMutations: number;
+  activeTab: "time" | "data" | "style";
 };
 
 type DevToolsStore = DevToolsSnapshot & {
   setOutline: (next: boolean | ((current: boolean) => boolean)) => void;
   setHistoricalEditingEnabled: (next: boolean | ((current: boolean) => boolean)) => void;
+  setActiveTab: (next: "time" | "data" | "style") => void;
 };
 
 let snapshot: DevToolsSnapshot = {
@@ -47,6 +54,7 @@ let snapshot: DevToolsSnapshot = {
   testSessionActive: false,
   testSessionId: "",
   testSessionMutations: 0,
+  activeTab: "time",
 };
 
 const listeners = new Set<() => void>();
@@ -63,6 +71,23 @@ function readStoredFlag(key: string) {
 function writeStoredFlag(key: string, value: boolean) {
   try {
     localStorage.setItem(key, value ? "1" : "0");
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+function readStoredActiveTab() {
+  try {
+    const value = sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+    return value === "time" || value === "data" || value === "style" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredActiveTab(value: "time" | "data" | "style") {
+  try {
+    sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, value);
   } catch {
     // Ignore storage errors.
   }
@@ -107,6 +132,7 @@ function setSnapshot(patch: Partial<DevToolsSnapshot>) {
   }
   writeStoredFlag(STORAGE_KEYS.outline, snapshot.outline);
   writeStoredFlag(STORAGE_KEYS.historicalEditing, snapshot.historicalEditingEnabled);
+  writeStoredActiveTab(snapshot.activeTab);
   notify();
 }
 
@@ -122,6 +148,7 @@ function initializeStore() {
   const bodyTestSessionActive = document.body.dataset.devTestSessionActive === "1";
   const bodyTestSessionId = document.body.dataset.devTestSessionId ?? "";
   const bodyTestSessionMutations = Number(document.body.dataset.devTestSessionMutations ?? "0");
+  const bodyActiveTab = readStoredActiveTab() ?? "time";
 
   snapshot = {
     outline: readStoredFlag(STORAGE_KEYS.outline) || bodyOutline,
@@ -133,6 +160,7 @@ function initializeStore() {
     testSessionActive: bodyTestSessionActive,
     testSessionId: bodyTestSessionId,
     testSessionMutations: Number.isFinite(bodyTestSessionMutations) ? bodyTestSessionMutations : 0,
+    activeTab: bodyActiveTab,
   };
 
   applyBodyFlag("data-dev-outline", snapshot.outline);
@@ -181,6 +209,15 @@ function formatMonthYearKey(value: string) {
   }).format(parsed);
 }
 
+function formatCurrencyPen(value: string) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return value;
+  return `PEN ${new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(amount)}`;
+}
+
 function readBodySnapshot() {
   if (typeof document === "undefined") return null;
 
@@ -192,6 +229,7 @@ function readBodySnapshot() {
   const bodyTestSessionActive = document.body.dataset.devTestSessionActive === "1";
   const bodyTestSessionId = document.body.dataset.devTestSessionId ?? "";
   const bodyTestSessionMutations = Number(document.body.dataset.devTestSessionMutations ?? "0");
+  const bodyActiveTab = readStoredActiveTab() ?? snapshot.activeTab;
 
   return {
     outline: readStoredFlag(STORAGE_KEYS.outline) || bodyOutline,
@@ -203,6 +241,7 @@ function readBodySnapshot() {
     testSessionActive: bodyTestSessionActive,
     testSessionId: bodyTestSessionId,
     testSessionMutations: Number.isFinite(bodyTestSessionMutations) ? bodyTestSessionMutations : 0,
+    activeTab: bodyActiveTab,
   } satisfies DevToolsSnapshot;
 }
 
@@ -247,11 +286,15 @@ export function useDevTools() {
       typeof next === "function" ? next(snapshot.historicalEditingEnabled) : next;
     setSnapshot({ historicalEditingEnabled: resolved });
   };
+  const setActiveTab = (next: "time" | "data" | "style") => {
+    setSnapshot({ activeTab: next });
+  };
 
   return {
     ...current,
     setOutline,
     setHistoricalEditingEnabled,
+    setActiveTab,
   } as DevToolsStore;
 }
 
@@ -274,11 +317,9 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
     startTop: number;
   } | null>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
-  const [activeTab, setActiveTab] = useState<"time" | "data" | "style">("time");
   const businessDateKey = isCanonicalDateKey(state.businessDateValue) ? state.businessDateValue : "";
   const businessDateLabel = businessDateKey ? formatCanonicalDateKey(businessDateKey) : null;
   const dataMonthLabel = dashboardFacts ? formatMonthYearKey(dashboardFacts.operatingMonth) : null;
-  const upcomingMonthLabel = dashboardFacts ? formatMonthYearKey(dashboardFacts.upcomingObligationMonth) : null;
 
   const items = useMemo(
     () => [
@@ -292,7 +333,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
 
   if (!showToolbar) return null;
 
-  const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
     const toolbar = toolbarRef.current;
     if (!toolbar) return;
     const rect = toolbar.getBoundingClientRect();
@@ -306,7 +347,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
-  const handlePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const handlePointerMove = (event: React.PointerEvent<HTMLElement>) => {
     const dragState = dragStateRef.current;
     const toolbar = toolbarRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId || !toolbar) return;
@@ -318,7 +359,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
     setPosition({ left: nextLeft, top: nextTop });
   };
 
-  const handlePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const handlePointerUp = (event: React.PointerEvent<HTMLElement>) => {
     if (dragStateRef.current?.pointerId === event.pointerId) {
       dragStateRef.current = null;
     }
@@ -341,20 +382,23 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
         className="fixed z-[10000] w-[24rem] max-w-[calc(100vw-24px)] rounded-xl border border-white/10 bg-black/75 p-3 text-xs text-white shadow-xl backdrop-blur"
         style={{ left: position.left, top: position.top }}
       >
-        <div className="flex items-center justify-between gap-3">
+        <div
+          className="flex items-center justify-between gap-3"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          role="presentation"
+        >
           <button
             type="button"
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            className="flex cursor-grab items-center gap-2 rounded-md px-1 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80 active:cursor-grabbing"
+            className="flex cursor-grab items-center gap-2 rounded-md px-1 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80"
             aria-label="Drag DEV toolbar"
             title="Drag to move"
           >
             <span>Dev only</span>
-            <span className="text-[10px] font-normal text-white/45">Drag</span>
           </button>
+          <span className="text-[10px] font-normal uppercase tracking-[0.18em] text-white/45">Drag</span>
         </div>
 
         <div className="mt-2 flex items-center gap-4 border-b border-white/10 text-[11px]">
@@ -362,9 +406,9 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
             <button
               key={tab}
               type="button"
-              onClick={() => setActiveTab(tab)}
+              onClick={() => state.setActiveTab(tab)}
               className={
-                activeTab === tab
+                state.activeTab === tab
                   ? "border-b-2 border-white pb-2 font-semibold text-white"
                   : "pb-2 text-white/55 hover:text-white/80"
               }
@@ -375,7 +419,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
         </div>
 
         <div className="mt-3">
-          {activeTab === "time" ? (
+          {state.activeTab === "time" ? (
             <div className="space-y-3">
               <form ref={dateFormRef} action={setDevBusinessDateAction} className="space-y-2">
                 <input type="hidden" name="return_to" value={pathname} />
@@ -415,7 +459,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
             </div>
           ) : null}
 
-          {activeTab === "data" ? (
+          {state.activeTab === "data" ? (
             <div className="space-y-4 text-[11px] text-white/80">
               <div className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
@@ -425,21 +469,71 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                 <div className="space-y-1.5">
                   <p className="text-sm font-medium text-white/90">Water</p>
                   <div className="space-y-1">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span>Sedapal bill</span>
-                      <span className="text-white/90">
-                        {dashboardFacts?.sourceWork.water.commonWaterBillPresent
-                          ? "Present"
-                          : "Missing"}
-                      </span>
+                    <div className="space-y-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span>Sedapal bill</span>
+                        <span className="text-white/90">
+                          {dashboardFacts?.sourceWork.water.commonWaterBillPresent ? "Present" : "Missing"}
+                        </span>
+                      </div>
+                      <div className="flex justify-end">
+                        {state.testSessionActive ? (
+                          <form action={addCommonWaterBillAction}>
+                            <input type="hidden" name="return_to" value={pathname} />
+                            <button
+                              type="submit"
+                              className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
+                            >
+                              + Add test bill
+                            </button>
+                          </form>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled
+                            className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
+                          >
+                            + Add test bill
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span>Meter readings</span>
-                      <span className="text-white/90">
-                        {dashboardFacts
-                          ? `${dashboardFacts.sourceWork.water.meterReadingCount} / ${dashboardFacts.sourceWork.water.meterReadingExpectedCount}`
-                          : "—"}
-                      </span>
+                    <div className="space-y-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span>Meter readings</span>
+                        <span className="text-white/90">
+                          {dashboardFacts
+                            ? `${dashboardFacts.sourceWork.water.meterReadingCount} / ${dashboardFacts.sourceWork.water.meterReadingExpectedCount}`
+                            : "—"}
+                        </span>
+                      </div>
+                      <div className="flex justify-end">
+                        {dashboardFacts ? (
+                          dashboardFacts.sourceWork.water.meterReadingCount < dashboardFacts.sourceWork.water.meterReadingExpectedCount ? (
+                            state.testSessionActive ? (
+                              <form action={completeWaterReadingsAction}>
+                                <input type="hidden" name="return_to" value={pathname} />
+                                <button
+                                  type="submit"
+                                  className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
+                                >
+                                  + Complete
+                                </button>
+                              </form>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled
+                                className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
+                              >
+                                + Complete
+                              </button>
+                            )
+                          ) : (
+                            <span className="text-white/45">Complete</span>
+                          )
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -447,21 +541,71 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                 <div className="space-y-1.5">
                   <p className="text-sm font-medium text-white/90">Gas</p>
                   <div className="space-y-1">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span>Supplier bills</span>
-                      <span className="text-white/90">
-                        {dashboardFacts
-                          ? `${dashboardFacts.upcoming.gas.supplierBillCount} · ${dashboardFacts.upcoming.gas.supplierBillTotal}`
-                          : "—"}
-                      </span>
+                    <div className="space-y-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span>Supplier bills</span>
+                        <span className="text-white/90">
+                          {dashboardFacts
+                            ? `${dashboardFacts.upcoming.gas.supplierBillCount} · ${formatCurrencyPen(dashboardFacts.upcoming.gas.supplierBillTotal)}`
+                            : "—"}
+                        </span>
+                      </div>
+                      <div className="flex justify-end">
+                        {state.testSessionActive ? (
+                          <form action={addGasSupplierBillAction}>
+                            <input type="hidden" name="return_to" value={pathname} />
+                            <button
+                              type="submit"
+                              className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
+                            >
+                              + Add test bill
+                            </button>
+                          </form>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled
+                            className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
+                          >
+                            + Add test bill
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span>Meter readings</span>
-                      <span className="text-white/90">
-                        {dashboardFacts
-                          ? `${dashboardFacts.sourceWork.gas.gasReadingCount} / ${dashboardFacts.sourceWork.gas.gasUnitCount}`
-                          : "—"}
-                      </span>
+                    <div className="space-y-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span>Meter readings</span>
+                        <span className="text-white/90">
+                          {dashboardFacts
+                            ? `${dashboardFacts.sourceWork.gas.gasReadingCount} / ${dashboardFacts.sourceWork.gas.gasUnitCount}`
+                            : "—"}
+                        </span>
+                      </div>
+                      <div className="flex justify-end">
+                        {dashboardFacts && dashboardFacts.sourceWork.gas.gasReadingCount < dashboardFacts.sourceWork.gas.gasUnitCount ? (
+                          state.testSessionActive ? (
+                            <form action={completeGasReadingsAction}>
+                              <input type="hidden" name="return_to" value={pathname} />
+                              <button
+                                type="submit"
+                                className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
+                              >
+                                + Complete
+                              </button>
+                            </form>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
+                            >
+                              + Complete
+                            </button>
+                          )
+                        ) : (
+                          <span className="text-white/45">Complete</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -474,6 +618,15 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                       {dashboardFacts ? dashboardFacts.upcoming.charges.unitChargeCount : "—"}
                     </span>
                   </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      disabled
+                      className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
+                    >
+                      + Add test charge
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -484,55 +637,27 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                     {state.testSessionActive ? `Active · ${state.testSessionMutations} changes` : "Not active"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    disabled
-                    className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
-                  >
-                    + Add test bill
-                  </button>
-                  <button
-                    type="button"
-                    disabled
-                    className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
-                  >
-                    + Complete
-                  </button>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    disabled
-                    className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
-                  >
-                    + Add test charge
-                  </button>
-                  {state.testSessionActive ? (
-                    <form action={resetDevTestSessionAction}>
-                      <input type="hidden" name="return_to" value={pathname} />
-                      <input type="hidden" name="session_id" value={state.testSessionId} />
-                      <button type="submit" className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white">
-                        Reset session
-                      </button>
-                    </form>
-                  ) : (
-                    <form action={startDevTestSessionAction}>
-                      <input type="hidden" name="return_to" value={pathname} />
-                      <button type="submit" className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white">
-                        Start session
-                      </button>
-                    </form>
-                  )}
-                </div>
-                {upcomingMonthLabel ? (
-                  <p className="text-[11px] text-white/45">Upcoming month preview: {upcomingMonthLabel}</p>
-                ) : null}
+                {state.testSessionActive ? (
+                  <form action={resetDevTestSessionAction} className="flex justify-end">
+                    <input type="hidden" name="return_to" value={pathname} />
+                    <input type="hidden" name="session_id" value={state.testSessionId} />
+                    <button type="submit" className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white">
+                      Reset session
+                    </button>
+                  </form>
+                ) : (
+                  <form action={startDevTestSessionAction} className="flex justify-end">
+                    <input type="hidden" name="return_to" value={pathname} />
+                    <button type="submit" className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white">
+                      Start session
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
           ) : null}
 
-          {activeTab === "style" ? (
+          {state.activeTab === "style" ? (
             <div className="space-y-2 text-[11px] text-white/80">
               {items.map(([label, checked, setChecked]) => (
                 <label

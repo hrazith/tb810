@@ -1,7 +1,12 @@
+import { randomUUID } from "node:crypto";
+
 import { createClient } from "@/lib/supabase/server";
+import { getBusinessNow } from "@/server/business-date";
+import { getActiveDevTestSessionId, getActiveDevTestSessionSummary, recordDevTestMutation } from "@/server/dev-test-session";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 import { parseGasWorkbook, type GasImportPreflight } from "./import";
+import { buildMissingGasReadingDrafts } from "./dev-completion";
 
 import type {
   GasBillInput,
@@ -207,6 +212,116 @@ export async function createGasReading(input: GasReadingInput): Promise<QueryRes
   if (error) return { data: null as never, error: error.message };
   invalidateBuildingMonthFinancialFactsCache(building.data.id);
   return { data, error: null };
+}
+
+function utcDateKey(date: Date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function businessMonthKey(date: Date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export async function completeMissingGasReadingsForCurrentBusinessMonth(): Promise<QueryResult<{ insertedCount: number }>> {
+  if (process.env.NODE_ENV !== "development") {
+    return { data: null as never, error: "DEV test actions are development-only." };
+  }
+
+  const session = await getActiveDevTestSessionSummary();
+  if (!session) {
+    return { data: null as never, error: "Start a DEV test session first." };
+  }
+
+  const sessionId = await getActiveDevTestSessionId();
+  if (!sessionId) {
+    return { data: null as never, error: "Start a DEV test session first." };
+  }
+
+  const building = await getCurrentBuilding();
+  if (building.error) return { data: null as never, error: building.error };
+  if (!building.data) return { data: null as never, error: "Building not found." };
+
+  const businessNow = await getBusinessNow();
+  const sourceReadingMonth = businessMonthKey(businessNow);
+  const readingDate = utcDateKey(businessNow);
+
+  const supabase = await createClient();
+  const unitsResult = await listUnits();
+  if (unitsResult.error) return { data: null as never, error: unitsResult.error };
+  const { data: readings, error: readingsError } = await supabase
+    .from("tb810_gas_readings")
+    .select(GAS_READING_SELECT)
+    .eq("building_id", building.data.id)
+    .order("reading_month", { ascending: false });
+  if (readingsError) return { data: null as never, error: readingsError.message };
+
+  const drafts = buildMissingGasReadingDrafts({
+    sourceReadingMonth,
+    readingDate,
+    units: unitsResult.data.map((unit) => ({
+      id: unit.id,
+      unit_number: unit.unit_number,
+      unit_type_code: unit.unit_type_code,
+      has_gas_service: Boolean(unit.has_gas_service),
+    })),
+    readings: (readings ?? []).map((reading) => ({
+      unit_id: reading.unit_id,
+      reading_month: reading.reading_month,
+      current_reading: reading.current_reading,
+      previous_reading: reading.previous_reading,
+      consumption: reading.consumption,
+    })),
+  });
+
+  if (!drafts.length) {
+    return { data: { insertedCount: 0 }, error: null };
+  }
+
+  let insertedCount = 0;
+  const insertedIds: string[] = [];
+
+  for (const draft of drafts) {
+    const id = randomUUID();
+    const { data, error } = await supabase
+      .from("tb810_gas_readings")
+      .insert({
+        id,
+        building_id: building.data.id,
+        unit_id: draft.unitId,
+        reading_month: draft.readingMonth,
+        reading_date: draft.readingDate,
+        previous_reading: draft.previousReading,
+        current_reading: draft.currentReading,
+        consumption: draft.consumption,
+      })
+      .select(GAS_READING_SELECT)
+      .single();
+    if (error) {
+      if (insertedIds.length) {
+        await supabase.from("tb810_gas_readings").delete().in("id", insertedIds);
+      }
+      return { data: null as never, error: error.message };
+    }
+    insertedIds.push(data.id);
+
+    const journalResult = await recordDevTestMutation({
+      domain: "gas",
+      recordType: "meter_reading",
+      operation: "create",
+      recordIdentity: data.id,
+    });
+    if (journalResult.error) {
+      await supabase.from("tb810_gas_readings").delete().eq("id", data.id);
+      if (insertedIds.length) {
+        await supabase.from("tb810_gas_readings").delete().in("id", insertedIds);
+      }
+      return { data: null as never, error: journalResult.error };
+    }
+    insertedCount += 1;
+  }
+
+  invalidateBuildingMonthFinancialFactsCache(building.data.id);
+  return { data: { insertedCount }, error: null };
 }
 
 export async function updateGasReading(id: string, input: GasReadingInput): Promise<QueryResult<GasReadingRecord>> {

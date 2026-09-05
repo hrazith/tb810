@@ -2361,7 +2361,7 @@ export type Database = {
         | "reconciliation_specialist"
         | "building_staff"
         | "viewer"
-      tb810_dev_test_domain: "water" | "charge"
+      tb810_dev_test_domain: "water" | "charge" | "gas"
       tb810_dev_test_operation: "create" | "update"
       tb810_dev_test_session_status: "active" | "resetting" | "completed"
       tb810_unit_type_code: "condo" | "parking" | "storage"
@@ -2560,7 +2560,7 @@ export const Constants = {
         "building_staff",
         "viewer",
       ],
-      tb810_dev_test_domain: ["water", "charge"],
+      tb810_dev_test_domain: ["water", "charge", "gas"],
       tb810_dev_test_operation: ["create", "update"],
       tb810_dev_test_session_status: ["active", "resetting", "completed"],
       tb810_unit_type_code: ["condo", "parking", "storage"],
