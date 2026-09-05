@@ -292,7 +292,10 @@ export async function getCharge(chargeId: string): Promise<QueryResult<ChargeRec
   return { data: (data ?? null) as ChargeRecord | null, error: null };
 }
 
-export async function createUnitCharge(input: ChargeInput): Promise<QueryResult<ChargeRecord>> {
+export async function createUnitCharge(
+  input: ChargeInput,
+  options?: { seriesId?: string },
+): Promise<QueryResult<ChargeRecord>> {
   return createTargetCharge({
     unitId: input.unit_id,
     description: input.description,
@@ -300,6 +303,7 @@ export async function createUnitCharge(input: ChargeInput): Promise<QueryResult<
     schedule: input.schedule,
     starts_month: input.starts_month,
     ends_month: input.ends_month,
+    seriesId: options?.seriesId,
   });
 }
 
@@ -311,6 +315,7 @@ async function createTargetCharge(input: {
   schedule: "one_off" | "recurring";
   starts_month: string;
   ends_month?: string | null;
+  seriesId?: string;
 }): Promise<QueryResult<ChargeRecord>> {
   const buildingResult = await getCurrentBuildingId();
   if (buildingResult.error) return { data: null as never, error: buildingResult.error };
@@ -355,18 +360,32 @@ async function createTargetCharge(input: {
   const successValidated = validated as Extract<ChargeLifecycleValidationResult, { error: null }>;
   const effectiveFromMonth = successValidated.effectiveFromMonth;
   const effectiveToMonth = successValidated.effectiveToMonth;
+  const insertPayload: {
+    building_id: string;
+    unit_id: string | null;
+    owner_id: string | null;
+    description: string;
+    amount: number;
+    schedule: "one_off" | "recurring";
+    effective_from_month: string;
+    effective_to_month: string | null;
+    series_id?: string;
+  } = {
+    building_id: buildingId,
+    unit_id: input.unitId ?? null,
+    owner_id: input.ownerId ?? null,
+    description: input.description,
+    amount: input.amount,
+    schedule: input.schedule,
+    effective_from_month: effectiveFromMonth,
+    effective_to_month: effectiveToMonth,
+  };
+  if (input.seriesId) {
+    insertPayload.series_id = input.seriesId;
+  }
   const { data, error } = await supabase
     .from("tb810_charges")
-    .insert({
-      building_id: buildingId,
-      unit_id: input.unitId ?? null,
-      owner_id: input.ownerId ?? null,
-      description: input.description,
-      amount: input.amount,
-      schedule: input.schedule,
-      effective_from_month: effectiveFromMonth,
-      effective_to_month: effectiveToMonth,
-    })
+    .insert(insertPayload)
     .select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
     .single();
   if (error) return { data: null as never, error: error.message };

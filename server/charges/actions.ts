@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -11,6 +12,7 @@ import {
   changeFutureChargeEconomics,
   stopFutureCharge,
 } from "./index";
+import { addUnitChargeForCurrentBusinessMonth } from "./dev-unit-charge";
 import {
   chargeEconomicsSchema,
   chargeInputSchema,
@@ -145,5 +147,13 @@ export async function stopFutureChargeAction(formData: FormData): Promise<void> 
   }
   const result = await stopFutureCharge(chargeId, parsed.data);
   if (result.error) redirectWithError(returnTo, result.error);
+  redirectBack(returnTo);
+}
+
+export async function addUnitChargeAction(formData: FormData): Promise<void> {
+  const returnTo = pickString(formData, "return_to") || "/";
+  const result = await addUnitChargeForCurrentBusinessMonth();
+  if (result.error) redirectWithError(returnTo, result.error);
+  revalidatePath("/", "layout");
   redirectBack(returnTo);
 }

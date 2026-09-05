@@ -16,6 +16,7 @@ import { completeGasReadingsAction } from "@/server/gas/actions";
 import { addCommonWaterBillAction, completeWaterReadingsAction } from "@/server/water/actions";
 import { addGasSupplierBillAction } from "@/server/gas/actions";
 import { resetDevTestSessionAction, startDevTestSessionAction } from "@/server/dev-test-session/actions";
+import { addUnitChargeAction } from "@/server/charges/actions";
 
 const STORAGE_KEYS = {
   outline: "tb810-dev-outline",
@@ -619,13 +620,25 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                     </span>
                   </div>
                   <div className="flex justify-end">
-                    <button
-                      type="button"
-                      disabled
-                      className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
-                    >
-                      + Add test charge
-                    </button>
+                    {state.testSessionActive ? (
+                      <form action={addUnitChargeAction}>
+                        <input type="hidden" name="return_to" value={pathname} />
+                        <button
+                          type="submit"
+                          className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
+                        >
+                          + Add test charge
+                        </button>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        className="cursor-not-allowed text-white/35 underline decoration-white/15 underline-offset-2"
+                      >
+                        + Add test charge
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
