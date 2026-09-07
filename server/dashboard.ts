@@ -5,6 +5,7 @@ import { getFixedBuildingIdentity } from "@/server/building";
 import { nextMonthKey } from "@/server/charges/month";
 import { buildMonthlyObligationSummaryFromFacts } from "@/server/obligations/summary-facts";
 import { loadBuildingMonthFinancialFacts, type BuildingMonthFinancialFacts } from "@/server/obligations/owner-facts";
+import { hasCompleteWaterReadings } from "@/server/water/readiness";
 
 type QueryResult<T> = {
   data: T;
@@ -17,6 +18,7 @@ type SourceWorkFacts = {
     meterReadingCount: number;
     meterReadingExpectedCount: number;
     meterReadingCompleteCount: number;
+    readingsReady: boolean;
   };
   gas: {
     supplierBillCount: number;
@@ -327,6 +329,10 @@ function buildSourceWorkFacts(
       meterReadingCount: waterReadings.readingCount,
       meterReadingExpectedCount: waterReadings.expectedCount,
       meterReadingCompleteCount: waterReadings.completedCount,
+      readingsReady: hasCompleteWaterReadings({
+        eligibleUnitIds: financialFacts.unitRows.filter((row) => row.unit_type_code === "condo").map((row) => row.id),
+        readings: financialFacts.waterReadings,
+      }),
     },
     gas: {
       supplierBillCount: financialFacts.gasBills.length,

@@ -321,6 +321,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
   const businessDateKey = isCanonicalDateKey(state.businessDateValue) ? state.businessDateValue : "";
   const businessDateLabel = businessDateKey ? formatCanonicalDateKey(businessDateKey) : null;
   const dataMonthLabel = dashboardFacts ? formatMonthYearKey(dashboardFacts.operatingMonth) : null;
+  const waterReadiness = dashboardFacts?.sourceWork.water.readingsReady ?? false;
 
   const items = useMemo(
     () => [
@@ -478,7 +479,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                         </span>
                       </div>
                       <div className="flex justify-end">
-                        {state.testSessionActive ? (
+                        {state.testSessionActive && waterReadiness ? (
                           <form action={addCommonWaterBillAction}>
                             <input type="hidden" name="return_to" value={pathname} />
                             <button
@@ -497,6 +498,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                             + Add test bill
                           </button>
                         )}
+                        {!waterReadiness ? <span className="mt-1 block text-white/45">Complete Water readings first</span> : null}
                       </div>
                     </div>
                     <div className="space-y-1">

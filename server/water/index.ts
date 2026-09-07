@@ -168,14 +168,14 @@ function formatDecimal(value: bigint, scaleDigits: number) {
   return `${negative ? "-" : ""}${whole}.${fraction}`;
 }
 
-function parseMoneyCents(value: number | string | null | undefined) {
+export function parseMoneyCents(value: number | string | null | undefined) {
   if (value === null || value === undefined) return null;
   const parsed = parseDecimal(String(value));
   if (!parsed) return null;
   return (parsed.integer * BigInt(100)) / parsed.scale;
 }
 
-function parseMilliUnits(value: number | string | null | undefined) {
+export function parseMilliUnits(value: number | string | null | undefined) {
   if (value === null || value === undefined) return null;
   const parsed = parseDecimal(String(value));
   if (!parsed) return null;
@@ -213,8 +213,30 @@ function monthKeyToDate(monthKey: string) {
   return `${monthKey}-01`;
 }
 
-function roundToNearestInteger(value: bigint, divisor: bigint) {
+export function roundToNearestInteger(value: bigint, divisor: bigint) {
   return (value + divisor / BigInt(2)) / divisor;
+}
+
+export function calculateWaterAllocationCents(input: {
+  amountCents: bigint;
+  totalConsumptionMilli: bigint;
+  unitConsumptionsMilli: bigint[];
+}) {
+  if (input.totalConsumptionMilli <= BigInt(0)) return null;
+
+  let unitConsumptionMilli = BigInt(0);
+  let meteredCents = BigInt(0);
+  for (const consumptionMilli of input.unitConsumptionsMilli) {
+    if (consumptionMilli < BigInt(0)) return null;
+    unitConsumptionMilli += consumptionMilli;
+    meteredCents += roundToNearestInteger(input.amountCents * consumptionMilli, input.totalConsumptionMilli);
+  }
+  if (meteredCents > input.amountCents) return null;
+  return {
+    unitConsumptionMilli,
+    meteredCents,
+    commonCents: input.amountCents - meteredCents,
+  };
 }
 
 function logWaterPerf(input: {
@@ -1554,7 +1576,7 @@ export function calculateWaterChargePreviewsForUnit(
       return { status: "unavailable", message: "Sedapal bill total consumption is invalid." };
     }
 
-    let summedMeteredChargeCents = BigInt(0);
+    const unitConsumptionsMilli: bigint[] = [];
     for (const unitId of eligibleUnitIds) {
       const rows = context.readingsByUnit.get(unitId) ?? [];
       if (rows.length === 0) {
@@ -1570,16 +1592,19 @@ export function calculateWaterChargePreviewsForUnit(
       if (consumptionMilli === null) {
         return { status: "unavailable", message: `${context.sourceReadingMonthLabel} meter reading is incomplete.` };
       }
-      const chargeCents =
-        (amountCents * consumptionMilli + totalConsumptionMilli / BigInt(2)) / totalConsumptionMilli;
-      summedMeteredChargeCents += chargeCents;
+      unitConsumptionsMilli.push(consumptionMilli);
     }
 
-    if (summedMeteredChargeCents > amountCents) {
+    const allocation = calculateWaterAllocationCents({
+      amountCents,
+      totalConsumptionMilli,
+      unitConsumptionsMilli,
+    });
+    if (!allocation) {
       return { status: "unavailable", message: "Common Water pool would be negative." };
     }
 
-    const commonWaterPoolCents = amountCents - summedMeteredChargeCents;
+    const commonWaterPoolCents = allocation.commonCents;
     const unitCount = BigInt(eligibleUnitIds.length);
     if (unitCount <= BigInt(0)) {
       return { status: "unavailable", message: "No eligible residential units are available." };
@@ -1594,7 +1619,7 @@ export function calculateWaterChargePreviewsForUnit(
         completedCount: context.completeness.completedCount,
         expectedCount: context.completeness.totalExpectedCount,
         supplierAmount: formatDecimal(amountCents, 2),
-        summedMeteredCharges: formatDecimal(summedMeteredChargeCents, 2),
+        summedMeteredCharges: formatDecimal(allocation.meteredCents, 2),
         commonWaterPool: formatDecimal(commonWaterPoolCents, 2),
         unitCommonWaterCharge: formatDecimal(unitCommonWaterChargeCents, 2),
       },
