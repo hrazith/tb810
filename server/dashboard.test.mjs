@@ -14,9 +14,10 @@ const businessDateModule = jiti("@/server/business-date");
 const buildingModule = jiti("@/server/building");
 const ownerFactsModule = jiti("@/server/obligations/owner-facts");
 
-const { projectGulianaDashboard, deriveGulianaDashboardMonths, getGulianaDashboardFacts } = dashboard;
+const { projectGulianaDashboard, deriveGulianaDashboardMonths, deriveDashboardContext, getGulianaDashboardFacts } = dashboard;
 
 function buildProjectionFacts(overrides = {}) {
+  const businessDate = overrides.businessDate ?? "2026-08-05";
   const overrideSourceWork = overrides.sourceWork ?? {};
   const overrideUpcoming = overrides.upcoming ?? {};
   const overrideUpcomingObligations = overrideUpcoming.obligations ?? {};
@@ -36,47 +37,53 @@ function buildProjectionFacts(overrides = {}) {
     },
   };
 
-  return {
-    businessDate: overrides.businessDate ?? "2026-08-05",
-    operatingMonth: "2026-08",
-    upcomingObligationMonth: "2026-09",
-    sourceWork,
-    upcoming: {
-      ...overrideUpcoming,
-      obligations: {
-        obligationMonth: "2026-09",
-        eligibleUnitCount: 0,
-        components: {
-          fixed_assessment: { state: "available", amount: "0.00", reason: null },
-          metered_water: { state: "available", amount: "0.00", reason: null },
-          common_water: { state: "available", amount: "0.00", reason: null },
-          gas: { state: "available", amount: "0.00", reason: null },
-          other_charge: { state: "available", amount: "0.00", count: 0 },
-          owner_direct_charge: { state: "available", amount: "0.00", count: 0 },
-        },
-        total: null,
-        ...overrideUpcomingObligations,
-        components: {
-          fixed_assessment: { state: "available", amount: "0.00", reason: null },
-          metered_water: { state: "available", amount: "0.00", reason: null },
-          common_water: { state: "available", amount: "0.00", reason: null },
-          gas: { state: "available", amount: "0.00", reason: null },
-          other_charge: { state: "available", amount: "0.00", count: 0 },
-          owner_direct_charge: { state: "available", amount: "0.00", count: 0 },
-          ...(overrideUpcomingObligations.components ?? {}),
-        },
+  const upcoming = {
+    sourceReadingMonth: "2026-08",
+    ...overrideUpcoming,
+    obligations: {
+      obligationMonth: "2026-09",
+      eligibleUnitCount: 0,
+      components: {
+        fixed_assessment: { state: "available", amount: "0.00", reason: null },
+        metered_water: { state: "available", amount: "0.00", reason: null },
+        common_water: { state: "available", amount: "0.00", reason: null },
+        gas: { state: "available", amount: "0.00", reason: null },
+        other_charge: { state: "available", amount: "0.00", count: 0 },
+        owner_direct_charge: { state: "available", amount: "0.00", count: 0 },
+        ...(overrideUpcomingObligations.components ?? {}),
       },
-      gas: {
-        supplierBillCount: 0,
-        supplierBillTotal: "0.00",
-        ...(overrideUpcoming.gas ?? {}),
-      },
-      charges: {
-        unitChargeCount: 0,
-        ownerDirectChargeCount: 0,
-        ...(overrideUpcoming.charges ?? {}),
+      total: null,
+      ...overrideUpcomingObligations,
+      components: {
+        fixed_assessment: { state: "available", amount: "0.00", reason: null },
+        metered_water: { state: "available", amount: "0.00", reason: null },
+        common_water: { state: "available", amount: "0.00", reason: null },
+        gas: { state: "available", amount: "0.00", reason: null },
+        other_charge: { state: "available", amount: "0.00", count: 0 },
+        owner_direct_charge: { state: "available", amount: "0.00", count: 0 },
+        ...(overrideUpcomingObligations.components ?? {}),
       },
     },
+    gas: {
+      supplierBillCount: 0,
+      supplierBillTotal: "0.00",
+      ...(overrideUpcoming.gas ?? {}),
+    },
+    charges: {
+      unitChargeCount: 0,
+      ownerDirectChargeCount: 0,
+      ...(overrideUpcoming.charges ?? {}),
+    },
+  };
+
+  return {
+    businessDate,
+    operatingMonth: "2026-08",
+    upcomingObligationMonth: "2026-09",
+    context: overrides.context ?? (businessDate.endsWith("-09-01") ? "open" : "close"),
+    sourceWork,
+    current: overrides.current ?? upcoming,
+    upcoming,
   };
 }
 
@@ -281,6 +288,118 @@ test("J month derivation advances from the canonical business month", () => {
   });
 });
 
+test("J2 month-open context is only projected for the first day", () => {
+  assert.equal(deriveDashboardContext(new Date("2026-08-31T00:00:00Z")), "close");
+  assert.equal(deriveDashboardContext(new Date("2026-09-01T00:00:00Z")), "open");
+});
+
+test("M month-open suppresses ordinary current-month source absence", () => {
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-01",
+    sourceWork: {
+      water: { meterReadingExpectedCount: 64 },
+      gas: { gasUnitCount: 58 },
+    },
+    current: {
+      ...buildProjectionFacts().upcoming,
+      obligations: {
+        ...buildProjectionFacts().upcoming.obligations,
+        obligationMonth: "2026-09",
+      },
+    },
+  }));
+
+  assert.equal(projection.context, "open");
+  assert.equal(projection.water.state, "waiting");
+  assert.equal(projection.gas.state, "waiting");
+  assert.deepEqual(projection.attentions, []);
+});
+
+test("N month-open keeps genuine current obligation blockers", () => {
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-01",
+    current: {
+      ...buildProjectionFacts().upcoming,
+      obligations: {
+        ...buildProjectionFacts().upcoming.obligations,
+        obligationMonth: "2026-09",
+        components: {
+          ...buildProjectionFacts().upcoming.obligations.components,
+          fixed_assessment: { state: "blocked", amount: null, reason: "Budget plan has not been entered yet." },
+        },
+      },
+    },
+  }));
+
+  assert.deepEqual(projection.attentions, [{
+    source: "obligations",
+    happened: "Budget plan has not been entered yet.",
+    impact: "September obligations cannot be completed.",
+  }]);
+});
+
+test("O month-open deduplicates the Sedapal root blocker and keeps gas independent", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-01",
+    sourceWork: {
+      water: { meterReadingExpectedCount: 64 },
+      gas: { gasUnitCount: 58 },
+    },
+    current: {
+      ...base,
+      sourceReadingMonth: "2026-08",
+      commonWaterBill: null,
+      obligations: {
+        ...base.obligations,
+        obligationMonth: "2026-09",
+        components: {
+          ...base.obligations.components,
+          common_water: { state: "blocked", amount: null, reason: "Sedapal water bill has not been entered yet." },
+          metered_water: { state: "blocked", amount: null, reason: "Sedapal water bill has not been entered yet." },
+          gas: { state: "blocked", amount: null, reason: "Required gas readings are missing." },
+        },
+      },
+    },
+  }));
+
+  assert.equal(projection.water.state, "waiting");
+  assert.equal(projection.gas.state, "waiting");
+  assert.equal(projection.obligations.readiness, "not_ready");
+  assert.deepEqual(projection.attentions, [
+    {
+      source: "water",
+      happened: "Sedapal bill is missing for August.",
+      impact: "September water obligations cannot be completed.",
+    },
+    {
+      source: "obligations",
+      happened: "Required gas readings are missing.",
+      impact: "September obligations cannot be completed.",
+    },
+  ]);
+});
+
+test("P month-open projects ready-for-Carlos without approval state", () => {
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-01",
+    current: {
+      ...buildProjectionFacts().upcoming,
+      obligations: {
+        ...buildProjectionFacts().upcoming.obligations,
+        obligationMonth: "2026-09",
+        total: "123.45",
+      },
+    },
+  }));
+
+  assert.equal(projection.obligations.readiness, "ready_for_carlos");
+  assert.equal(projection.obligations.ready, true);
+  assert.deepEqual(projection.attentions, []);
+  assert.equal("approved" in projection.obligations, false);
+  assert.equal("dispatched" in projection.obligations, false);
+});
+
 test("K dashboard facts read uses exactly one bounded month read", async () => {
   const originalGetBusinessNow = businessDateModule.getBusinessNow;
   const originalGetFixedBuildingIdentity = buildingModule.getFixedBuildingIdentity;
@@ -291,13 +410,10 @@ test("K dashboard facts read uses exactly one bounded month read", async () => {
   buildingModule.getFixedBuildingIdentity = () => ({ id: "building-1", name: "Building One" });
   ownerFactsModule.loadBuildingMonthFinancialFacts = async ({ obligationMonth }) => {
     obligationMonths.push(obligationMonth);
-    const data = {
-      obligationMonth,
-      sourceReadingMonth: "2026-08",
+    const shared = {
       planYear: 2026,
       plan: { currency: "PEN", monthly_operating_budget: "1000.00" },
       commonWaterType: { id: "cw", code: "common_water", name: "Common Water" },
-      commonWaterBill: null,
       unitRows: [
         {
           id: "u-1",
@@ -348,6 +464,22 @@ test("K dashboard facts read uses exactly one bounded month read", async () => {
         },
       ],
     };
+    const data = {
+      current: {
+        ...shared,
+        obligationMonth,
+        sourceReadingMonth: "2026-07",
+        commonWaterBill: null,
+        waterReadings: [],
+        gasReadings: [],
+      },
+      upcoming: {
+        ...shared,
+        obligationMonth: "2026-09",
+        sourceReadingMonth: "2026-08",
+        commonWaterBill: null,
+      },
+    };
 
     return { data, error: null, requestCount: 1, source: "remote", elapsedMs: 1 };
   };
@@ -358,7 +490,7 @@ test("K dashboard facts read uses exactly one bounded month read", async () => {
     assert.equal(result.error, null);
     assert.ok(result.data);
     assert.equal(obligationMonths.length, 1);
-    assert.deepEqual(obligationMonths, ["2026-09"]);
+    assert.deepEqual(obligationMonths, ["2026-08"]);
     assert.equal(result.data?.operatingMonth, "2026-08");
     assert.equal(result.data?.upcomingObligationMonth, "2026-09");
     assert.equal(result.data?.upcoming.commonWaterBill, null);

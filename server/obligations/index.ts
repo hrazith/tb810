@@ -125,7 +125,7 @@ export async function getUnitMonthlyObligationForBuilding({
   if (buildingFactsResult.error) return { data: null as never, error: buildingFactsResult.error };
   if (!buildingFactsResult.data) return { data: null as never, error: "Building month financial facts not found." };
 
-  const buildingFacts = buildingFactsResult.data;
+  const buildingFacts = buildingFactsResult.data.current;
   const selectedUnitFacts = buildingFacts.unitRows.find((row) => row.id === unit.unitId) ?? null;
   const calculationStartedAt = Date.now();
   const fixedAssessmentByUnitId = buildFixedAssessmentMap(buildingFacts.plan, buildingFacts.planYear, [
@@ -223,7 +223,7 @@ export async function getMonthlyObligationSummary({ obligationMonth }: { obligat
   if (buildingFactsResult.error) return { data: null as never, error: buildingFactsResult.error };
   if (!buildingFactsResult.data) return { data: null as never, error: "Building month facts unavailable." };
 
-  const summary = buildMonthlyObligationSummaryFromFacts(buildingFactsResult.data, obligationMonth);
+  const summary = buildMonthlyObligationSummaryFromFacts(buildingFactsResult.data.current, obligationMonth);
   const elapsedMs = Date.now() - startedAt;
   if (isPerfLoggingEnabled()) {
     console.info(

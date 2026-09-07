@@ -1,8 +1,8 @@
-import type { BuildingMonthFinancialFacts } from "./owner-facts";
+import type { DualPeriodBuildingMonthFinancialFacts } from "./owner-facts";
 
 type CachedBuildingMonthFinancialFacts = {
   elapsedMs: number;
-  data: BuildingMonthFinancialFacts;
+  data: DualPeriodBuildingMonthFinancialFacts;
 };
 
 const buildingMonthFinancialFactsCache = new Map<string, CachedBuildingMonthFinancialFacts>();
@@ -21,7 +21,7 @@ export function getCachedBuildingMonthFinancialFacts(
 export function setCachedBuildingMonthFinancialFacts(
   buildingId: string,
   obligationMonth: string,
-  data: BuildingMonthFinancialFacts,
+  data: DualPeriodBuildingMonthFinancialFacts,
   elapsedMs: number,
 ) {
   buildingMonthFinancialFactsCache.set(cacheKey(buildingId, obligationMonth), {

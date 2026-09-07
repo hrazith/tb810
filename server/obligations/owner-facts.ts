@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getUnitFixedMonthlyAssessmentFromFacts } from "@/server/budget-plans";
 import type { UnitFixedMonthlyAssessmentState } from "@/server/budget-plans/types";
 import { calculateUpcomingUnitChargesFromFacts } from "@/server/charges";
+import { nextMonthKey } from "@/server/charges/month";
 import type { ChargeRecord } from "@/server/charges/types";
 import { type GasCalculationInput } from "@/server/gas/calculation";
 import { calculateWaterChargePreviewsForUnit, type WaterChargePreviewBundle } from "@/server/water";
@@ -55,8 +56,13 @@ export type BuildingMonthFinancialFacts = {
   charges: ChargeRecord[];
 };
 
+export type DualPeriodBuildingMonthFinancialFacts = {
+  current: BuildingMonthFinancialFacts;
+  upcoming: BuildingMonthFinancialFacts;
+};
+
 export type BuildingMonthFinancialFactsResult = {
-  data: BuildingMonthFinancialFacts | null;
+  data: DualPeriodBuildingMonthFinancialFacts | null;
   error: string | null;
   requestCount: number;
   source?: "remote" | "cached";
@@ -106,10 +112,16 @@ export type OwnerMonthResponsibilityResult = {
   requestCount: number;
 };
 
-type BuildingMonthFinancialFactsRpcPayload = {
-  plan?: { currency: string; monthly_operating_budget: number | string } | null;
-  commonWaterType?: { id: string; code: string; name: string } | null;
+type BuildingMonthFinancialFactsRpcPeriod = {
   commonWaterBill?: CommonWaterBill | null;
+  waterReadings?: BuildingMonthFinancialFacts["waterReadings"];
+  gasReadings?: BuildingMonthFinancialFacts["gasReadings"];
+};
+
+type BuildingMonthFinancialFactsRpcPayload = {
+  currentPlan?: { currency: string; monthly_operating_budget: number | string } | null;
+  upcomingPlan?: { currency: string; monthly_operating_budget: number | string } | null;
+  commonWaterType?: { id: string; code: string; name: string } | null;
   unitRows?: Array<{
     id: string;
     unit_number: string;
@@ -119,10 +131,10 @@ type BuildingMonthFinancialFactsRpcPayload = {
     has_gas_service: boolean;
     participation_percentage: number | null;
   }>;
-  waterReadings?: BuildingMonthFinancialFacts["waterReadings"];
   gasBills?: BuildingMonthFinancialFacts["gasBills"];
-  gasReadings?: BuildingMonthFinancialFacts["gasReadings"];
   charges?: ChargeRecord[];
+  current?: BuildingMonthFinancialFactsRpcPeriod;
+  upcoming?: BuildingMonthFinancialFactsRpcPeriod;
 };
 
 function monthLabelFromKey(monthKey: string) {
@@ -315,20 +327,37 @@ export async function loadBuildingMonthFinancialFacts({
   }
 
   const payload = rpc.data as BuildingMonthFinancialFactsRpcPayload;
-  const commonWaterBill = payload.commonWaterBill ?? null;
+  const upcomingMonth = nextMonthKey(obligationMonth) ?? obligationMonth;
+  const sharedFacts = {
+    commonWaterType: payload.commonWaterType ?? null,
+    unitRows: payload.unitRows ?? [],
+    gasBills: payload.gasBills ?? [],
+    charges: payload.charges ?? [],
+  };
+  const current = {
+    obligationMonth,
+    sourceReadingMonth,
+    planYear: Number(obligationMonth.slice(0, 4)),
+    plan: payload.currentPlan ? { currency: String(payload.currentPlan.currency), monthly_operating_budget: String(payload.currentPlan.monthly_operating_budget) } : null,
+    ...sharedFacts,
+    commonWaterBill: payload.current?.commonWaterBill ?? null,
+    waterReadings: payload.current?.waterReadings ?? [],
+    gasReadings: payload.current?.gasReadings ?? [],
+  } satisfies BuildingMonthFinancialFacts;
+  const upcoming = {
+    obligationMonth: upcomingMonth,
+    sourceReadingMonth: obligationMonth,
+    planYear: Number(upcomingMonth.slice(0, 4)),
+    plan: payload.upcomingPlan ? { currency: String(payload.upcomingPlan.currency), monthly_operating_budget: String(payload.upcomingPlan.monthly_operating_budget) } : null,
+    ...sharedFacts,
+    commonWaterBill: payload.upcoming?.commonWaterBill ?? null,
+    waterReadings: payload.upcoming?.waterReadings ?? [],
+    gasReadings: payload.upcoming?.gasReadings ?? [],
+  } satisfies BuildingMonthFinancialFacts;
   const facts = {
     data: {
-      obligationMonth,
-      sourceReadingMonth,
-      planYear,
-      plan: payload.plan ? { currency: String(payload.plan.currency), monthly_operating_budget: String(payload.plan.monthly_operating_budget) } : null,
-      commonWaterType: payload.commonWaterType ?? null,
-      commonWaterBill,
-      unitRows: payload.unitRows ?? [],
-      waterReadings: payload.waterReadings ?? [],
-      gasBills: payload.gasBills ?? [],
-      gasReadings: payload.gasReadings ?? [],
-      charges: payload.charges ?? [],
+      current,
+      upcoming,
     },
     error: null,
     requestCount: 1,

@@ -94,9 +94,9 @@ export async function getOwnerMonthlyObligationForBuilding({
   if (responsibilityResult.error) return { data: null, error: responsibilityResult.error };
   dataRemoteRequests = (buildingFactsResult.requestCount ?? 0) + (responsibilityResult.requestCount ?? 0);
 
-  const buildingFacts = buildingFactsResult.data;
+  if (!buildingFactsResult.data) return { data: null, error: "Building month financial facts not found." };
+  const buildingFacts = buildingFactsResult.data.current;
   const responsibility = responsibilityResult.data;
-  if (!buildingFacts) return { data: null, error: "Building month financial facts not found." };
   if (!responsibility) return { data: null, error: "Owner month responsibility not found." };
   const units = responsibility.responsibleUnits;
   const fixedAssessmentByUnitId = buildFixedAssessmentMap(
