@@ -380,6 +380,94 @@ test("O month-open deduplicates the Sedapal root blocker and keeps gas independe
   ]);
 });
 
+test("shared negative Common Water reconciliation emits one Water attention", () => {
+  const reason = "Common Water pool would be negative.";
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    sourceWork: {
+      water: {
+        commonWaterBillPresent: true,
+        meterReadingCount: 64,
+        meterReadingExpectedCount: 64,
+        meterReadingCompleteCount: 64,
+      },
+    },
+    upcoming: {
+      obligations: {
+        components: {
+          metered_water: { state: "blocked", amount: null, reason },
+          common_water: { state: "blocked", amount: null, reason },
+        },
+      },
+    },
+  }));
+
+  assert.deepEqual(projection.attentions, [{
+    source: "obligations",
+    happened: reason,
+    impact: "September obligations cannot be completed.",
+  }]);
+});
+
+test("shared Water reconciliation failure remains independent from Gas", () => {
+  const waterReason = "Common Water pool would be negative.";
+  const gasReason = "Required gas supplier bills are missing.";
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    sourceWork: {
+      water: {
+        commonWaterBillPresent: true,
+        meterReadingCount: 64,
+        meterReadingExpectedCount: 64,
+        meterReadingCompleteCount: 64,
+      },
+    },
+    upcoming: {
+      obligations: {
+        components: {
+          metered_water: { state: "blocked", amount: null, reason: waterReason },
+          common_water: { state: "blocked", amount: null, reason: waterReason },
+          gas: { state: "blocked", amount: null, reason: gasReason },
+        },
+      },
+    },
+  }));
+
+  assert.deepEqual(projection.attentions, [
+    {
+      source: "obligations",
+      happened: waterReason,
+      impact: "September obligations cannot be completed.",
+    },
+    {
+      source: "obligations",
+      happened: gasReason,
+      impact: "September obligations cannot be completed.",
+    },
+  ]);
+});
+
+test("different Water blockers are not collapsed", () => {
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    sourceWork: {
+      water: {
+        commonWaterBillPresent: true,
+        meterReadingCount: 64,
+        meterReadingExpectedCount: 64,
+        meterReadingCompleteCount: 64,
+      },
+    },
+    upcoming: {
+      obligations: {
+        components: {
+          metered_water: { state: "blocked", amount: null, reason: "Metered Water is invalid." },
+          common_water: { state: "blocked", amount: null, reason: "Common Water is invalid." },
+        },
+      },
+    },
+  }));
+
+  assert.equal(projection.attentions.length, 2);
+});
+
 test("P month-open projects ready-for-Carlos without approval state", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
     businessDate: "2026-09-01",

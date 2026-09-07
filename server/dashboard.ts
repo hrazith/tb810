@@ -177,6 +177,10 @@ function deriveAttentions(
   const waterMissingCount = Math.max(sourceWork.water.meterReadingExpectedCount - sourceWork.water.meterReadingCompleteCount, 0);
   const gasMissingCount = Math.max(sourceWork.gas.gasUnitCount - sourceWork.gas.gasReadingCount, 0);
   const currentSedapalMissing = !facts.commonWaterBill && facts.obligations.components.common_water.state === "blocked";
+  const sharedWaterReconciliationFailure = facts.obligations.components.metered_water.state === "blocked"
+    && facts.obligations.components.common_water.state === "blocked"
+    && facts.obligations.components.metered_water.reason === "Common Water pool would be negative."
+    && facts.obligations.components.common_water.reason === facts.obligations.components.metered_water.reason;
 
   if ((context === "close" && !sourceWork.water.commonWaterBillPresent && (sourceWork.water.meterReadingExpectedCount > 0 || sourceWork.water.meterReadingCount > 0)) || (context === "open" && currentSedapalMissing)) {
     attentions.push({
@@ -209,7 +213,7 @@ function deriveAttentions(
   for (const message of [
     facts.obligations.components.fixed_assessment.reason,
     suppressWaterDownstream ? null : facts.obligations.components.metered_water.reason,
-    suppressWaterDownstream ? null : facts.obligations.components.common_water.reason,
+    suppressWaterDownstream || sharedWaterReconciliationFailure ? null : facts.obligations.components.common_water.reason,
     suppressGasDownstream ? null : facts.obligations.components.gas.reason,
   ]) {
     if (!message) continue;
