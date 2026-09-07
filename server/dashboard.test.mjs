@@ -14,7 +14,7 @@ const businessDateModule = jiti("@/server/business-date");
 const buildingModule = jiti("@/server/building");
 const ownerFactsModule = jiti("@/server/obligations/owner-facts");
 
-const { projectGulianaDashboard, deriveGulianaDashboardMonths, deriveDashboardContext, getGulianaDashboardFacts } = dashboard;
+const { projectGulianaDashboard, deriveUnitChargeWorthNoting, deriveGulianaDashboardMonths, deriveDashboardContext, getGulianaDashboardFacts } = dashboard;
 
 function buildProjectionFacts(overrides = {}) {
   const businessDate = overrides.businessDate ?? "2026-08-05";
@@ -74,6 +74,7 @@ function buildProjectionFacts(overrides = {}) {
       ownerDirectChargeCount: 0,
       ...(overrideUpcoming.charges ?? {}),
     },
+    worthNoting: overrideUpcoming.worthNoting ?? [],
   };
 
   return {
@@ -230,6 +231,83 @@ test("G completed obligations stay informational and do not invent approval stat
   assert.equal("approved" in projection.obligations, false);
   assert.equal("readyForDispatch" in projection.obligations, false);
   assert.equal("dispatched" in projection.obligations, false);
+});
+
+function buildChargeFacts(charges) {
+  return {
+    unitRows: [
+      { id: "unit-201", unit_number: "201", unit_type_code: "condo" },
+      { id: "unit-202", unit_number: "202", unit_type_code: "condo" },
+    ],
+    charges,
+  };
+}
+
+function makeUnitCharge(overrides = {}) {
+  return {
+    id: "charge-1",
+    unit_id: "unit-201",
+    owner_id: null,
+    description: "Plumbing repair",
+    amount: 500,
+    schedule: "one_off",
+    effective_from_month: "2026-09-01",
+    effective_to_month: null,
+    created_at: "2026-08-31T00:00:00Z",
+    ...overrides,
+  };
+}
+
+test("valid September Unit Charge appears once in Worth noting, not Attention", () => {
+  const worthNoting = deriveUnitChargeWorthNoting(buildChargeFacts([makeUnitCharge()]), "2026-09");
+
+  assert.deepEqual(worthNoting, [{
+    kind: "unit_charge",
+    unitNumber: "201",
+    amount: "500",
+    obligationMonth: "2026-09",
+    reason: "Plumbing repair",
+  }]);
+  const projection = projectGulianaDashboard(buildProjectionFacts({ upcoming: { worthNoting } }));
+  assert.equal(projection.worthNoting.length, 1);
+  assert.deepEqual(projection.attentions, []);
+});
+
+test("multiple valid Unit Charges retain deterministic order and separate items", () => {
+  const worthNoting = deriveUnitChargeWorthNoting(buildChargeFacts([
+    makeUnitCharge({ id: "charge-2", unit_id: "unit-202", description: "Window repair", created_at: "2026-08-31T00:00:02Z" }),
+    makeUnitCharge({ id: "charge-1", created_at: "2026-08-31T00:00:01Z" }),
+  ]), "2026-09");
+
+  assert.deepEqual(worthNoting.map((item) => item.reason), ["Plumbing repair", "Window repair"]);
+  assert.equal(worthNoting.length, 2);
+});
+
+test("no Unit Charges produces no Worth noting items", () => {
+  assert.deepEqual(deriveUnitChargeWorthNoting(buildChargeFacts([]), "2026-09"), []);
+});
+
+test("a Unit Charge remains Worth noting beside an independent blocker", () => {
+  const worthNoting = [{
+    kind: "unit_charge",
+    unitNumber: "201",
+    amount: "500",
+    obligationMonth: "2026-09",
+    reason: "Plumbing repair",
+  }];
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    upcoming: {
+      worthNoting,
+      obligations: {
+        components: {
+          fixed_assessment: { state: "blocked", amount: null, reason: "Budget plan has not been entered yet." },
+        },
+      },
+    },
+  }));
+
+  assert.deepEqual(projection.worthNoting, worthNoting);
+  assert.equal(projection.attentions.length, 1);
 });
 
 test("H partial gas work stays active and normal", () => {

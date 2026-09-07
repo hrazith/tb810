@@ -71,6 +71,7 @@ export default async function DashboardPage() {
   const projection = projectGulianaDashboard(result.data);
   const isOpen = projection.context === "open";
   const attentionCount = projection.attentions.length;
+  const worthNoting = projection.worthNoting;
   const operatingMonthLabel = formatMonthLabel(result.data.operatingMonth);
   const upcomingMonthLabel = formatMonthLabel(result.data.upcomingObligationMonth);
   const financialFacts = isOpen ? result.data.current : result.data.upcoming;
@@ -104,23 +105,37 @@ export default async function DashboardPage() {
         </details>
       </div>
 
-      {attentionCount > 0 ? (
+      {attentionCount > 0 || worthNoting.length > 0 ? (
         <Panel className="space-y-4 border-zinc-200 bg-white" padding="compact">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">{attentionCount} {attentionCount === 1 ? "item" : "items"} need attention</p>
-            <p className="text-sm text-zinc-600">These inputs are blocking {financialMonthLabel} obligations.</p>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-3">
-            {projection.attentions.map((attention, index) => (
-              <div key={`${attention.source}:${attention.happened}:${index}`} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{attention.source}</p>
-                <p className="mt-2 text-sm font-medium leading-6 text-zinc-950">{attention.happened}</p>
-                <Link href={uploadHrefForAttention(attention.source, attention.happened)} className="mt-3 inline-flex text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">
-                  {uploadLabelForAttention(attention.source, attention.happened)} →
-                </Link>
-              </div>
-            ))}
-          </div>
+          {attentionCount > 0 ? <>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">{attentionCount} {attentionCount === 1 ? "item" : "items"} need attention</p>
+              <p className="text-sm text-zinc-600">These inputs are blocking {financialMonthLabel} obligations.</p>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-3">
+              {projection.attentions.map((attention, index) => (
+                <div key={`${attention.source}:${attention.happened}:${index}`} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{attention.source}</p>
+                  <p className="mt-2 text-sm font-medium leading-6 text-zinc-950">{attention.happened}</p>
+                  <Link href={uploadHrefForAttention(attention.source, attention.happened)} className="mt-3 inline-flex text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">
+                    {uploadLabelForAttention(attention.source, attention.happened)} →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </> : null}
+          {worthNoting.length > 0 ? <div className={attentionCount > 0 ? "space-y-3 border-t border-zinc-200 pt-4" : "space-y-3"}>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Worth noting</p>
+            <div className="grid gap-2 lg:grid-cols-3">
+              {worthNoting.map((item) => (
+                <div key={`${item.kind}:${item.unitNumber}:${item.obligationMonth}:${item.reason}:${item.amount}`} className="rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3">
+                  <p className="text-sm font-medium text-zinc-950">Unit {item.unitNumber} · Unit charge</p>
+                  <p className="mt-1 text-sm text-zinc-600">{formatMoney(item.amount)} · {formatMonthLabel(item.obligationMonth)} obligations</p>
+                  <p className="mt-1 text-sm text-zinc-600">{item.reason}</p>
+                </div>
+              ))}
+            </div>
+          </div> : null}
         </Panel>
       ) : null}
 

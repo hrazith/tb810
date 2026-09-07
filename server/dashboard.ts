@@ -2,7 +2,7 @@ import { cache } from "react";
 
 import { getBusinessNow } from "@/server/business-date";
 import { getFixedBuildingIdentity } from "@/server/building";
-import { nextMonthKey } from "@/server/charges/month";
+import { isChargeEligibleForMonth, nextMonthKey } from "@/server/charges/month";
 import { buildMonthlyObligationSummaryFromFacts } from "@/server/obligations/summary-facts";
 import { loadBuildingMonthFinancialFacts, type BuildingMonthFinancialFacts } from "@/server/obligations/owner-facts";
 import { hasCompleteWaterReadings } from "@/server/water/readiness";
@@ -44,6 +44,7 @@ type UpcomingFacts = {
     unitChargeCount: number;
     ownerDirectChargeCount: number;
   };
+  worthNoting: DashboardWorthNoting[];
 };
 
 export type DashboardContext = "close" | "open";
@@ -72,6 +73,14 @@ export type DashboardAttention = {
   impact: string;
 };
 
+export type DashboardWorthNoting = {
+  kind: "unit_charge";
+  unitNumber: string;
+  amount: string;
+  obligationMonth: string;
+  reason: string;
+};
+
 export type GulianaDashboardProjection = {
   businessDate: string;
   operatingMonth: string;
@@ -98,6 +107,7 @@ export type GulianaDashboardProjection = {
     readiness: "ready_for_carlos" | "not_ready";
   };
   attentions: DashboardAttention[];
+  worthNoting: DashboardWorthNoting[];
   completed: Array<{
     key: "water" | "gas" | "obligations";
     state: "complete" | "compressed";
@@ -155,6 +165,37 @@ function countChargeRows(financialFacts: BuildingMonthFinancialFacts, obligation
     unitChargeCount: unitCharges.length,
     ownerDirectChargeCount: ownerDirectCharges.length,
   };
+}
+
+export function deriveUnitChargeWorthNoting(
+  financialFacts: BuildingMonthFinancialFacts,
+  obligationMonth: string,
+): DashboardWorthNoting[] {
+  const unitsById = new Map(
+    financialFacts.unitRows
+      .filter((unit) => unit.unit_type_code === "condo")
+      .map((unit) => [unit.id, unit.unit_number]),
+  );
+
+  return financialFacts.charges
+    .filter((row) => {
+      if (row.owner_id != null || row.unit_id == null || row.schedule !== "one_off") return false;
+      if (!unitsById.has(row.unit_id)) return false;
+      return isChargeEligibleForMonth({
+        schedule: row.schedule,
+        effectiveFromMonth: row.effective_from_month.slice(0, 7),
+        effectiveToMonth: row.effective_to_month ? row.effective_to_month.slice(0, 7) : null,
+        obligationMonth,
+      });
+    })
+    .sort((left, right) => left.created_at.localeCompare(right.created_at) || left.id.localeCompare(right.id))
+    .map((row) => ({
+      kind: "unit_charge" as const,
+      unitNumber: unitsById.get(row.unit_id as string) as string,
+      amount: String(row.amount),
+      obligationMonth,
+      reason: row.description,
+    }));
 }
 
 function monthLabelFromMonthKey(monthKey: string) {
@@ -312,6 +353,7 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
     gas,
     obligations,
     attentions: deriveAttentions(sourceWork, financialFacts, monthFacts.context),
+    worthNoting: financialFacts.worthNoting,
     completed: deriveCompleted(sourceWork, financialFacts.obligations),
     quickActions: [
       "upload_sedapal_bill",
@@ -371,6 +413,7 @@ function buildUpcomingFacts(
       supplierBillTotal: includedGasBills.reduce((sum, bill) => sum + Number(bill.amount), 0).toFixed(2),
     },
     charges,
+    worthNoting: deriveUnitChargeWorthNoting(financialFacts, upcomingObligationMonth),
   };
 }
 
