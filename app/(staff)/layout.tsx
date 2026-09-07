@@ -24,7 +24,7 @@ export default async function StaffLayout({
         signOutAction={signOut}
       />
 
-      <main className="mx-auto w-full max-w-6xl px-6 py-20">{children}</main>
+      <main className="mx-auto w-full max-w-6xl">{children}</main>
     </div>
   );
 }

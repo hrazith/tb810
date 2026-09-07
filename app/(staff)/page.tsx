@@ -1,7 +1,9 @@
 import Link from "next/link";
 
+import { DashboardGreeting } from "@/components/dashboard-greeting";
 import { Panel } from "@/components/ui/panel";
 import { getGulianaDashboardFacts, projectGulianaDashboard } from "@/server/dashboard";
+import { getStaffContext } from "@/server/staff-context";
 
 function formatDateLabel(value: string) {
   const parsed = new Date(`${value}T00:00:00Z`);
@@ -52,14 +54,16 @@ function uploadHrefForAttention(source: string, happened: string) {
   return "/obligations";
 }
 
-function uploadLabelForAttention(source: string, happened: string) {
-  if (source === "gas") return "Enter gas readings";
-  if (source === "water" && happened.startsWith("Sedapal")) return "Upload Sedapal bill";
-  if (source === "water") return "Enter water readings";
-  return "Open obligations";
-}
-
 export default async function DashboardPage() {
+  const staffContext = await getStaffContext();
+  if (!staffContext) {
+    throw new Error("Staff context unavailable.");
+  }
+  const displayName = staffContext.staffProfile.display_name.trim();
+  if (!displayName) {
+    throw new Error("Staff display name unavailable.");
+  }
+  const firstName = displayName.split(/\s+/)[0];
   const result = await getGulianaDashboardFacts();
   if (result.error) {
     throw new Error(result.error);
@@ -73,7 +77,6 @@ export default async function DashboardPage() {
   const attentionCount = projection.attentions.length;
   const worthNoting = projection.worthNoting;
   const operatingMonthLabel = formatMonthLabel(result.data.operatingMonth);
-  const upcomingMonthLabel = formatMonthLabel(result.data.upcomingObligationMonth);
   const financialFacts = isOpen ? result.data.current : result.data.upcoming;
   const financialMonthLabel = formatMonthLabel(financialFacts.obligations.obligationMonth);
   const waterBill = result.data.upcoming.commonWaterBill;
@@ -87,15 +90,15 @@ export default async function DashboardPage() {
     <section className="mx-auto flex w-full max-w-6xl flex-col space-y-6 px-6 py-6 sm:py-8">
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div className="space-y-4">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-500">{formatDateLabel(result.data.businessDate)}</p>
+          <p className="text-sm  font-semibold uppercase   tracking-widest  text-zinc-500">{formatDateLabel(result.data.businessDate)}</p>
           <div className="space-y-3">
-            <h1 className="text-4xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">{operatingMonthLabel} {isOpen ? "open" : "close"}</h1>
-            <p className="text-lg leading-8 text-zinc-600">{isOpen ? `${operatingMonthLabel} operations are open.` : `Preparing ${upcomingMonthLabel} obligations for Carlos.`}</p>
+            <DashboardGreeting firstName={firstName} />
+            
           </div>
         </div>
 
-        <details className="relative">
-          <summary className="cursor-pointer list-none rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 shadow-sm hover:border-zinc-950 [&::-webkit-details-marker]:hidden">Upload</summary>
+        <details className="relative ">
+          <summary className=" cursor-pointer list-none rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 shadow-sm hover:border-zinc-950 [&::-webkit-details-marker]:hidden">Upload</summary>
           <div className="absolute right-0 z-20 mt-2 w-64 rounded-2xl border border-zinc-200 bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.08)]">
             <Link href="/water/sedapal/new" className="block rounded-xl px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950">Sedapal bill</Link>
             <Link href="/water/unit-meter-readings/new" className="block rounded-xl px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950">Water readings</Link>
@@ -106,26 +109,25 @@ export default async function DashboardPage() {
       </div>
 
       {attentionCount > 0 || worthNoting.length > 0 ? (
-        <Panel className="space-y-4 border-zinc-200 bg-white" padding="compact">
+        <div className="space-y-4 mt-24">
           {attentionCount > 0 ? <>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">{attentionCount} {attentionCount === 1 ? "item" : "items"} need attention</p>
-              <p className="text-sm text-zinc-600">These inputs are blocking {financialMonthLabel} obligations.</p>
+            <div className="space-y-1 ">
+              
+              <p className="text-md text-zinc-950">These inputs are blocking {financialMonthLabel} obligations.</p>
             </div>
-            <div className="grid gap-3 lg:grid-cols-3">
+            <div className="grid gap-14 lg:grid-cols-3">
               {projection.attentions.map((attention, index) => (
-                <div key={`${attention.source}:${attention.happened}:${index}`} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{attention.source}</p>
-                  <p className="mt-2 text-sm font-medium leading-6 text-zinc-950">{attention.happened}</p>
-                  <Link href={uploadHrefForAttention(attention.source, attention.happened)} className="mt-3 inline-flex text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">
-                    {uploadLabelForAttention(attention.source, attention.happened)} →
+                <div key={`${attention.source}:${attention.happened}:${index}`} >
+                 
+                  <Link href={uploadHrefForAttention(attention.source, attention.happened)} className="mt-2 inline-block text-2xl font-normal leading-tight text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">
+                    {attention.happened}
                   </Link>
                 </div>
               ))}
             </div>
           </> : null}
           {worthNoting.length > 0 ? <div className={attentionCount > 0 ? "space-y-3 border-t border-zinc-200 pt-4" : "space-y-3"}>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Worth noting</p>
+            <p className="text-sm font-semibold uppercase  tracking-wide  text-zinc-500">Worth noting</p>
             <div className="grid gap-2 lg:grid-cols-3">
               {worthNoting.map((item) => (
                 <div key={`${item.kind}:${item.unitNumber}:${item.obligationMonth}:${item.reason}:${item.amount}`} className="rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3">
@@ -136,7 +138,7 @@ export default async function DashboardPage() {
               ))}
             </div>
           </div> : null}
-        </Panel>
+        </div>
       ) : null}
 
       <div className={`grid gap-4 lg:grid-cols-2 ${isOpen ? "order-3" : "order-2"}`}>
