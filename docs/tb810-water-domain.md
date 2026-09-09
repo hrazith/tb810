@@ -147,9 +147,12 @@ Her responsibilities are:
 - read all condominium meters;
 - enter the monthly meter readings;
 - review the monthly water cycle;
-- explicitly trigger monthly obligation generation.
+- prepare the source facts used by the obligation package.
 
 Guliana does **not** perform the monthly calculations manually. The system performs the calculations.
+Successful obligation finalization and Carlos approval are defined in
+[`docs/architecture/monthly-obligations.md`](/Users/roon/dev/tb810/docs/architecture/monthly-obligations.md),
+not as a separate Water-domain generation workflow.
 
 ### Carlos
 
@@ -161,9 +164,8 @@ Confirmed responsibilities include:
 - validating the operational model for shared water and private consumption;
 - confirming the monthly workflow with Guliana.
 
-Open question:
-
-- whether Carlos actively approves the monthly cycle in the business process, or primarily acts as an administrative reference point.
+Carlos approves the finalized financial obligation package. That approval is
+the accountability boundary; it is not a second Water calculation.
 
 ### Owners
 
@@ -340,11 +342,20 @@ The monthly water cycle follows this business sequence:
 2. Record the invoice in the Monthly Water Ledger.
 3. Record the 64 current meter readings.
 4. The system calculates monthly consumption.
-5. Guliana reviews the cycle.
-6. Guliana explicitly generates the monthly obligations.
-7. The water cycle becomes processed.
+5. Guliana reviews the source-fact cycle.
+6. A successfully complete obligation package is finalized according to the
+   Monthly Obligations lifecycle.
+7. Carlos approves the frozen obligation package.
 
-This is a business workflow, not a technical implementation description.
+This is a business workflow, not a technical implementation description. The
+Water domain owns source facts and formulas; the Monthly Obligations domain
+owns finalization and approval semantics.
+
+Cross-period continuity does not prevent capture of a known physical fact. A
+new-period Water reading may be recorded even when its prior-period predecessor
+is missing. The predecessor may be required before dependent consumption can be
+calculated, but the missing predecessor blocks calculation, not capture. The
+Monthly Obligations document owns the resulting month-turn lifecycle.
 
 ## 6. Business Concepts
 

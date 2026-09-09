@@ -41,7 +41,7 @@ export default async function UnitsPage({ searchParams }: PageProps) {
           Units
         </h1>
         
-        <div className="flex flex-col gap-3 xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end">
+        <div className=" flex flex-col gap-3 xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end">
           <div className="flex items-center gap-2 self-end xl:self-auto">
             <Link
               href={`/units?${new URLSearchParams({

@@ -66,7 +66,7 @@ export function UnitsControls({
   }
 
   return (
-    <div className="flex w-full flex-col gap-3 xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end xl:ml-auto">
+    <div className=" flex w-full flex-col gap-3 xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end xl:ml-auto">
       <Input
         type="search"
         value={query}

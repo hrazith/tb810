@@ -17,7 +17,8 @@ It is strictly a database architecture exercise. It does not propose migrations 
 ## Overall Observations
 
 - The current schema has solid persistence support for Units, Owners, Ownerships, Unit Accounts, Billing Periods, invoices, and related operational records.
-- The current schema does not yet expose dedicated tables for Organization, Property, Budget Plan, or Monthly Obligation.
+- The current schema does not yet expose dedicated tables for Organization, Property, or Budget Plan. The `tb810_monthly_financial_obligations` table exists as a schema foundation, but the active application does not yet materialize or finalize obligations through it.
+- The product canon defines automatic month-turn snapshotting for complete and valid packages, followed by Carlos approval and invoice/bundle manifestation; those services are not yet implemented here.
 - `tb810_buildings` is currently carrying the top-level real-estate context, and in practice it is acting as the persistence home for what TB810 needs today.
 - The main persistence risk is not lack of relational depth inside the existing finance tables. It is that a few concepts now need clearer aggregate boundaries and first-class historical records.
 - The target model can stay small. It does not need a generic enterprise platform shape.
@@ -566,10 +567,12 @@ Smallest extension point:
 
 ### Decision
 
-- Current model: no dedicated obligations table exists.
-- Target model: add one generic Monthly Obligation table with clear source and correction metadata.
-- Required before UI sprint: `REQUIRED BEFORE FINANCE IMPLEMENTATION`, and `REQUIRED BEFORE UI` if the finance UI will expose monthly charges or previews.
-- Migration/backfill: `REQUIRES CARLOS CLARIFICATION` because historical monthly obligation records will likely need to be reconstructed from legacy evidence if they are to become first-class history.
+- Current model: the `tb810_monthly_financial_obligations` schema foundation exists, but no active materialization or finalization service uses it.
+- Product decision: a complete and valid package is automatically snapshotted at the happy-path month turn, then awaits Carlos approval; approval manifests invoices and compressed dispatch bundles.
+- Target model: use the existing generic Monthly Obligation table with clear source and correction metadata, subject to the lifecycle decisions in the canonical Monthly Obligations document.
+- Active implementation: the dashboard and obligations workspace currently calculate from canonical facts dynamically and do not write this table.
+- Generated Supabase database types currently appear to omit this table; that is implementation/tooling debt for a later task.
+- Migration/backfill: `REQUIRES CARLOS CLARIFICATION` because historical monthly obligation records may need reconstruction from legacy evidence if they become first-class history.
 
 ---
 
@@ -704,10 +707,11 @@ Likely future connection points:
 - Aggregate/domain owner: Monthly Obligation
 - Key relationships: Billing Period, Unit, Unit Account, future invoice line generation
 - Immutable historical responsibilities: calculation inputs, obligation amounts, source context, correction history
-- Already exists: no
-- Requires modification: n/a
-- New: yes
-- Required before the UI sprint: `REQUIRED BEFORE FINANCE IMPLEMENTATION`
+- Already exists: yes, as a schema foundation
+- Requires modification: not established by this review
+- New: no
+- Active materialization/finalization service: no
+- Required before obligation lifecycle implementation: yes
 
 ## Concise Summary
 
@@ -730,7 +734,7 @@ Likely future connection points:
 
 - preserve or formalize the current Unit and Ownership boundaries
 - keep `tb810_billing_periods` keyed by building plus calendar month and stop relying on workflow state as the domain identity
-- add the persistence shape for Monthly Obligation if the UI will show monthly charges or billing previews
+- design the active materialization/finalization and immutable-snapshot workflow if the UI will expose frozen monthly charges
 
 ### Database changes that can safely wait
 

@@ -109,6 +109,17 @@ The absence of work should not automatically become a warning.
 The dashboard should speak primarily in terms of the current operating month.
 Precise source periods remain visible inside Water and Gas workspaces where they belong.
 
+The dashboard also distinguishes the obligation lifecycle from the operating
+calendar. A date provides context; successful finalization creates lifecycle
+state. In the normal happy path, a complete and valid September obligation
+package is previewed during August, automatically snapshotted at the August-to-
+September month turn, and then shown to Giuliana as Awaiting Carlos Approval.
+Carlos approval manifests invoices and compressed dispatch bundles, which
+become available to Giuliana and produce Ready for Dispatch. The behavior of
+an incomplete package is now defined as no snapshot, a live obligation, and
+Not Ready. Giuliana sees actionable blockers; Carlos sees oversight/status and
+has no approval action until the delayed snapshot occurs.
+
 ## 5. Monthly Rhythm
 
 The dashboard changes emphasis as the month progresses.
@@ -153,6 +164,12 @@ Exceptions should expand.
 
 At the end of the month, the dashboard may also surface source-fact preparation for the next obligation month.
 That is a month-close boundary for real upstream inputs, not a generic "day X" warning rule.
+
+For a complete and valid happy-path package, month close is the automatic
+snapshot boundary. The date alone does not snapshot an incomplete package.
+An incomplete package remains live while Giuliana enters or corrects the
+missing prior-period facts. When the final blocker resolves, the system
+automatically snapshots the package and returns to Awaiting Carlos Approval.
 
 ### Mid-month
 
@@ -299,6 +316,18 @@ If the current month's obligations require Carlos's review, that actionable stat
 Once Carlos has reviewed or approved the obligations, this section compresses.
 Collections then naturally becomes the dominant dashboard responsibility.
 
+The happy-path lifecycle is:
+
+- Live Preview before successful finalization
+- automatic month-turn snapshot when complete and valid
+- Awaiting Carlos Approval after the immutable package is available
+- Ready for Dispatch after Carlos approval manifests invoices and compressed dispatch bundles
+
+The incomplete month-turn path is Not Ready rather than a normal lifecycle
+stage. Giuliana continues resolving actionable blockers, while Carlos retains
+visibility but cannot approve before snapshot. New operational intake continues
+separately; it does not make the next obligation month the active package.
+
 The dashboard must not become a miniature Obligations workspace.
 The Obligations workspace is where Carlos can inspect the complete information through the already-established unit-specific and owner-responsibility lenses.
 
@@ -369,6 +398,12 @@ Avoid:
 The dashboard is a server-side projection over canonical domain truth.
 It should not reconstruct domain calculations or create parallel business logic.
 
+The read model may expose both September obligation facts and September
+operational source intake on September 1. The latter may eventually feed
+October obligations, but it does not make October the primary obligation
+package merely because the calendar advanced. This does not resolve the
+incomplete prior-month snapshot case.
+
 ## 17. Role-Aware Surface
 
 Carlos and Guliana consume the same underlying operational truth, but the dashboard interprets and prioritizes that truth differently according to role.
@@ -414,6 +449,13 @@ Frozen architecture and domain decisions include:
 - Completed Work as compressed confirmation
 - Worth Noting versus Exceptions
 - Carlos obligations-first hierarchy
+- successful finalization as the frozen-package boundary
+- Awaiting Carlos Approval and Ready for Dispatch as post-finalization states
+- automatic happy-path month-turn snapshot for complete, valid packages
+- no snapshot for incomplete or invalid packages at month turn
+- automatic delayed snapshot after the final blocker resolves
+- approval-triggered invoice and compressed-bundle manifestation
+- operational source intake kept distinct from the next obligation package
 - collections lifecycle semantics
 - primary navigation versus secondary Menu architecture
 - role-aware dashboard and shared shell

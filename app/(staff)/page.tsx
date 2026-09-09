@@ -1,7 +1,7 @@
 import Link from "next/link";
+import { CaretDown, Warning, Drop } from "@phosphor-icons/react/dist/ssr";
 
 import { DashboardGreeting } from "@/components/dashboard-greeting";
-import { Panel } from "@/components/ui/panel";
 import { getGulianaDashboardFacts, projectGulianaDashboard } from "@/server/dashboard";
 import { getStaffContext } from "@/server/staff-context";
 
@@ -40,6 +40,23 @@ function formatMoney(value: string | null | undefined) {
 
 function amountText(amount: string | null) {
   return amount ? formatMoney(amount) : "Unavailable";
+}
+
+function componentText(component: { state: "available" | "blocked"; amount: string | null }) {
+  return component.state === "blocked" ? "Blocked" : amountText(component.amount);
+}
+
+function shortMonthLabel(monthKey: string) {
+  const parsed = new Date(`${monthKey}-01T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return monthKey;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).formatToParts(parsed);
+  const month = parts.find((part) => part.type === "month")?.value ?? monthKey;
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  return `${month} ’${year.slice(-2)}`;
 }
 
 function progressPercent(complete: number, expected: number) {
@@ -88,16 +105,14 @@ export default async function DashboardPage() {
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col space-y-6 px-6 py-6 sm:py-8">
-      <div className="flex flex-wrap items-start justify-between gap-6">
-        <div className="space-y-4">
-          <p className="text-sm  font-semibold uppercase   tracking-widest  text-zinc-500">{formatDateLabel(result.data.businessDate)}</p>
-          <div className="space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-6 mt-12">
+        <div className="space-y-4 ">
+          <p className="text-md  text-zinc-800">{formatDateLabel(result.data.businessDate)}</p>
             <DashboardGreeting firstName={firstName} />
-            
-          </div>
         </div>
 
-        <details className="relative ">
+{/*   Upload Button */}
+        <details className="relative">
           <summary className=" cursor-pointer list-none rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 shadow-sm hover:border-zinc-950 [&::-webkit-details-marker]:hidden">Upload</summary>
           <div className="absolute right-0 z-20 mt-2 w-64 rounded-2xl border border-zinc-200 bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.08)]">
             <Link href="/water/sedapal/new" className="block rounded-xl px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950">Sedapal bill</Link>
@@ -108,14 +123,18 @@ export default async function DashboardPage() {
         </details>
       </div>
 
+{/*   Attention and Worth Noting */}
       {attentionCount > 0 || worthNoting.length > 0 ? (
-        <div className="space-y-4 mt-24">
+        <div className="space-y-4 mt-6">
           {attentionCount > 0 ? <>
-            <div className="space-y-1 ">
-              
-              <p className="text-md text-zinc-950">These inputs are blocking {financialMonthLabel} obligations.</p>
+            <div className="space-y-1  border-b border-zinc-200 py-4 ">
+              <div className="flex items-center gap-2  ">
+                <Warning size={20} weight="regular" aria-hidden="true" />
+                <p className="text-lg text-zinc-950 ">These inputs are blocking {financialMonthLabel} obligations.</p>
+                
+              </div>
             </div>
-            <div className="grid gap-14 lg:grid-cols-3">
+            <div className="grid gap-14 lg:grid-cols-3 ">
               {projection.attentions.map((attention, index) => (
                 <div key={`${attention.source}:${attention.happened}:${index}`} >
                  
@@ -141,14 +160,15 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      <div className={`grid gap-4 lg:grid-cols-2 ${isOpen ? "order-3" : "order-2"}`}>
-        <Panel className="space-y-4" padding="compact">
+      <div className={`grid  mt-14 gap-4 lg:grid-cols-2 ${isOpen ? "order-3" : "order-2"}`}>
+        <Link href="/water" className="group rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
           <div className="flex items-start justify-between gap-4">
+
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Water</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight text-zinc-950">{projection.water.state === "complete" ? "Complete" : projection.water.state === "blocked" ? "Blocked" : isOpen && projection.water.state === "waiting" ? "Waiting for inputs" : isOpen ? "In progress" : "Incomplete"}</h2>
+              <Drop size={20} weight="regular" aria-hidden="true" />
+              <p className="text-md font-light text-zinc-950">Water</p>
+              <h2 className="mt-1  text-xl font-semibold tracking-tight text-zinc-950">{projection.water.state === "complete" ? "Complete" : projection.water.state === "blocked" ? "Blocked" : isOpen && projection.water.state === "waiting" ? "Waiting for inputs" : isOpen ? "In progress" : "Incomplete"}</h2>
             </div>
-            <Link href="/water" className="text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">View water details →</Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Sedapal bill</p><p className="mt-2 text-lg font-semibold text-zinc-950">{waterBill ? "Present" : isOpen ? "Not received yet" : "Missing"}</p>{waterBill ? <p className="mt-1 text-sm text-zinc-600">{formatMoney(waterBill.amount)}</p> : null}</div>
@@ -158,15 +178,14 @@ export default async function DashboardPage() {
               <p className="mt-2 text-sm text-zinc-600">{waterComplete} of {waterExpected} complete</p>
             </div>
           </div>
-        </Panel>
+        </Link>
 
-        <Panel className="space-y-4" padding="compact">
+        <Link href="/gas" className="group rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Gas</p>
               <h2 className="mt-1 text-xl font-semibold tracking-tight text-zinc-950">{projection.gas.state === "complete" ? "Complete" : projection.gas.state === "blocked" ? "Blocked" : isOpen && projection.gas.state === "waiting" ? "Waiting for inputs" : isOpen ? "In progress" : "Incomplete"}</h2>
             </div>
-            <Link href="/gas" className="text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">View gas details →</Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -176,23 +195,39 @@ export default async function DashboardPage() {
             </div>
             <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Supplier bills</p><p className="mt-2 text-lg font-semibold text-zinc-950">{result.data.upcoming.gas.supplierBillCount} bills</p><p className="mt-1 text-sm text-zinc-600">{formatMoney(result.data.upcoming.gas.supplierBillTotal)}</p></div>
           </div>
-        </Panel>
+        </Link>
       </div>
 
-      <Panel className={`order-2 space-y-5 ${isOpen ? "" : "order-3"}`} padding="compact">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3"><h2 className="text-xl font-semibold tracking-tight text-zinc-950">{financialMonthLabel} obligations</h2><span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">{isOpen ? projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready" : "Live preview"}</span></div>
-          <Link href="/obligations" className="text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">Open obligations →</Link>
+      <details className="relative order-2 self-end">
+        <summary className="flex cursor-pointer list-none items-center gap-4 rounded-full border border-zinc-200 bg-white px-5 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:border-zinc-950 [&::-webkit-details-marker]:hidden">
+          <span className="text-sm font-semibold text-zinc-950">Obligations</span>
+          <span className="text-sm text-zinc-600">{shortMonthLabel(financialFacts.obligations.obligationMonth)}</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">
+            {isOpen ? projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready" : "Live preview"}
+          </span>
+          <CaretDown size={16} aria-hidden="true" />
+        </summary>
+        <div className="absolute right-0 z-20 mt-3 w-[min(32rem,calc(100vw-3rem))] rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_18px_40px_rgba(0,0,0,0.1)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{financialMonthLabel} obligations</p>
+              <p className="mt-1 text-lg font-semibold text-zinc-950">
+                {isOpen ? projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready" : "Live preview"}
+              </p>
+            </div>
+            <Link href="/obligations" className="text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">Open obligations →</Link>
+          </div>
+          <div className="mt-6 space-y-3 text-sm">
+            <div className="flex items-center justify-between gap-6"><span className="text-zinc-600">Fixed assessments</span><span className="font-medium text-zinc-950">{componentText(components.fixed_assessment)}</span></div>
+            <div className="flex items-center justify-between gap-6"><span className="text-zinc-600">Metered water</span><span className="font-medium text-zinc-950">{componentText(components.metered_water)}</span></div>
+            <div className="flex items-center justify-between gap-6"><span className="text-zinc-600">Common water</span><span className="font-medium text-zinc-950">{componentText(components.common_water)}</span></div>
+            <div className="flex items-center justify-between gap-6"><span className="text-zinc-600">Gas</span><span className="font-medium text-zinc-950">{componentText(components.gas)}</span></div>
+            <div className="flex items-center justify-between gap-6"><span className="text-zinc-600">Other charges</span><span className="font-medium text-zinc-950">{componentText(components.other_charge)}</span></div>
+            <div className="flex items-center justify-between gap-6"><span className="text-zinc-600">Owner-direct charges</span><span className="font-medium text-zinc-950">{componentText(components.owner_direct_charge)}</span></div>
+            <div className="flex items-center justify-between gap-6 border-t border-zinc-200 pt-4 text-base"><span className="font-semibold text-zinc-950">Total</span><span className="font-semibold text-zinc-950">{amountText(financialFacts.obligations.total)}</span></div>
+          </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-          <div className="sm:col-span-2 xl:col-span-1"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Total receivable</p><p className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950">{amountText(financialFacts.obligations.total)}</p>{financialFacts.obligations.total === null ? <p className="mt-1 text-sm text-zinc-500">3 source inputs block completion.</p> : null}</div>
-          <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Fixed assessment</p><p className="mt-2 text-lg font-semibold text-zinc-950">{amountText(components.fixed_assessment.amount)}</p></div>
-          <div className="text-zinc-500"><p className="text-xs font-semibold uppercase tracking-[0.16em]">Water</p><p className="mt-2 text-lg font-semibold text-zinc-700">{amountText(components.metered_water.amount)}</p></div>
-          <div className="text-zinc-500"><p className="text-xs font-semibold uppercase tracking-[0.16em]">Gas</p><p className="mt-2 text-lg font-semibold text-zinc-700">{amountText(components.gas.amount)}</p></div>
-          <div className="text-zinc-500"><p className="text-xs font-semibold uppercase tracking-[0.16em]">Other charges</p><p className="mt-2 text-lg font-semibold text-zinc-700">{amountText(components.other_charge.amount)}</p><p className="mt-1 text-xs">{components.other_charge.count ?? 0} charges</p></div>
-          <div className="text-zinc-500"><p className="text-xs font-semibold uppercase tracking-[0.16em]">Owner-direct</p><p className="mt-2 text-lg font-semibold text-zinc-700">{amountText(components.owner_direct_charge.amount)}</p><p className="mt-1 text-xs">{components.owner_direct_charge.count ?? 0} charges</p></div>
-        </div>
-      </Panel>
+      </details>
     </section>
   );
 }
