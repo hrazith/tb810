@@ -160,7 +160,7 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      <div className={`grid  mt-14 gap-4 lg:grid-cols-2 ${isOpen ? "order-3" : "order-2"}`}>
+      <div className={`grid  mt-6 gap-4 lg:grid-cols-2 ${isOpen ? "order-3" : "order-2"}`}>
         <Link href="/water" className="group rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
           <div className="flex items-start justify-between gap-4">
 
@@ -198,16 +198,16 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <details className="relative order-2 self-end">
+      <details className="fixed bottom-6 right-6 z-40 max-sm:bottom-4 max-sm:right-4">
         <summary className="flex cursor-pointer list-none items-center gap-4 rounded-full border border-zinc-200 bg-white px-5 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:border-zinc-950 [&::-webkit-details-marker]:hidden">
           <span className="text-sm font-semibold text-zinc-950">Obligations</span>
           <span className="text-sm text-zinc-600">{shortMonthLabel(financialFacts.obligations.obligationMonth)}</span>
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">
+          <span className="text-xs font-semibold tracking-[0.12em] text-zinc-500">
             {isOpen ? projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready" : "Live preview"}
           </span>
           <CaretDown size={16} aria-hidden="true" />
         </summary>
-        <div className="absolute right-0 z-20 mt-3 w-[min(32rem,calc(100vw-3rem))] rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_18px_40px_rgba(0,0,0,0.1)]">
+        <div className="absolute bottom-full right-0 z-20 mb-3 w-[min(32rem,calc(100vw-3rem))] rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_18px_40px_rgba(0,0,0,0.1)]">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{financialMonthLabel} obligations</p>
