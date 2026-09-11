@@ -38,12 +38,16 @@ test("dual-period facts keep Aug 31 and Sep 1 source periods distinct", { concur
           current: {
             commonWaterBill: missing ? null : { id: "water-july", amount: 10 },
             waterReadings: missing ? [] : [{ unit_id: "july-unit", reading_date: "2026-07-31", reading_end: 1 }],
-            gasReadings: missing ? [] : [{ unit_id: "july-unit", reading_month: "2026-07", consumption: 1 }],
+          gasReadings: missing ? [] : [{ unit_id: "july-unit", reading_month: "2026-07", consumption: 1 }],
+            obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-september", billingPeriodStatus: "ready_for_review" },
+            obligationSnapshot: { billingPeriodId: "period-september", status: "ready_for_review", components: {}, total: 0 },
           },
           upcoming: {
             commonWaterBill: missing ? null : { id: "water-august", amount: 20 },
             waterReadings: missing ? [] : [{ unit_id: "august-unit", reading_date: "2026-08-31", reading_end: 2 }],
-            gasReadings: missing ? [] : [{ unit_id: "august-unit", reading_month: "2026-08", consumption: 2 }],
+          gasReadings: missing ? [] : [{ unit_id: "august-unit", reading_month: "2026-08", consumption: 2 }],
+            obligationLifecycle: { mode: "live", billingPeriodId: null, billingPeriodStatus: null },
+            obligationSnapshot: null,
           },
         },
         error: null,
@@ -71,6 +75,8 @@ test("dual-period facts keep Aug 31 and Sep 1 source periods distinct", { concur
     assert.equal(aug31.data?.upcoming.waterReadings[0]?.unit_id, "august-unit");
     assert.equal(aug31.data?.current.gasReadings[0]?.reading_month, "2026-07");
     assert.equal(aug31.data?.upcoming.gasReadings[0]?.reading_month, "2026-08");
+    assert.equal(aug31.data?.current.obligationLifecycle.mode, "snapshotted");
+    assert.equal(aug31.data?.upcoming.obligationLifecycle.mode, "live");
     assert.equal(rpcCalls.length, 2);
     assert.equal(rpcCalls[1][1].p_reading_month, "2026-07-01");
 

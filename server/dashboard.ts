@@ -3,7 +3,7 @@ import { cache } from "react";
 import { getBusinessNow } from "@/server/business-date";
 import { getFixedBuildingIdentity } from "@/server/building";
 import { isChargeEligibleForMonth, nextMonthKey } from "@/server/charges/month";
-import { buildMonthlyObligationSummaryFromFacts } from "@/server/obligations/summary-facts";
+import { buildMonthlyObligationSummaryFromFacts, buildMonthlyObligationSummaryFromSnapshot } from "@/server/obligations/summary-facts";
 import { loadBuildingMonthFinancialFacts, type BuildingMonthFinancialFacts } from "@/server/obligations/owner-facts";
 import { hasCompleteWaterReadings } from "@/server/water/readiness";
 
@@ -45,6 +45,7 @@ type UpcomingFacts = {
     ownerDirectChargeCount: number;
   };
   worthNoting: DashboardWorthNoting[];
+  obligationLifecycle: BuildingMonthFinancialFacts["obligationLifecycle"];
 };
 
 export type DashboardContext = "close" | "open";
@@ -104,7 +105,7 @@ export type GulianaDashboardProjection = {
     emphasis: "normal" | "compressed" | "attention";
     ready: boolean;
     blocked: boolean;
-    readiness: "ready_for_carlos" | "not_ready";
+    readiness: "ready_for_carlos" | "awaiting_approval" | "not_ready";
   };
   attentions: DashboardAttention[];
   worthNoting: DashboardWorthNoting[];
@@ -305,19 +306,22 @@ function deriveGasState(
 
 function deriveObligationState(
   obligations: UpcomingFacts["obligations"],
+  lifecycle: UpcomingFacts["obligationLifecycle"],
+  businessDate: string,
 ): GulianaDashboardProjection["obligations"] {
   const blocked = obligations.components.fixed_assessment.state === "blocked"
     || obligations.components.metered_water.state === "blocked"
     || obligations.components.common_water.state === "blocked"
     || obligations.components.gas.state === "blocked";
   const ready = obligations.total !== null && !blocked;
+  const lifecycleVisible = businessDate.slice(0, 7) >= obligations.obligationMonth;
 
   return {
     state: blocked ? "blocked" : ready ? "complete" : "active",
     emphasis: blocked ? "attention" : ready ? "compressed" : "normal",
     ready,
     blocked,
-    readiness: ready ? "ready_for_carlos" : "not_ready",
+    readiness: ready ? lifecycleVisible && lifecycle?.mode === "snapshotted" ? "awaiting_approval" : "ready_for_carlos" : "not_ready",
   };
 }
 
@@ -341,7 +345,7 @@ function deriveCompleted(
 export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): GulianaDashboardProjection {
   const sourceWork = monthFacts.sourceWork;
   const financialFacts = monthFacts.context === "open" ? monthFacts.current : monthFacts.upcoming;
-  const obligations = deriveObligationState(financialFacts.obligations);
+  const obligations = deriveObligationState(financialFacts.obligations, financialFacts.obligationLifecycle, monthFacts.businessDate);
   const water = deriveWaterState(sourceWork, financialFacts.obligations, monthFacts.context);
   const gas = deriveGasState(sourceWork, financialFacts.obligations, monthFacts.context);
 
@@ -392,7 +396,9 @@ function buildUpcomingFacts(
   financialFacts: BuildingMonthFinancialFacts,
   upcomingObligationMonth: string,
 ): UpcomingFacts {
-  const obligations = buildMonthlyObligationSummaryFromFacts(financialFacts, upcomingObligationMonth);
+  const obligations = financialFacts.obligationSnapshot
+    ? buildMonthlyObligationSummaryFromSnapshot(financialFacts, upcomingObligationMonth, financialFacts.obligationSnapshot)
+    : buildMonthlyObligationSummaryFromFacts(financialFacts, upcomingObligationMonth);
   const waterBill = financialFacts.commonWaterBill;
   const includedGasBills = financialFacts.gasBills.filter((bill) => bill.processed_at === null);
   const charges = countChargeRows(financialFacts, upcomingObligationMonth);
@@ -414,6 +420,7 @@ function buildUpcomingFacts(
     },
     charges,
     worthNoting: deriveUnitChargeWorthNoting(financialFacts, upcomingObligationMonth),
+    obligationLifecycle: financialFacts.obligationLifecycle,
   };
 }
 

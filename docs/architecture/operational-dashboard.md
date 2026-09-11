@@ -2,7 +2,7 @@
 
 Status: Frozen concept document
 
-Date: August 27, 2026
+Date: September 10, 2026
 
 This document is the canonical architecture reference for the Operational Dashboard domain in TB810.
 It defines the dashboard as a staff-facing operational awareness surface and a server-side projection over canonical domain truth.
@@ -38,36 +38,21 @@ Do not manufacture alerts, progress indicators, or exceptions simply to make the
 
 ## 2. Primary Operating Context
 
-Month is the primary operating context.
+Month is the primary operating context, but the dashboard intentionally represents two concurrent monthly timelines.
 
-The dashboard is anchored to the current operating month.
+The first timeline is the obligation package crossing a lifecycle boundary. On September 1, this is the September 2026 package derived from August source facts. It may be Not Ready, Complete and Awaiting Carlos Approval, or a later approved or dispatched state.
 
-Users should not have to mentally reconcile multiple source periods on the dashboard.
+The second timeline is the operational source work being collected for the next package. On September 1, Water and Gas inputs are September source inputs preparing October 2026 obligations.
 
-Some calculations may consume facts from another service period.
-That precision belongs inside the relevant domain workspace, not on the dashboard.
+These timelines must remain distinct rather than collapsing into one generic "current month" concept.
 
-At month close, Guliana's dashboard intentionally spans two related temporal contexts:
+The dashboard therefore has three related responsibilities:
 
-- the current operating/source month
-- the upcoming obligation month
+- the monthly status/handoff region communicates the obligation package currently crossing lifecycle boundaries;
+- the Water and Gas operational area communicates source work currently being collected for the next obligation package;
+- the floating Obligations utility remains the persistent financial-detail surface for the package currently deserving Giuliana's primary financial focus.
 
-The dashboard may answer both:
-
-- whether the source work feeding the upcoming obligation cycle is complete or blocked
-- what obligation set those source facts are progressively producing for Carlos to review
-
-The dashboard should communicate:
-
-- "What is the state of August?"
-
-rather than:
-
-- "Prepare July gas while preparing August water."
-
-Avoid competing month labels on the dashboard.
-The dashboard should speak primarily in terms of the current operating month.
-Do not collapse source month and obligation month into one "current month" concept when the dashboard is intentionally previewing the next obligation cycle.
+Source periods and obligation periods may differ. The dashboard should explain the relationship at a useful level, while precise service, billing, and reading-period detail remains inside the relevant domain workspace.
 
 ## 3. Domain Workspace Boundaries
 
@@ -106,19 +91,16 @@ The system should distinguish:
 
 The absence of work should not automatically become a warning.
 
-The dashboard should speak primarily in terms of the current operating month.
-Precise source periods remain visible inside Water and Gas workspaces where they belong.
+The dashboard should not force users to reconcile implementation-level source periods, but it must make the two user-relevant timelines explicit.
+Precise source-period rules remain visible inside Water and Gas workspaces where they belong.
 
-The dashboard also distinguishes the obligation lifecycle from the operating
-calendar. A date provides context; successful finalization creates lifecycle
-state. In the normal happy path, a complete and valid September obligation
-package is previewed during August, automatically snapshotted at the August-to-
-September month turn, and then shown to Giuliana as Awaiting Carlos Approval.
-Carlos approval manifests invoices and compressed dispatch bundles, which
-become available to Giuliana and produce Ready for Dispatch. The behavior of
-an incomplete package is now defined as no snapshot, a live obligation, and
-Not Ready. Giuliana sees actionable blockers; Carlos sees oversight/status and
-has no approval action until the delayed snapshot occurs.
+The dashboard also distinguishes the obligation lifecycle from the operating calendar. A date provides context; successful finalization creates lifecycle state. In the normal happy path, a complete and valid package is previewed before its obligation month, automatically snapshotted at the month turn, and shown to Giuliana as Awaiting Carlos Approval.
+
+Persisted future lifecycle state must not leak backward when the DEV business date is rewound. A snapshot is presentation-visible for its obligation month only when the business date has reached that month. Rewinding the business date changes projection only; it does not mutate, reopen, delete, or rewrite persisted lifecycle state.
+
+Carlos approval is the financial-focus pivot. Before approval, Giuliana's floating Obligations utility stays on the current immutable package awaiting approval. After approval, that package becomes Ready for Dispatch and the utility advances to the next live obligation preview. The calendar alone must not cause that switch.
+
+The behavior of an incomplete package remains no snapshot, a live obligation, and Not Ready. Giuliana sees actionable blockers; Carlos sees oversight/status and has no approval action until the delayed snapshot occurs.
 
 ## 5. Monthly Rhythm
 
@@ -135,10 +117,12 @@ Primary questions:
 - Are there unusual obligations?
 - Are there exceptions requiring investigation?
 
-At this point, utility inputs may not exist yet.
-That can be normal.
+At this point, utility inputs for the new operational cycle may not exist yet.
+That can be normal. Water readings at 0 of the expected units, a Sedapal bill not yet received, or zero Gas supplier bills are not warnings by themselves.
 
-The dashboard should not manufacture urgency simply because those inputs are not yet present.
+The top region reports the prior package's real state. If it is complete and snapshotted, the region communicates Complete and Awaiting Carlos Approval. If it is incomplete, it remains Not Ready with actionable blockers. The operational area separately begins the next source-work cycle.
+
+The dashboard must not manufacture urgency simply because new-cycle inputs are not yet present.
 
 ### Early month, approximately days 4 to 6
 
@@ -171,6 +155,19 @@ An incomplete package remains live while Giuliana enters or corrects the
 missing prior-period facts. When the final blocker resolves, the system
 automatically snapshots the package and returns to Awaiting Carlos Approval.
 
+### Business-date month boundary
+
+The month boundary is generic and is determined from the business date and obligation month, not from a September-specific condition or a later fixed day such as September 8.
+
+For example:
+
+- August 31 with a September snapshot: September remains a Live Preview;
+- September 1 with a September snapshot: September becomes Complete and Awaiting Carlos Approval;
+- September 1 without a valid snapshot: September is Not Ready when real blockers exist;
+- September source work remains preparation for October regardless of the prior package's handoff state.
+
+Incomplete does not mean late. Calendar passage alone must not create Attention; a real business expectation or blocking rule is required.
+
 ### Mid-month
 
 Operational emphasis may shift toward expenses and other exceptions.
@@ -189,10 +186,10 @@ Do not implement that workflow inside this document.
 
 The dashboard state hierarchy is:
 
-- month state
-- current work
+- monthly status and handoff
+- current operational source work
 - exceptions or normality
-- completed
+- completed work
 - quick actions
 
 This hierarchy is conceptual, not a requirement for any one card layout.
@@ -291,7 +288,7 @@ For MVP, prefer deterministic and explainable identification of noteworthy activ
 
 Carlos is Super Admin.
 
-His dashboard follows decision and money boundaries.
+His dashboard follows decision and money boundaries. It is broader financial oversight, not merely an Obligations dashboard.
 
 His primary questions are:
 
@@ -301,6 +298,8 @@ His primary questions are:
 - Who has crossed into overdue?
 - Is anything unusual or operationally wrong?
 - Eventually: what expenses has Guliana prepared for me to pay?
+
+Carlos reviews and approves monthly obligations, monitors overall building financial health and collections, reviews financial exceptions, and defines escalation boundaries for delinquent owners. Giuliana and her colleagues perform routine delinquency follow-up; Carlos intervenes at the authority or decision point rather than performing that routine work himself.
 
 For Sprint 1, do not invent the Expenses workflow.
 Expenses remain a future dashboard handoff area until that domain is designed.
@@ -316,6 +315,8 @@ If the current month's obligations require Carlos's review, that actionable stat
 Once Carlos has reviewed or approved the obligations, this section compresses.
 Collections then naturally becomes the dominant dashboard responsibility.
 
+The first Carlos implementation slice is intentionally narrow: review and approval of the existing immutable monthly obligation package. Carlos does not recalculate, generate, finalize, or snapshot the package.
+
 The happy-path lifecycle is:
 
 - Live Preview before successful finalization
@@ -330,6 +331,8 @@ separately; it does not make the next obligation month the active package.
 
 The dashboard must not become a miniature Obligations workspace.
 The Obligations workspace is where Carlos can inspect the complete information through the already-established unit-specific and owner-responsibility lenses.
+
+The primary approval surface should show the package status, total, and review entry point. Detailed provenance and operational Water/Gas mechanics remain secondary to the financial decision.
 
 ## 13. Worth Noting for Carlos
 
@@ -412,6 +415,22 @@ The dashboard should be role-aware, but the shell should remain shared.
 
 The dashboard should not become two separate applications or two unrelated navigation systems.
 
+The first cross-role handoff sequence is:
+
+### Sep 8A — Giuliana / Awaiting Carlos
+
+Ordinary in-month Water and Gas intake continues for the next obligation package while the prior package remains Complete and Awaiting Carlos Approval. Partial or zero source-work progress is neutral unless an actual business rule makes it actionable. The floating utility remains on the current package.
+
+### Sep 8B — Carlos / Review and Approve
+
+Carlos sees the immutable September package, its status, total, and a review action. He performs a real approval action against that package. This is not a DEV state simulator.
+
+### Sep 8C — Giuliana / Approved and Ready for Dispatch
+
+After approval, the package is Approved and Ready for Dispatch. The next operational source-work cycle continues, and Giuliana's floating Obligations utility advances to the next live obligation preview. Invoice and compressed dispatch-bundle details belong in this region once their implementation exists.
+
+Sep 8 is an acceptance point, not product timing logic. No production behavior should depend on a fixed date or on an arbitrary "after eight days" rule.
+
 ## 18. Sprint Scope
 
 Sprint 1 remains intentionally narrow:
@@ -438,6 +457,8 @@ Do not expand this sprint into:
 
 ## 19. Documentation Status
 
+The snapshot foundation and snapshot-aware bounded financial read are implemented. Automatic month-turn coordination, delayed automatic snapshot coordination, Carlos approval, invoice generation, compressed dispatch-bundle generation, dispatch, and the full Carlos dashboard remain deferred implementation work.
+
 Frozen architecture and domain decisions include:
 
 - dashboard is operational situational awareness
@@ -459,6 +480,10 @@ Frozen architecture and domain decisions include:
 - collections lifecycle semantics
 - primary navigation versus secondary Menu architecture
 - role-aware dashboard and shared shell
+- two concurrent monthly timelines and the monthly status/handoff region
+- business-date-coherent lifecycle presentation
+- Carlos approval as Giuliana's financial-focus pivot
+- the narrow Sep 8A to Sep 8B to Sep 8C cross-role acceptance sequence
 
 Implementation or visual details still open include:
 
@@ -476,107 +501,6 @@ Implementation or visual details still open include:
 These are implementation details, not domain-open questions.
 
 ## 20. Relationship to Other Canonical Documents
-
-This document sits above the detailed domain references for:
-
-- Water
-- Gas
-- Budget Plans
-- Monthly Obligations
-- Expenses
-
-Those documents own the precise domain behavior.
-This document only defines how the dashboard should summarize current operational state across them.
-
-## 6. Dashboard Read Model
-
-The dashboard should be implemented as a dashboard read model that composes existing canonical domain reads.
-
-It should not let a React page independently query Water, Gas, Charges, Budget, and other domains as unrelated one-off fetches.
-
-Preferred shape:
-
-- dashboard
-  - staff context
-  - dashboard read model
-  - canonical domain reads
-  - database
-
-The dashboard should consume domain state, not recalculate domain truth.
-
-Avoid N+1 behavior.
-Avoid fetching detailed datasets when the dashboard only needs a small status summary.
-
-Do not create a new database RPC unless the existing architecture genuinely requires it.
-
-## 7. Current Dashboard Content
-
-The dashboard should focus on:
-
-- personal and time context
-- the current month's operating work
-- a lightweight area for useful non-scheduled actions
-- exceptions only when they are meaningful and cheap to derive truthfully
-
-The dashboard should not be dominated by:
-
-- owner administration
-- unit administration
-- ownership transfer
-- budget CRUD
-- financial collection metrics
-- system administration
-
-Those belong primarily to Carlos or other administrative contexts.
-
-## 8. Role Behavior
-
-The dashboard uses the canonical staff context.
-
-The role is the product boundary.
-
-The dashboard should render for building_manager.
-
-Do not infer dashboard behavior from email address or user id.
-
-Carlos, as super_admin, should not accidentally receive the Guliana dashboard as his final experience.
-
-## 9. Canonical Presentation Principles
-
-Use plain operational language.
-
-Prefer:
-
-- August operations
-- Prepare July gas
-- Enter Sedapal bill
-- Review water readings
-- Done
-- Needs attention
-
-Avoid software-centric language such as:
-
-- Manage Water Module
-- Gas Administration
-- Utility Management
-
-The dashboard should describe Guliana's work, not TB810's database taxonomy.
-
-Keep the page visually restrained.
-
-The goal is strong hierarchy, calm typography, generous spacing, clear task state, and obvious action.
-
-## 10. Security
-
-UI visibility is not authorization.
-
-Database and RLS remain the authoritative security boundary.
-
-The dashboard must not introduce a service-role client into normal request handling.
-
-It must not weaken RLS.
-
-## 11. Relationship to Other Canonical Documents
 
 This document sits above the detailed domain references for:
 

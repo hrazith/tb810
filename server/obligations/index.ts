@@ -3,7 +3,7 @@ import { isChargeEligibleForMonth } from "../charges/month";
 import { composeMonthlyObligation } from "./core";
 import { createMonthlyObligationProviders } from "./providers";
 import { buildChargeMap, buildFixedAssessmentMap, buildGasCalculationInputFromFacts, buildWaterPreviewFromFacts, loadBuildingMonthFinancialFacts } from "./owner-facts";
-import { buildMonthlyObligationSummaryFromFacts } from "./summary-facts";
+import { buildMonthlyObligationSummaryFromFacts, buildMonthlyObligationSummaryFromSnapshot } from "./summary-facts";
 import { calculateGasCharges } from "../gas/calculation";
 import { isPerfLoggingEnabled } from "@/server/perf";
 
@@ -223,7 +223,10 @@ export async function getMonthlyObligationSummary({ obligationMonth }: { obligat
   if (buildingFactsResult.error) return { data: null as never, error: buildingFactsResult.error };
   if (!buildingFactsResult.data) return { data: null as never, error: "Building month facts unavailable." };
 
-  const summary = buildMonthlyObligationSummaryFromFacts(buildingFactsResult.data.current, obligationMonth);
+  const facts = buildingFactsResult.data.current;
+  const summary = facts.obligationSnapshot
+    ? buildMonthlyObligationSummaryFromSnapshot(facts, obligationMonth, facts.obligationSnapshot)
+    : buildMonthlyObligationSummaryFromFacts(facts, obligationMonth);
   const elapsedMs = Date.now() - startedAt;
   if (isPerfLoggingEnabled()) {
     console.info(
@@ -254,3 +257,4 @@ export type {
   UnitMonthlyObligation,
 } from "./types";
 export { getOwnerMonthlyObligation } from "./owner";
+export { createCurrentBuildingMonthlyObligationSnapshot, createMonthlyObligationSnapshot } from "./snapshot";

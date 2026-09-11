@@ -75,6 +75,7 @@ function buildProjectionFacts(overrides = {}) {
       ...(overrideUpcoming.charges ?? {}),
     },
     worthNoting: overrideUpcoming.worthNoting ?? [],
+    obligationLifecycle: { mode: "live", billingPeriodId: null, billingPeriodStatus: null },
   };
 
   return {
@@ -546,11 +547,12 @@ test("different Water blockers are not collapsed", () => {
   assert.equal(projection.attentions.length, 2);
 });
 
-test("P month-open projects ready-for-Carlos without approval state", () => {
+test("P month-open projects a snapshotted package as awaiting approval", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
     businessDate: "2026-09-01",
     current: {
       ...buildProjectionFacts().upcoming,
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "ready_for_review" },
       obligations: {
         ...buildProjectionFacts().upcoming.obligations,
         obligationMonth: "2026-09",
@@ -559,11 +561,53 @@ test("P month-open projects ready-for-Carlos without approval state", () => {
     },
   }));
 
-  assert.equal(projection.obligations.readiness, "ready_for_carlos");
+  assert.equal(projection.obligations.readiness, "awaiting_approval");
   assert.equal(projection.obligations.ready, true);
   assert.deepEqual(projection.attentions, []);
   assert.equal("approved" in projection.obligations, false);
   assert.equal("dispatched" in projection.obligations, false);
+});
+
+test("P2 future snapshots remain live preview before the obligation month starts", () => {
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-08-31",
+    context: "close",
+    upcoming: {
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "ready_for_review" },
+      obligations: {
+        total: "123.45",
+      },
+    },
+  }));
+
+  assert.equal(projection.obligations.readiness, "ready_for_carlos");
+});
+
+test("P3 an equivalent generic month boundary exposes the snapshot on month one", () => {
+  const before = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-10-31",
+    context: "close",
+    operatingMonth: "2026-10",
+    upcomingObligationMonth: "2026-11",
+    upcoming: {
+      obligations: { obligationMonth: "2026-11", total: "123.45" },
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-2", billingPeriodStatus: "ready_for_review" },
+    },
+  }));
+  const onBoundary = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-11-01",
+    context: "open",
+    operatingMonth: "2026-11",
+    upcomingObligationMonth: "2026-12",
+    current: {
+      ...buildProjectionFacts().upcoming,
+      obligations: { ...buildProjectionFacts().upcoming.obligations, obligationMonth: "2026-11", total: "123.45" },
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-2", billingPeriodStatus: "ready_for_review" },
+    },
+  }));
+
+  assert.equal(before.obligations.readiness, "ready_for_carlos");
+  assert.equal(onBoundary.obligations.readiness, "awaiting_approval");
 });
 
 test("K dashboard facts read uses exactly one bounded month read", async () => {

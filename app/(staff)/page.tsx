@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CaretDown, Warning, Drop } from "@phosphor-icons/react/dist/ssr";
+import { CaretDown, Warning, Drop, Flame } from "@phosphor-icons/react/dist/ssr";
 
 import { DashboardGreeting } from "@/components/dashboard-greeting";
 import { getGulianaDashboardFacts, projectGulianaDashboard } from "@/server/dashboard";
@@ -96,6 +96,8 @@ export default async function DashboardPage() {
   const operatingMonthLabel = formatMonthLabel(result.data.operatingMonth);
   const financialFacts = isOpen ? result.data.current : result.data.upcoming;
   const financialMonthLabel = formatMonthLabel(financialFacts.obligations.obligationMonth);
+  const nextCycleMonthLabel = formatMonthLabel(result.data.upcomingObligationMonth);
+  const sourceMonthLabel = formatMonthLabel(result.data.operatingMonth);
   const waterBill = result.data.upcoming.commonWaterBill;
   const waterComplete = result.data.sourceWork.water.meterReadingCompleteCount;
   const waterExpected = result.data.sourceWork.water.meterReadingExpectedCount;
@@ -124,7 +126,7 @@ export default async function DashboardPage() {
       </div>
 
 {/*   Attention and Worth Noting */}
-      {attentionCount > 0 || worthNoting.length > 0 ? (
+      {attentionCount > 0 || worthNoting.length > 0 || projection.obligations.readiness === "awaiting_approval" ? (
         <div className="space-y-4 mt-6">
           {attentionCount > 0 ? <>
             <div className="space-y-1  border-b border-zinc-200 py-4 ">
@@ -145,6 +147,13 @@ export default async function DashboardPage() {
               ))}
             </div>
           </> : null}
+          {attentionCount === 0 && projection.obligations.readiness === "awaiting_approval" ? (
+            <div className="space-y-1 border-b border-zinc-200 py-4">
+              <p className="text-lg font-medium text-zinc-950">{financialMonthLabel} obligations</p>
+              <p className="text-lg text-zinc-950">Complete · Awaiting Carlos approval</p>
+              <p className="text-md text-zinc-600">All {financialMonthLabel} obligations are complete. Once Carlos approves them, they&apos;ll be ready for dispatch.</p>
+            </div>
+          ) : null}
           {worthNoting.length > 0 ? <div className={attentionCount > 0 ? "space-y-3 border-t border-zinc-200 pt-4" : "space-y-3"}>
             <p className="text-sm font-semibold uppercase  tracking-wide  text-zinc-500">Worth noting</p>
             <div className="grid gap-2 lg:grid-cols-3">
@@ -160,17 +169,25 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      <div className={`grid  mt-6 gap-4 lg:grid-cols-2 ${isOpen ? "order-3" : "order-2"}`}>
-        <Link href="/water" className="group rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
-          <div className="flex items-start justify-between gap-4">
+      <div className="mt-6 space-y-1">
+        <p className="text-lg font-medium text-zinc-950">Preparing {nextCycleMonthLabel} obligations</p>
+        <p className="text-md text-zinc-600">{sourceMonthLabel} source inputs</p>
+      </div>
+
+      <div className={` grid  mt-6 gap-4 lg:grid-cols-2 ${isOpen ? "order-3" : "order-2"}`}>
+
+{/*   Water insights */}
+        <Link href="/water" className="group rounded-3xl border  border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
+          <div className="flex items-start justify-between gap-4 ">
 
             <div>
               <Drop size={20} weight="regular" aria-hidden="true" />
               <p className="text-md font-light text-zinc-950">Water</p>
-              <h2 className="mt-1  text-xl font-semibold tracking-tight text-zinc-950">{projection.water.state === "complete" ? "Complete" : projection.water.state === "blocked" ? "Blocked" : isOpen && projection.water.state === "waiting" ? "Waiting for inputs" : isOpen ? "In progress" : "Incomplete"}</h2>
+
             </div>
+            <div>{projection.water.state === "complete" || projection.water.state === "blocked" || !isOpen ? <h2 className="mt-1 text-md font-semibold tracking-tight text-zinc-950">{projection.water.state === "complete" ? "Complete" : projection.water.state === "blocked" ? "Blocked" : "Incomplete"}</h2> : null}</div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 ">
             <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Sedapal bill</p><p className="mt-2 text-lg font-semibold text-zinc-950">{waterBill ? "Present" : isOpen ? "Not received yet" : "Missing"}</p>{waterBill ? <p className="mt-1 text-sm text-zinc-600">{formatMoney(waterBill.amount)}</p> : null}</div>
             <div>
               <div className="flex items-baseline justify-between gap-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Meter readings</p><p className="text-sm font-medium text-zinc-950">{waterComplete} of {waterExpected}</p></div>
@@ -180,13 +197,28 @@ export default async function DashboardPage() {
           </div>
         </Link>
 
+{/*   Gas insights */}
         <Link href="/gas" className="group rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
-          <div className="flex items-start justify-between gap-4">
+
+        <div className="flex items-start justify-between gap-4 ">
+
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Gas</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight text-zinc-950">{projection.gas.state === "complete" ? "Complete" : projection.gas.state === "blocked" ? "Blocked" : isOpen && projection.gas.state === "waiting" ? "Waiting for inputs" : isOpen ? "In progress" : "Incomplete"}</h2>
+              <Flame size={20} weight="regular" aria-hidden="true" />
+              <p className="text-md font-light text-zinc-950">Gas</p>
+
+            </div>
+            <div>
+
+              {projection.gas.state === "complete" || projection.gas.state === "blocked" || !isOpen ? <h2 className="mt-1 text-md font-semibold tracking-tight text-zinc-950">
+                {projection.gas.state === "complete" ? "Complete" : projection.gas.state === "blocked" ? "Blocked" : "Incomplete"}
+
+                </h2> : null}
+
             </div>
           </div>
+
+
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <div className="flex items-baseline justify-between gap-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Meter readings</p><p className="text-sm font-medium text-zinc-950">{gasComplete} of {gasExpected}</p></div>
@@ -203,7 +235,7 @@ export default async function DashboardPage() {
           <span className="text-sm font-semibold text-zinc-950">Obligations</span>
           <span className="text-sm text-zinc-600">{shortMonthLabel(financialFacts.obligations.obligationMonth)}</span>
           <span className="text-xs font-semibold tracking-[0.12em] text-zinc-500">
-            {isOpen ? projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready" : "Live preview"}
+            {isOpen ? projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready" : "Live preview"}
           </span>
           <CaretDown size={16} aria-hidden="true" />
         </summary>
@@ -212,7 +244,7 @@ export default async function DashboardPage() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{financialMonthLabel} obligations</p>
               <p className="mt-1 text-lg font-semibold text-zinc-950">
-                {isOpen ? projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready" : "Live preview"}
+                {isOpen ? projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready" : "Live preview"}
               </p>
             </div>
             <Link href="/obligations" className="text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">Open obligations →</Link>

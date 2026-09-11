@@ -3,6 +3,7 @@ import { calculateGasCharges } from "@/server/gas/calculation";
 import { buildWaterPreviewFromFacts, type BuildingMonthFinancialFacts } from "./owner-facts";
 import { buildMonthlyObligationSummary, type MonthlyObligationSummary } from "./summary";
 import { isChargeEligibleForMonth } from "@/server/charges/month";
+import type { PersistedObligationSnapshot } from "./owner-facts";
 
 function formatAmount(total: number) {
   return total.toFixed(2);
@@ -95,13 +96,15 @@ function buildWaterSummaryFromFacts(financialFacts: BuildingMonthFinancialFacts,
   }
 
   const meteredAmount = previews.reduce((sum, preview) => sum + Number(preview.meteredWater.status === "available" ? preview.meteredWater.data.amount : "0.00"), 0);
-  const firstPreview = previews[0];
-  const commonWaterAmount = firstPreview && firstPreview.commonWater.status === "available" ? firstPreview.commonWater.data.unitCommonWaterCharge : null;
+  const commonWaterAmount = formatAmount(
+    previews.reduce(
+      (sum, preview) => sum + Number(preview.commonWater.status === "available" ? preview.commonWater.data.unitCommonWaterCharge : "0.00"),
+      0,
+    ),
+  );
   return {
     metered_water: { state: "available" as const, amount: formatAmount(meteredAmount) },
-    common_water: commonWaterAmount
-      ? { state: "available" as const, amount: commonWaterAmount }
-      : { state: "blocked" as const, amount: null, reason: "Water lookup data is incomplete." },
+    common_water: { state: "available" as const, amount: commonWaterAmount },
     eligibleUnitCount: eligibleUnits.length,
   };
 }
@@ -169,6 +172,27 @@ function buildOwnerDirectChargeSummaryFromFacts(financialFacts: BuildingMonthFin
     amount: formatAmount(amount),
     count: applicableCharges.length,
   };
+}
+
+export function buildMonthlyObligationSummaryFromSnapshot(
+  financialFacts: BuildingMonthFinancialFacts,
+  obligationMonth: string,
+  snapshot: PersistedObligationSnapshot,
+): MonthlyObligationSummary {
+  const ownerDirectCharges = buildOwnerDirectChargeSummaryFromFacts(financialFacts, obligationMonth);
+  const components = snapshot.components;
+  return buildMonthlyObligationSummary({
+    obligationMonth,
+    eligibleUnitCount: financialFacts.unitRows.filter((unit) => unit.unit_type_code === "condo").length,
+    fixedAssessment: { state: "available", amount: String(components.fixed_assessment.amount) },
+    meteredWater: { state: "available", amount: String(components.water_consumption.amount) },
+    commonWater: { state: "available", amount: String(components.common_water.amount) },
+    gas: { state: "available", amount: String(components.gas_consumption.amount) },
+    otherChargeAmount: String(components.other_charge.amount),
+    otherChargeCount: components.other_charge.count,
+    ownerDirectChargeAmount: ownerDirectCharges.amount,
+    ownerDirectChargeCount: ownerDirectCharges.count,
+  });
 }
 
 export function buildMonthlyObligationSummaryFromFacts(

@@ -54,6 +54,21 @@ export type BuildingMonthFinancialFacts = {
     consumption: number | null;
   }>;
   charges: ChargeRecord[];
+  obligationLifecycle: ObligationLifecycle;
+  obligationSnapshot: PersistedObligationSnapshot | null;
+};
+
+export type ObligationLifecycle = {
+  mode: "live" | "snapshotted";
+  billingPeriodId: string | null;
+  billingPeriodStatus: string | null;
+};
+
+export type PersistedObligationSnapshot = {
+  billingPeriodId: string;
+  status: string;
+  components: Record<"fixed_assessment" | "water_consumption" | "common_water" | "gas_consumption" | "other_charge", { amount: number | string; count: number }>;
+  total: number | string;
 };
 
 export type DualPeriodBuildingMonthFinancialFacts = {
@@ -116,6 +131,8 @@ type BuildingMonthFinancialFactsRpcPeriod = {
   commonWaterBill?: CommonWaterBill | null;
   waterReadings?: BuildingMonthFinancialFacts["waterReadings"];
   gasReadings?: BuildingMonthFinancialFacts["gasReadings"];
+  obligationLifecycle?: ObligationLifecycle;
+  obligationSnapshot?: PersistedObligationSnapshot | null;
 };
 
 type BuildingMonthFinancialFactsRpcPayload = {
@@ -343,6 +360,8 @@ export async function loadBuildingMonthFinancialFacts({
     commonWaterBill: payload.current?.commonWaterBill ?? null,
     waterReadings: payload.current?.waterReadings ?? [],
     gasReadings: payload.current?.gasReadings ?? [],
+    obligationLifecycle: payload.current?.obligationLifecycle ?? { mode: "live", billingPeriodId: null, billingPeriodStatus: null },
+    obligationSnapshot: payload.current?.obligationSnapshot ?? null,
   } satisfies BuildingMonthFinancialFacts;
   const upcoming = {
     obligationMonth: upcomingMonth,
@@ -353,6 +372,8 @@ export async function loadBuildingMonthFinancialFacts({
     commonWaterBill: payload.upcoming?.commonWaterBill ?? null,
     waterReadings: payload.upcoming?.waterReadings ?? [],
     gasReadings: payload.upcoming?.gasReadings ?? [],
+    obligationLifecycle: payload.upcoming?.obligationLifecycle ?? { mode: "live", billingPeriodId: null, billingPeriodStatus: null },
+    obligationSnapshot: payload.upcoming?.obligationSnapshot ?? null,
   } satisfies BuildingMonthFinancialFacts;
   const facts = {
     data: {

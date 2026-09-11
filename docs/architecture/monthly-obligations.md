@@ -7,6 +7,11 @@ Date: August 7, 2026
 This document is the canonical architecture reference for Monthly Obligations.
 It consolidates the frozen decisions that define the month-centric financial workspace for TB810.
 
+The snapshot foundation and snapshot-aware bounded read are implemented. The
+automatic month-turn coordinator, delayed snapshot coordinator, Carlos approval,
+invoice generation, compressed dispatch bundles, and dispatch remain deferred
+implementation work.
+
 ## 1. Purpose
 
 Monthly Obligations is the financial heart of TB810.
@@ -122,6 +127,12 @@ Month close is the expected automatic snapshot boundary for a complete and
 valid happy-path package. The date alone does not freeze an incomplete package;
 an incomplete package remains live and Not Ready without a snapshot until its
 final blocker resolves.
+
+The dashboard may show the next obligation package as a live preview while the
+current immutable package awaits approval. Carlos's approval is the event that
+transfers financial focus: before approval, Giuliana's financial utility stays
+on the current package; after approval, it advances to the next live package.
+The calendar alone must not advance that focus.
 
 ## 5. Component Contract
 
@@ -274,6 +285,12 @@ specified below. Carlos remains the financial authority for approval; the
 system must present the frozen package without silently recalculating it from
 mutable source facts.
 
+Persisted lifecycle state must also be projected coherently with the business
+date. A future snapshot may exist because a development business date was
+advanced and later rewound, but it must not be presented as post-boundary
+lifecycle state before the obligation month begins. This is a presentation
+rule only and does not alter the persisted Billing Period or snapshot.
+
 Month-close source-fact collection, such as late-entered water or gas inputs that feed the next obligation month, is a preparation boundary only.
 It does not itself mean the obligation has been approved, finalized, or dispatched.
 
@@ -363,6 +380,10 @@ She handles the later operational dispatch workflow once the approved artifacts 
 This document does not define the final invoice-generation, PDF-bundle, dispatch-tracking, or Collections implementation.
 Those downstream details remain intentionally open until their dedicated workflows are designed.
 
+Carlos's first implementation slice is review and approval of an existing
+immutable snapshot. Approval is an authority action over that package, not a
+recalculation or a new snapshot operation.
+
 ## 14. Workspace Responsibilities
 
 Monthly Obligations allows Carlos to:
@@ -428,6 +449,8 @@ This document does not:
 - Before finalization, live/progressive obligations may be presented as a preview.
 - After finalization, the package is Awaiting Carlos Approval.
 - Carlos approves the existing immutable snapshot without recalculating it.
+- A future snapshot is not presentation-visible before its obligation month begins.
+- Carlos approval advances Giuliana's primary financial focus to the next live obligation preview.
 - Carlos approval manifests invoices and creates compressed dispatch bundles available to Giuliana.
 - After approval and artifact manifestation, the package is Ready for Dispatch.
 - An incomplete package at month turn is not snapshotted and remains live until its final blocker resolves.
