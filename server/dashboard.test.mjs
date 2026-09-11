@@ -580,6 +580,7 @@ test("P2 future snapshots remain live preview before the obligation month starts
     },
   }));
 
+  assert.equal(projection.financialFocus, "upcoming");
   assert.equal(projection.obligations.readiness, "ready_for_carlos");
 });
 
@@ -606,8 +607,76 @@ test("P3 an equivalent generic month boundary exposes the snapshot on month one"
     },
   }));
 
+  assert.equal(before.financialFocus, "upcoming");
+  assert.equal(onBoundary.financialFocus, "current");
   assert.equal(before.obligations.readiness, "ready_for_carlos");
   assert.equal(onBoundary.obligations.readiness, "awaiting_approval");
+});
+
+test("Sep 1 unresolved current obligations keep the current package in focus", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-01",
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    current: {
+      ...base,
+      obligations: {
+        ...base.obligations,
+        obligationMonth: "2026-09",
+        components: {
+          ...base.obligations.components,
+          common_water: { state: "blocked", amount: null, reason: "Sedapal water bill has not been entered yet." },
+        },
+      },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+  }));
+
+  assert.equal(projection.financialFocus, "current");
+  assert.equal(projection.obligations.readiness, "not_ready");
+  assert.equal(projection.water.state, "waiting");
+  assert.deepEqual(projection.attentions.map((attention) => attention.happened), [
+    "Sedapal bill is missing for August.",
+  ]);
+});
+
+test("Sep 8 ready-for-review keeps current financials and neutral source work", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-08",
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-09", total: "123.45" },
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "ready_for_review" },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+  }));
+
+  assert.equal(projection.financialFocus, "current");
+  assert.equal(projection.obligations.readiness, "awaiting_approval");
+  assert.equal(projection.water.state, "waiting");
+  assert.equal(projection.gas.state, "waiting");
+  assert.deepEqual(projection.attentions, []);
+});
+
+test("Sep 8 approved current obligations advance financial focus to upcoming", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-08",
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-09", total: "123.45" },
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "approved" },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+  }));
+
+  assert.equal(projection.financialFocus, "upcoming");
 });
 
 test("K dashboard facts read uses exactly one bounded month read", async () => {

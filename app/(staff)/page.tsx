@@ -64,6 +64,25 @@ function progressPercent(complete: number, expected: number) {
   return Math.min(Math.max((complete / expected) * 100, 0), 100);
 }
 
+function MeterProgress({ complete, expected, label }: { complete: number; expected: number; label: string }) {
+  const percent = progressPercent(complete, expected);
+  const circumference = 2 * Math.PI * 50;
+
+  return (
+    <div className="relative h-32 w-32" role="progressbar" aria-label={`${label} completeness`} aria-valuemin={0} aria-valuemax={expected} aria-valuenow={complete}>
+      <svg className="h-full w-full" viewBox="0 0 120 120" aria-hidden="true">
+        <circle cx="60" cy="60" r="50" fill="none" stroke="#e4e4e7" strokeWidth="10" />
+        <circle cx="60" cy="60" r="50" fill="none" stroke="#09090b" strokeDasharray={circumference} strokeDashoffset={circumference - (circumference * percent) / 100} strokeLinecap="round" strokeWidth="10" transform="rotate(-90 60 60)" />
+        <circle cx="60" cy="10" r="4" fill="#a1a1aa" />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-950">
+        <span className="text-base font-semibold">{complete} of {expected}</span>
+        <span className="text-sm text-zinc-600">{percent}%</span>
+      </div>
+    </div>
+  );
+}
+
 function uploadHrefForAttention(source: string, happened: string) {
   if (source === "gas") return "/gas/readings/new";
   if (source === "water" && happened.startsWith("Sedapal")) return "/water/sedapal/new";
@@ -94,7 +113,7 @@ export default async function DashboardPage() {
   const attentionCount = projection.attentions.length;
   const worthNoting = projection.worthNoting;
   const operatingMonthLabel = formatMonthLabel(result.data.operatingMonth);
-  const financialFacts = isOpen ? result.data.current : result.data.upcoming;
+  const financialFacts = result.data[projection.financialFocus];
   const financialMonthLabel = formatMonthLabel(financialFacts.obligations.obligationMonth);
   const nextCycleMonthLabel = formatMonthLabel(result.data.upcomingObligationMonth);
   const sourceMonthLabel = formatMonthLabel(result.data.operatingMonth);
@@ -170,11 +189,11 @@ export default async function DashboardPage() {
       ) : null}
 
       <div className="mt-6 space-y-1">
-        <p className="text-lg font-medium text-zinc-950">Preparing {nextCycleMonthLabel} obligations</p>
+        <p className="text-lg font-medium text-zinc-950">Source input for <span className="font-semibold">{nextCycleMonthLabel} obligations</span></p>
         <p className="text-md text-zinc-600">{sourceMonthLabel} source inputs</p>
       </div>
 
-      <div className={` grid  mt-6 gap-4 lg:grid-cols-2 ${isOpen ? "order-3" : "order-2"}`}>
+      <div className={` grid   gap-6 lg:grid-cols-2 ${isOpen ? "order-3" : "order-2"}`}>
 
 {/*   Water insights */}
         <Link href="/water" className="group rounded-3xl border  border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
@@ -187,12 +206,16 @@ export default async function DashboardPage() {
             </div>
             <div>{projection.water.state === "complete" || projection.water.state === "blocked" || !isOpen ? <h2 className="mt-1 text-md font-semibold tracking-tight text-zinc-950">{projection.water.state === "complete" ? "Complete" : projection.water.state === "blocked" ? "Blocked" : "Incomplete"}</h2> : null}</div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 ">
-            <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Sedapal bill</p><p className="mt-2 text-lg font-semibold text-zinc-950">{waterBill ? "Present" : isOpen ? "Not received yet" : "Missing"}</p>{waterBill ? <p className="mt-1 text-sm text-zinc-600">{formatMoney(waterBill.amount)}</p> : null}</div>
+          <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div className="flex flex-col items-center gap-3 sm:items-start">
+              <p className="text-lg font-medium text-zinc-950">Meter Readings</p>
+              <MeterProgress complete={waterComplete} expected={waterExpected} label="Water meter readings" />
+            </div>
+            <div className="hidden h-36 w-px bg-zinc-200 sm:block" />
             <div>
-              <div className="flex items-baseline justify-between gap-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Meter readings</p><p className="text-sm font-medium text-zinc-950">{waterComplete} of {waterExpected}</p></div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar" aria-label="Water meter reading completeness" aria-valuemin={0} aria-valuemax={waterExpected} aria-valuenow={waterComplete}><div className="h-full rounded-full bg-zinc-950" style={{ width: `${progressPercent(waterComplete, waterExpected)}%` }} /></div>
-              <p className="mt-2 text-sm text-zinc-600">{waterComplete} of {waterExpected} complete</p>
+              <p className="text-lg font-medium text-zinc-950">Sedapal Bill</p>
+              <p className="mt-2 text-lg font-semibold text-zinc-950">{waterBill ? "Present" : isOpen ? "Not received yet" : "Missing"}</p>
+              {waterBill ? <p className="mt-1 text-sm text-zinc-600">{formatMoney(waterBill.amount)}</p> : null}
             </div>
           </div>
         </Link>
@@ -219,13 +242,17 @@ export default async function DashboardPage() {
 
 
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <div className="flex items-baseline justify-between gap-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Meter readings</p><p className="text-sm font-medium text-zinc-950">{gasComplete} of {gasExpected}</p></div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar" aria-label="Gas meter reading completeness" aria-valuemin={0} aria-valuemax={gasExpected} aria-valuenow={gasComplete}><div className="h-full rounded-full bg-zinc-950" style={{ width: `${progressPercent(gasComplete, gasExpected)}%` }} /></div>
-              <p className="mt-2 text-sm text-zinc-600">{gasComplete} of {gasExpected} complete</p>
+          <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div className="flex flex-col items-center gap-3 sm:items-start">
+              <p className="text-lg font-medium text-zinc-950">Meter Readings</p>
+              <MeterProgress complete={gasComplete} expected={gasExpected} label="Gas meter readings" />
             </div>
-            <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Supplier bills</p><p className="mt-2 text-lg font-semibold text-zinc-950">{result.data.upcoming.gas.supplierBillCount} bills</p><p className="mt-1 text-sm text-zinc-600">{formatMoney(result.data.upcoming.gas.supplierBillTotal)}</p></div>
+            <div className="hidden h-36 w-px bg-zinc-200 sm:block" />
+            <div>
+              <p className="text-lg font-medium text-zinc-950">Supplier Bills</p>
+              <p className="mt-2 text-lg font-semibold text-zinc-950">{result.data.upcoming.gas.supplierBillCount} bills</p>
+              <p className="mt-1 text-sm text-zinc-600">{formatMoney(result.data.upcoming.gas.supplierBillTotal)}</p>
+            </div>
           </div>
         </Link>
       </div>
@@ -235,7 +262,7 @@ export default async function DashboardPage() {
           <span className="text-sm font-semibold text-zinc-950">Obligations</span>
           <span className="text-sm text-zinc-600">{shortMonthLabel(financialFacts.obligations.obligationMonth)}</span>
           <span className="text-xs font-semibold tracking-[0.12em] text-zinc-500">
-            {isOpen ? projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready" : "Live preview"}
+            {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready"}
           </span>
           <CaretDown size={16} aria-hidden="true" />
         </summary>
@@ -244,7 +271,7 @@ export default async function DashboardPage() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{financialMonthLabel} obligations</p>
               <p className="mt-1 text-lg font-semibold text-zinc-950">
-                {isOpen ? projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready" : "Live preview"}
+                {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready"}
               </p>
             </div>
             <Link href="/obligations" className="text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">Open obligations →</Link>

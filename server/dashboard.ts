@@ -49,6 +49,7 @@ type UpcomingFacts = {
 };
 
 export type DashboardContext = "close" | "open";
+export type DashboardFinancialFocus = "current" | "upcoming";
 
 export type GulianaDashboardFacts = {
   businessDate: string;
@@ -86,6 +87,7 @@ export type GulianaDashboardProjection = {
   businessDate: string;
   operatingMonth: string;
   context: DashboardContext;
+  financialFocus: DashboardFinancialFocus;
   water: {
     state: DashboardSectionState;
     completion: "incomplete" | "complete";
@@ -208,10 +210,35 @@ function monthLabelFromMonthKey(monthKey: string) {
   }).format(parsed);
 }
 
+function isApprovedLifecycleStatus(status: string | null) {
+  return status === "approved" || status === "invoices_generated" || status === "closed";
+}
+
+function hasBlockedObligationComponent(obligations: UpcomingFacts["obligations"]) {
+  return obligations.components.fixed_assessment.state === "blocked"
+    || obligations.components.metered_water.state === "blocked"
+    || obligations.components.common_water.state === "blocked"
+    || obligations.components.gas.state === "blocked";
+}
+
+function deriveFinancialFocus(monthFacts: GulianaDashboardFacts): DashboardFinancialFocus {
+  const businessMonth = monthFacts.businessDate.slice(0, 7);
+  const current = monthFacts.current;
+
+  if (businessMonth < current.obligations.obligationMonth) return "upcoming";
+
+  if (current.obligationLifecycle.mode === "snapshotted") {
+    return isApprovedLifecycleStatus(current.obligationLifecycle.billingPeriodStatus) ? "upcoming" : "current";
+  }
+
+  if (current.obligations.total === null || hasBlockedObligationComponent(current.obligations)) return "current";
+  return businessMonth < monthFacts.upcoming.obligations.obligationMonth ? "upcoming" : "current";
+}
+
 function deriveAttentions(
   sourceWork: SourceWorkFacts,
   facts: UpcomingFacts,
-  context: DashboardContext,
+  sourceWorkActionable: boolean,
 ): DashboardAttention[] {
   const attentions: DashboardAttention[] = [];
   const sourceMonthLabel = monthLabelFromMonthKey(facts.sourceReadingMonth);
@@ -224,7 +251,7 @@ function deriveAttentions(
     && facts.obligations.components.metered_water.reason === "Common Water pool would be negative."
     && facts.obligations.components.common_water.reason === facts.obligations.components.metered_water.reason;
 
-  if ((context === "close" && !sourceWork.water.commonWaterBillPresent && (sourceWork.water.meterReadingExpectedCount > 0 || sourceWork.water.meterReadingCount > 0)) || (context === "open" && currentSedapalMissing)) {
+  if ((sourceWorkActionable && !sourceWork.water.commonWaterBillPresent && (sourceWork.water.meterReadingExpectedCount > 0 || sourceWork.water.meterReadingCount > 0)) || (!sourceWorkActionable && currentSedapalMissing)) {
     attentions.push({
       source: "water",
       happened: `Sedapal bill is missing for ${sourceMonthLabel}.`,
@@ -232,7 +259,7 @@ function deriveAttentions(
     });
   }
 
-  if (context === "close" && waterMissingCount > 0) {
+  if (sourceWorkActionable && waterMissingCount > 0) {
     attentions.push({
       source: "water",
       happened: `${waterMissingCount} of ${sourceWork.water.meterReadingExpectedCount} water readings are missing.`,
@@ -240,7 +267,7 @@ function deriveAttentions(
     });
   }
 
-  if (context === "close" && gasMissingCount > 0) {
+  if (sourceWorkActionable && gasMissingCount > 0) {
     attentions.push({
       source: "gas",
       happened: `${gasMissingCount} of ${sourceWork.gas.gasUnitCount} gas readings are missing.`,
@@ -248,10 +275,10 @@ function deriveAttentions(
     });
   }
 
-  const suppressWaterDownstream = context === "close"
+  const suppressWaterDownstream = sourceWorkActionable
     ? !sourceWork.water.commonWaterBillPresent || waterMissingCount > 0
     : currentSedapalMissing;
-  const suppressGasDownstream = context === "close" && gasMissingCount > 0;
+  const suppressGasDownstream = sourceWorkActionable && gasMissingCount > 0;
   for (const message of [
     facts.obligations.components.fixed_assessment.reason,
     suppressWaterDownstream ? null : facts.obligations.components.metered_water.reason,
@@ -271,11 +298,11 @@ function deriveAttentions(
 function deriveWaterState(
   sourceWork: SourceWorkFacts,
   obligations: UpcomingFacts["obligations"],
-  context: DashboardContext,
+  sourceWorkActionable: boolean,
 ): GulianaDashboardProjection["water"] {
   const complete = sourceWork.water.commonWaterBillPresent && sourceWork.water.meterReadingCompleteCount >= sourceWork.water.meterReadingExpectedCount;
   const active = sourceWork.water.commonWaterBillPresent || sourceWork.water.meterReadingCount > 0;
-  const blocked = context === "close" && (obligations.components.common_water.state === "blocked" || obligations.components.metered_water.state === "blocked");
+  const blocked = sourceWorkActionable && (obligations.components.common_water.state === "blocked" || obligations.components.metered_water.state === "blocked");
 
   return {
     state: blocked ? "blocked" : complete ? "complete" : active ? "active" : "waiting",
@@ -289,11 +316,11 @@ function deriveWaterState(
 function deriveGasState(
   sourceWork: SourceWorkFacts,
   obligations: UpcomingFacts["obligations"],
-  context: DashboardContext,
+  sourceWorkActionable: boolean,
 ): GulianaDashboardProjection["gas"] {
   const complete = sourceWork.gas.supplierBillCount > 0 && sourceWork.gas.gasReadingCount >= sourceWork.gas.gasUnitCount;
   const active = sourceWork.gas.supplierBillCount > 0 || sourceWork.gas.gasReadingCount > 0;
-  const blocked = context === "close" && obligations.components.gas.state === "blocked";
+  const blocked = sourceWorkActionable && obligations.components.gas.state === "blocked";
 
   return {
     state: blocked ? "blocked" : complete ? "complete" : active ? "active" : "waiting",
@@ -344,19 +371,22 @@ function deriveCompleted(
 
 export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): GulianaDashboardProjection {
   const sourceWork = monthFacts.sourceWork;
-  const financialFacts = monthFacts.context === "open" ? monthFacts.current : monthFacts.upcoming;
+  const financialFocus = deriveFinancialFocus(monthFacts);
+  const financialFacts = monthFacts[financialFocus];
+  const sourceWorkActionable = financialFocus === "upcoming" && monthFacts.current.obligationLifecycle.mode !== "snapshotted";
   const obligations = deriveObligationState(financialFacts.obligations, financialFacts.obligationLifecycle, monthFacts.businessDate);
-  const water = deriveWaterState(sourceWork, financialFacts.obligations, monthFacts.context);
-  const gas = deriveGasState(sourceWork, financialFacts.obligations, monthFacts.context);
+  const water = deriveWaterState(sourceWork, financialFacts.obligations, sourceWorkActionable);
+  const gas = deriveGasState(sourceWork, financialFacts.obligations, sourceWorkActionable);
 
   return {
     businessDate: monthFacts.businessDate,
     operatingMonth: monthFacts.operatingMonth,
     context: monthFacts.context,
+    financialFocus,
     water,
     gas,
     obligations,
-    attentions: deriveAttentions(sourceWork, financialFacts, monthFacts.context),
+    attentions: deriveAttentions(sourceWork, financialFacts, sourceWorkActionable),
     worthNoting: financialFacts.worthNoting,
     completed: deriveCompleted(sourceWork, financialFacts.obligations),
     quickActions: [
