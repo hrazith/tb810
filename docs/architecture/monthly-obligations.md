@@ -7,10 +7,10 @@ Date: August 7, 2026
 This document is the canonical architecture reference for Monthly Obligations.
 It consolidates the frozen decisions that define the month-centric financial workspace for TB810.
 
-The snapshot foundation and snapshot-aware bounded read are implemented. The
-automatic month-turn coordinator, delayed snapshot coordinator, Carlos approval,
-invoice generation, compressed dispatch bundles, and dispatch remain deferred
-implementation work.
+The snapshot foundation, snapshot-aware bounded read, and the first Carlos
+review/approval slice are implemented. The automatic month-turn coordinator,
+delayed snapshot coordinator, invoice generation, compressed dispatch bundles,
+and dispatch remain deferred implementation work.
 
 ## 1. Purpose
 
@@ -118,6 +118,12 @@ happy-path package.
 Carlos's approval is the financial authority boundary. He approves the
 existing immutable snapshot; he does not create it, recalculate it, or redefine
 its amounts.
+
+The provisional approval target is the fifth calendar day of the obligation
+month. A `ready_for_review` snapshot is Ready for Carlos approval through day 5;
+from day 6 onward, while still awaiting approval, it is Approval overdue and
+dispatch is blocked. This operating policy is provisional pending Carlos's
+confirmation and is not specific to September.
 
 This approved snapshot must preserve the financial facts Carlos reviewed so later source-data changes do not silently change what was approved.
 

@@ -50,6 +50,9 @@ type UpcomingFacts = {
 
 export type DashboardContext = "close" | "open";
 export type DashboardFinancialFocus = "current" | "upcoming";
+export type CarlosApprovalState = "ready" | "overdue" | "approved" | "not_ready";
+
+export const MONTHLY_OBLIGATION_APPROVAL_CUTOFF_DAY = 5;
 
 export type GulianaDashboardFacts = {
   businessDate: string;
@@ -109,6 +112,10 @@ export type GulianaDashboardProjection = {
     blocked: boolean;
     readiness: "ready_for_carlos" | "awaiting_approval" | "not_ready";
   };
+  handoff: {
+    obligationMonth: string;
+    status: "approved_ready_for_dispatch";
+  } | null;
   attentions: DashboardAttention[];
   worthNoting: DashboardWorthNoting[];
   completed: Array<{
@@ -116,6 +123,17 @@ export type GulianaDashboardProjection = {
     state: "complete" | "compressed";
   }>;
   quickActions: DashboardQuickActionKey[];
+};
+
+export type CarlosDashboardProjection = {
+  businessDate: string;
+  financialFocus: DashboardFinancialFocus;
+  obligationMonth: string;
+  total: string | null;
+  components: UpcomingFacts["obligations"]["components"];
+  billingPeriodId: string | null;
+  billingPeriodStatus: string | null;
+  approvalState: CarlosApprovalState;
 };
 
 function countCompletedWaterReadings(financialFacts: BuildingMonthFinancialFacts) {
@@ -235,43 +253,82 @@ function deriveFinancialFocus(monthFacts: GulianaDashboardFacts): DashboardFinan
   return businessMonth < monthFacts.upcoming.obligations.obligationMonth ? "upcoming" : "current";
 }
 
+function isReadyToApprove(facts: UpcomingFacts) {
+  return facts.obligations.total !== null && !hasBlockedObligationComponent(facts.obligations);
+}
+
+export function projectCarlosDashboard(monthFacts: GulianaDashboardFacts): CarlosDashboardProjection {
+  const financialFocus = deriveFinancialFocus(monthFacts);
+  const currentLifecycle = monthFacts.current.obligationLifecycle;
+  const hasCurrentApprovalLifecycle = currentLifecycle.mode === "snapshotted"
+    && (currentLifecycle.billingPeriodStatus === "ready_for_review" || isApprovedLifecycleStatus(currentLifecycle.billingPeriodStatus));
+  const financialFacts = hasCurrentApprovalLifecycle ? monthFacts.current : monthFacts[financialFocus];
+  const lifecycle = financialFacts.obligationLifecycle;
+  const currentMonth = monthFacts.businessDate.slice(0, 7) === financialFacts.obligations.obligationMonth;
+  const readyForApproval = currentMonth && lifecycle.mode === "snapshotted"
+    && lifecycle.billingPeriodStatus === "ready_for_review"
+    && isReadyToApprove(financialFacts);
+  const approvalState = readyForApproval
+    ? currentMonth && Number(monthFacts.businessDate.slice(8, 10)) > MONTHLY_OBLIGATION_APPROVAL_CUTOFF_DAY ? "overdue" : "ready"
+    : currentMonth && lifecycle.mode === "snapshotted" && isApprovedLifecycleStatus(lifecycle.billingPeriodStatus) ? "approved" : "not_ready";
+
+  return {
+    businessDate: monthFacts.businessDate,
+    financialFocus,
+    obligationMonth: financialFacts.obligations.obligationMonth,
+    total: financialFacts.obligations.total,
+    components: financialFacts.obligations.components,
+    billingPeriodId: lifecycle.billingPeriodId,
+    billingPeriodStatus: lifecycle.billingPeriodStatus,
+    approvalState,
+  };
+}
+
 function deriveAttentions(
   sourceWork: SourceWorkFacts,
   facts: UpcomingFacts,
+  upcomingFacts: UpcomingFacts,
+  financialFocus: DashboardFinancialFocus,
   sourceWorkActionable: boolean,
+  businessDate: string,
 ): DashboardAttention[] {
   const attentions: DashboardAttention[] = [];
   const sourceMonthLabel = monthLabelFromMonthKey(facts.sourceReadingMonth);
   const upcomingMonthLabel = monthLabelFromMonthKey(facts.obligations.obligationMonth);
+  const sourceWorkMonthLabel = monthLabelFromMonthKey(upcomingFacts.sourceReadingMonth);
+  const sourceWorkObligationMonthLabel = monthLabelFromMonthKey(upcomingFacts.obligations.obligationMonth);
   const waterMissingCount = Math.max(sourceWork.water.meterReadingExpectedCount - sourceWork.water.meterReadingCompleteCount, 0);
   const gasMissingCount = Math.max(sourceWork.gas.gasUnitCount - sourceWork.gas.gasReadingCount, 0);
   const currentSedapalMissing = !facts.commonWaterBill && facts.obligations.components.common_water.state === "blocked";
+  const sourceWorkLate = Number(businessDate.slice(8, 10)) >= 7;
+  const sourceSedapalLate = sourceWorkLate
+    && !sourceWork.water.commonWaterBillPresent
+    && (sourceWork.water.meterReadingExpectedCount > 0 || sourceWork.water.meterReadingCount > 0);
+  const currentSedapalBlocker = !sourceWorkActionable
+    && facts.obligations.obligationMonth === businessDate.slice(0, 7)
+    && currentSedapalMissing;
   const sharedWaterReconciliationFailure = facts.obligations.components.metered_water.state === "blocked"
     && facts.obligations.components.common_water.state === "blocked"
     && facts.obligations.components.metered_water.reason === "Common Water pool would be negative."
     && facts.obligations.components.common_water.reason === facts.obligations.components.metered_water.reason;
 
-  if ((sourceWorkActionable && !sourceWork.water.commonWaterBillPresent && (sourceWork.water.meterReadingExpectedCount > 0 || sourceWork.water.meterReadingCount > 0)) || (!sourceWorkActionable && currentSedapalMissing)) {
+  if (sourceSedapalLate || currentSedapalBlocker) {
     attentions.push({
       source: "water",
-      happened: `Sedapal bill is missing for ${sourceMonthLabel}.`,
-      impact: `${upcomingMonthLabel} water obligations cannot be completed.`,
+      happened: sourceSedapalLate
+        ? `Sedapal bill for ${sourceWorkMonthLabel} is late.`
+        : `Sedapal bill is missing for ${sourceMonthLabel}.`,
+      impact: sourceSedapalLate
+        ? `${sourceWorkObligationMonthLabel} water obligations cannot be completed.`
+        : `${upcomingMonthLabel} water obligations cannot be completed.`,
     });
   }
 
-  if (sourceWorkActionable && waterMissingCount > 0) {
+  if (sourceWorkLate && waterMissingCount > 0) {
     attentions.push({
       source: "water",
-      happened: `${waterMissingCount} of ${sourceWork.water.meterReadingExpectedCount} water readings are missing.`,
-      impact: `${upcomingMonthLabel} water obligations cannot be completed.`,
-    });
-  }
-
-  if (sourceWorkActionable && gasMissingCount > 0) {
-    attentions.push({
-      source: "gas",
-      happened: `${gasMissingCount} of ${sourceWork.gas.gasUnitCount} gas readings are missing.`,
-      impact: `${upcomingMonthLabel} gas obligations cannot be completed.`,
+      happened: `Water meter readings for ${sourceWorkMonthLabel} are late. ${waterMissingCount} readings are still missing.`,
+      impact: `${sourceWorkObligationMonthLabel} water obligations cannot be completed.`,
     });
   }
 
@@ -279,12 +336,13 @@ function deriveAttentions(
     ? !sourceWork.water.commonWaterBillPresent || waterMissingCount > 0
     : currentSedapalMissing;
   const suppressGasDownstream = sourceWorkActionable && gasMissingCount > 0;
-  for (const message of [
+  const financialBlockers = financialFocus === "current" ? [
     facts.obligations.components.fixed_assessment.reason,
     suppressWaterDownstream ? null : facts.obligations.components.metered_water.reason,
     suppressWaterDownstream || sharedWaterReconciliationFailure ? null : facts.obligations.components.common_water.reason,
     suppressGasDownstream ? null : facts.obligations.components.gas.reason,
-  ]) {
+  ] : [];
+  for (const message of financialBlockers) {
     if (!message) continue;
     attentions.push({
       source: "obligations",
@@ -377,6 +435,13 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
   const obligations = deriveObligationState(financialFacts.obligations, financialFacts.obligationLifecycle, monthFacts.businessDate);
   const water = deriveWaterState(sourceWork, financialFacts.obligations, sourceWorkActionable);
   const gas = deriveGasState(sourceWork, financialFacts.obligations, sourceWorkActionable);
+  const currentLifecycle = monthFacts.current.obligationLifecycle;
+  const currentObligationMonth = monthFacts.current.obligations.obligationMonth;
+  const handoff = monthFacts.businessDate.slice(0, 7) >= currentObligationMonth
+    && currentLifecycle.mode === "snapshotted"
+    && isApprovedLifecycleStatus(currentLifecycle.billingPeriodStatus)
+    ? { obligationMonth: currentObligationMonth, status: "approved_ready_for_dispatch" as const }
+    : null;
 
   return {
     businessDate: monthFacts.businessDate,
@@ -386,7 +451,8 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
     water,
     gas,
     obligations,
-    attentions: deriveAttentions(sourceWork, financialFacts, sourceWorkActionable),
+    handoff,
+    attentions: deriveAttentions(sourceWork, financialFacts, monthFacts.upcoming, financialFocus, sourceWorkActionable, monthFacts.businessDate),
     worthNoting: financialFacts.worthNoting,
     completed: deriveCompleted(sourceWork, financialFacts.obligations),
     quickActions: [

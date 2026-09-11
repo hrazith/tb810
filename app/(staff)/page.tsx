@@ -2,7 +2,8 @@ import Link from "next/link";
 import { CaretDown, Warning, Drop, Flame } from "@phosphor-icons/react/dist/ssr";
 
 import { DashboardGreeting } from "@/components/dashboard-greeting";
-import { getGulianaDashboardFacts, projectGulianaDashboard } from "@/server/dashboard";
+import { getGulianaDashboardFacts, projectCarlosDashboard, projectGulianaDashboard } from "@/server/dashboard";
+import { approveMonthlyObligationAction } from "@/app/(staff)/obligations/actions";
 import { getStaffContext } from "@/server/staff-context";
 
 function formatDateLabel(value: string) {
@@ -90,6 +91,81 @@ function uploadHrefForAttention(source: string, happened: string) {
   return "/obligations";
 }
 
+function componentLabel(key: string) {
+  if (key === "fixed_assessment") return "Fixed assessments";
+  if (key === "metered_water") return "Metered water";
+  if (key === "common_water") return "Common water";
+  if (key === "gas") return "Gas";
+  return "Other charges";
+}
+
+const reviewComponentKeys = ["fixed_assessment", "metered_water", "common_water", "gas", "other_charge"] as const;
+
+async function CarlosDashboardPage({ firstName }: { firstName: string }) {
+  const result = await getGulianaDashboardFacts();
+  if (result.error) throw new Error(result.error);
+  if (!result.data) throw new Error("Dashboard facts unavailable.");
+
+  const projection = projectCarlosDashboard(result.data);
+  const hasApprovalItem = projection.approvalState === "ready" || projection.approvalState === "overdue";
+  const statusLabel = projection.approvalState === "overdue" ? "Approval overdue" : "Ready for your approval";
+
+  return (
+    <section className="mx-auto flex w-full max-w-6xl flex-col space-y-6 px-6 py-6 sm:py-8">
+      <div className="mt-12 space-y-4">
+        <p className="text-md text-zinc-800">{formatDateLabel(result.data.businessDate)}</p>
+        <DashboardGreeting firstName={firstName} />
+      </div>
+
+      {hasApprovalItem ? (
+        <div className="mt-8 space-y-6 border-t border-zinc-200 pt-8">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Needs your attention</p>
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="space-y-3">
+              <p className="text-2xl font-semibold tracking-tight text-zinc-950">{formatMonthLabel(projection.obligationMonth)} obligations</p>
+              <p className="text-xl font-semibold text-zinc-950">{statusLabel}</p>
+              <p className="max-w-2xl text-lg text-zinc-600">Invoices and owner statements have not been dispatched because your approval is still required.</p>
+            </div>
+            <p className="text-2xl font-semibold tracking-tight text-zinc-950">{amountText(projection.total)}</p>
+          </div>
+
+          <details className="max-w-3xl border-t border-zinc-200 pt-5 ">
+            <summary className="cursor-pointer list-none text-lg font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950 [&::-webkit-details-marker]:hidden">Review and approve →</summary>
+            <div className="mt-6 space-y-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Ready for approval</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950">{formatMonthLabel(projection.obligationMonth)} obligations</h2>
+              </div>
+              <div className="flex items-center justify-between gap-6 border-y border-zinc-200 py-4">
+                <span className="font-medium text-zinc-600">Total</span>
+                <span className="text-xl font-semibold text-zinc-950">{amountText(projection.total)}</span>
+              </div>
+              <div className="space-y-3 text-sm">
+                {reviewComponentKeys.map((key) => (
+                  <div key={key} className="flex items-center justify-between gap-6">
+                    <span className="text-zinc-600">{componentLabel(key)}</span>
+                    <span className="font-medium text-zinc-950">{componentText(projection.components[key])}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-zinc-600">All required source inputs complete.</p>
+              <form action={approveMonthlyObligationAction}>
+                <input type="hidden" name="billingPeriodId" value={projection.billingPeriodId ?? ""} />
+                <button type="submit" className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-zinc-950 bg-zinc-950 px-6 py-3 text-base font-medium text-white transition hover:bg-zinc-800">Approve {formatMonthLabel(projection.obligationMonth)} obligations</button>
+              </form>
+            </div>
+          </details>
+        </div>
+      ) : (
+        <div className="mt-8 border-t border-zinc-200 pt-8">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Needs your attention</p>
+          <p className="mt-3 text-xl font-semibold text-zinc-950">No monthly obligations require approval.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default async function DashboardPage() {
   const staffContext = await getStaffContext();
   if (!staffContext) {
@@ -100,6 +176,9 @@ export default async function DashboardPage() {
     throw new Error("Staff display name unavailable.");
   }
   const firstName = displayName.split(/\s+/)[0];
+  if (staffContext.primaryRoleKey === "super_admin") {
+    return <CarlosDashboardPage firstName={firstName} />;
+  }
   const result = await getGulianaDashboardFacts();
   if (result.error) {
     throw new Error(result.error);
@@ -112,17 +191,18 @@ export default async function DashboardPage() {
   const isOpen = projection.context === "open";
   const attentionCount = projection.attentions.length;
   const worthNoting = projection.worthNoting;
-  const operatingMonthLabel = formatMonthLabel(result.data.operatingMonth);
   const financialFacts = result.data[projection.financialFocus];
   const financialMonthLabel = formatMonthLabel(financialFacts.obligations.obligationMonth);
   const nextCycleMonthLabel = formatMonthLabel(result.data.upcomingObligationMonth);
-  const sourceMonthLabel = formatMonthLabel(result.data.operatingMonth);
   const waterBill = result.data.upcoming.commonWaterBill;
   const waterComplete = result.data.sourceWork.water.meterReadingCompleteCount;
   const waterExpected = result.data.sourceWork.water.meterReadingExpectedCount;
   const gasComplete = result.data.sourceWork.gas.gasReadingCount;
   const gasExpected = result.data.sourceWork.gas.gasUnitCount;
   const components = financialFacts.obligations.components;
+  const hasSourceLatenessAttention = projection.attentions.some((attention) => attention.source !== "obligations" && attention.happened.includes(" late."));
+  const sourceWorkMonthLabel = formatMonthLabel(result.data.upcoming.sourceReadingMonth);
+  const sourceWorkObligationMonthLabel = formatMonthLabel(result.data.upcoming.obligations.obligationMonth);
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col space-y-6 px-6 py-6 sm:py-8">
@@ -145,21 +225,21 @@ export default async function DashboardPage() {
       </div>
 
 {/*   Attention and Worth Noting */}
-      {attentionCount > 0 || worthNoting.length > 0 || projection.obligations.readiness === "awaiting_approval" ? (
+      {attentionCount > 0 || worthNoting.length > 0 || projection.obligations.readiness === "awaiting_approval" || projection.handoff ? (
         <div className="space-y-4 mt-6">
           {attentionCount > 0 ? <>
-            <div className="space-y-1  border-b border-zinc-200 py-4 ">
+            <div className="space-y-1  border-b border-zinc-200 py-3 ">
               <div className="flex items-center gap-2  ">
-                <Warning size={20} weight="regular" aria-hidden="true" />
-                <p className="text-lg text-zinc-950 ">These inputs are blocking {financialMonthLabel} obligations.</p>
+                <Warning size={20}  weight="bold" aria-hidden="true" />
+                <p className="text-lg text-zinc-950 font-medium ">{hasSourceLatenessAttention ? `${sourceWorkMonthLabel} source inputs need attention for ${sourceWorkObligationMonthLabel} obligations.` : `These inputs are blocking ${financialMonthLabel} obligations.`}</p>
                 
               </div>
             </div>
-            <div className="grid gap-14 lg:grid-cols-3 ">
+            <div className="grid gap-14 lg:grid-cols-3  ">
               {projection.attentions.map((attention, index) => (
                 <div key={`${attention.source}:${attention.happened}:${index}`} >
                  
-                  <Link href={uploadHrefForAttention(attention.source, attention.happened)} className="mt-2 inline-block text-2xl font-normal leading-tight text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">
+                  <Link href={uploadHrefForAttention(attention.source, attention.happened)} className="mt-2 inline-block text-lg font-normal leading-snug text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">
                     {attention.happened}
                   </Link>
                 </div>
@@ -171,6 +251,13 @@ export default async function DashboardPage() {
               <p className="text-lg font-medium text-zinc-950">{financialMonthLabel} obligations</p>
               <p className="text-lg text-zinc-950">Complete · Awaiting Carlos approval</p>
               <p className="text-md text-zinc-600">All {financialMonthLabel} obligations are complete. Once Carlos approves them, they&apos;ll be ready for dispatch.</p>
+            </div>
+          ) : null}
+          {projection.handoff ? (
+            <div className="space-y-1 border-b border-zinc-200 py-4">
+              <p className="text-lg font-medium text-zinc-950">{formatMonthLabel(projection.handoff.obligationMonth)} obligations</p>
+              <p className="text-lg text-zinc-950">Approved · Ready for dispatch</p>
+              <p className="text-md text-zinc-600">{formatMonthLabel(projection.handoff.obligationMonth)} obligations have been approved. Dispatch preparation is next.</p>
             </div>
           ) : null}
           {worthNoting.length > 0 ? <div className={attentionCount > 0 ? "space-y-3 border-t border-zinc-200 pt-4" : "space-y-3"}>
@@ -189,8 +276,8 @@ export default async function DashboardPage() {
       ) : null}
 
       <div className="mt-6 space-y-1">
-        <p className="text-lg font-medium text-zinc-950">Source input for <span className="font-semibold">{nextCycleMonthLabel} obligations</span></p>
-        <p className="text-md text-zinc-600">{sourceMonthLabel} source inputs</p>
+        <p className="text-lg font-medium text-zinc-950">Source inputs for <span className="font-semibold">{nextCycleMonthLabel} </span> obligations</p>
+
       </div>
 
       <div className={` grid   gap-6 lg:grid-cols-2 ${isOpen ? "order-3" : "order-2"}`}>

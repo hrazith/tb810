@@ -14,7 +14,7 @@ const businessDateModule = jiti("@/server/business-date");
 const buildingModule = jiti("@/server/building");
 const ownerFactsModule = jiti("@/server/obligations/owner-facts");
 
-const { projectGulianaDashboard, deriveUnitChargeWorthNoting, deriveGulianaDashboardMonths, deriveDashboardContext, getGulianaDashboardFacts } = dashboard;
+const { projectCarlosDashboard, projectGulianaDashboard, deriveUnitChargeWorthNoting, deriveGulianaDashboardMonths, deriveDashboardContext, getGulianaDashboardFacts } = dashboard;
 
 function buildProjectionFacts(overrides = {}) {
   const businessDate = overrides.businessDate ?? "2026-08-05";
@@ -96,7 +96,7 @@ test("A month open stays calm and produces no manufactured exceptions", () => {
   assert.deepEqual(projection.attentions, []);
 });
 
-test("B early month with partial water work surfaces only the water-readings attention", () => {
+test("B early month with partial water work stays neutral before the deadline", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
     sourceWork: {
       water: {
@@ -111,17 +111,12 @@ test("B early month with partial water work surfaces only the water-readings att
   assert.equal(projection.water.state, "active");
   assert.equal(projection.water.completion, "incomplete");
   assert.equal(projection.water.emphasis, "normal");
-  assert.deepEqual(projection.attentions, [
-    {
-      source: "water",
-      happened: "2 of 4 water readings are missing.",
-      impact: "September water obligations cannot be completed.",
-    },
-  ]);
+  assert.deepEqual(projection.attentions, []);
 });
 
-test("B2 missing Sedapal plus incomplete water readings surfaces two water attentions", () => {
+test("B2 missing Sedapal plus incomplete water readings are late from day seven", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-08-07",
     sourceWork: {
       water: {
         commonWaterBillPresent: false,
@@ -144,15 +139,28 @@ test("B2 missing Sedapal plus incomplete water readings surfaces two water atten
   assert.deepEqual(projection.attentions, [
     {
       source: "water",
-      happened: "Sedapal bill is missing for August.",
+      happened: "Sedapal bill for August is late.",
       impact: "September water obligations cannot be completed.",
     },
     {
       source: "water",
-      happened: "63 of 64 water readings are missing.",
+      happened: "Water meter readings for August are late. 63 readings are still missing.",
       impact: "September water obligations cannot be completed.",
     },
   ]);
+});
+
+test("Water and Sedapal remain neutral through the sixth day", () => {
+  for (const businessDate of ["2026-08-05", "2026-08-06"]) {
+    const projection = projectGulianaDashboard(buildProjectionFacts({
+      businessDate,
+      sourceWork: {
+        water: { meterReadingExpectedCount: 64 },
+      },
+    }));
+
+    assert.deepEqual(projection.attentions, []);
+  }
 });
 
 test("C complete water work compresses", () => {
@@ -172,9 +180,9 @@ test("C complete water work compresses", () => {
   assert.deepEqual(projection.attentions, []);
 });
 
-test("D late month without Sedapal bill does not become an exception", () => {
+test("D missing Water inputs stay neutral through the sixth day", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
-    businessDate: "2026-08-15",
+    businessDate: "2026-08-06",
   }));
 
   assert.equal(projection.water.state, "waiting");
@@ -194,10 +202,14 @@ test("E late month without gas supplier bill does not become an exception", () =
 
 test("F a real canonical blocker surfaces regardless of date", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
-    businessDate: "2026-08-20",
-    upcoming: {
+    businessDate: "2026-09-01",
+    current: {
+      ...buildProjectionFacts().upcoming,
       obligations: {
+        ...buildProjectionFacts().upcoming.obligations,
+        obligationMonth: "2026-09",
         components: {
+          ...buildProjectionFacts().upcoming.obligations.components,
           fixed_assessment: { state: "blocked", amount: null, reason: "Budget plan has not been entered yet." },
         },
       },
@@ -297,10 +309,15 @@ test("a Unit Charge remains Worth noting beside an independent blocker", () => {
     reason: "Plumbing repair",
   }];
   const projection = projectGulianaDashboard(buildProjectionFacts({
-    upcoming: {
+    businessDate: "2026-09-01",
+    current: {
+      ...buildProjectionFacts().upcoming,
       worthNoting,
       obligations: {
+        ...buildProjectionFacts().upcoming.obligations,
+        obligationMonth: "2026-09",
         components: {
+          ...buildProjectionFacts().upcoming.obligations.components,
           fixed_assessment: { state: "blocked", amount: null, reason: "Budget plan has not been entered yet." },
         },
       },
@@ -311,7 +328,7 @@ test("a Unit Charge remains Worth noting beside an independent blocker", () => {
   assert.equal(projection.attentions.length, 1);
 });
 
-test("H partial gas work stays active and normal", () => {
+test("H partial gas work stays active and normal without date-based attention", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
     businessDate: "2026-08-15",
     sourceWork: {
@@ -326,13 +343,7 @@ test("H partial gas work stays active and normal", () => {
   assert.equal(projection.gas.state, "active");
   assert.equal(projection.gas.emphasis, "normal");
   assert.equal(projection.gas.completion, "incomplete");
-  assert.deepEqual(projection.attentions, [
-    {
-      source: "gas",
-      happened: "2 of 4 gas readings are missing.",
-      impact: "September gas obligations cannot be completed.",
-    },
-  ]);
+  assert.deepEqual(projection.attentions, []);
 });
 
 test("I complete gas work compresses", () => {
@@ -462,6 +473,7 @@ test("O month-open deduplicates the Sedapal root blocker and keeps gas independe
 test("shared negative Common Water reconciliation emits one Water attention", () => {
   const reason = "Common Water pool would be negative.";
   const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-01",
     sourceWork: {
       water: {
         commonWaterBillPresent: true,
@@ -470,9 +482,14 @@ test("shared negative Common Water reconciliation emits one Water attention", ()
         meterReadingCompleteCount: 64,
       },
     },
-    upcoming: {
+    current: {
+      ...buildProjectionFacts().upcoming,
+      commonWaterBill: { id: "bill-1", amount: "100", bill_date: "2026-08-05", status: "entered" },
       obligations: {
+        ...buildProjectionFacts().upcoming.obligations,
+        obligationMonth: "2026-09",
         components: {
+          ...buildProjectionFacts().upcoming.obligations.components,
           metered_water: { state: "blocked", amount: null, reason },
           common_water: { state: "blocked", amount: null, reason },
         },
@@ -491,6 +508,7 @@ test("shared Water reconciliation failure remains independent from Gas", () => {
   const waterReason = "Common Water pool would be negative.";
   const gasReason = "Required gas supplier bills are missing.";
   const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-01",
     sourceWork: {
       water: {
         commonWaterBillPresent: true,
@@ -499,9 +517,14 @@ test("shared Water reconciliation failure remains independent from Gas", () => {
         meterReadingCompleteCount: 64,
       },
     },
-    upcoming: {
+    current: {
+      ...buildProjectionFacts().upcoming,
+      commonWaterBill: { id: "bill-1", amount: "100", bill_date: "2026-08-05", status: "entered" },
       obligations: {
+        ...buildProjectionFacts().upcoming.obligations,
+        obligationMonth: "2026-09",
         components: {
+          ...buildProjectionFacts().upcoming.obligations.components,
           metered_water: { state: "blocked", amount: null, reason: waterReason },
           common_water: { state: "blocked", amount: null, reason: waterReason },
           gas: { state: "blocked", amount: null, reason: gasReason },
@@ -526,6 +549,7 @@ test("shared Water reconciliation failure remains independent from Gas", () => {
 
 test("different Water blockers are not collapsed", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-01",
     sourceWork: {
       water: {
         commonWaterBillPresent: true,
@@ -534,9 +558,14 @@ test("different Water blockers are not collapsed", () => {
         meterReadingCompleteCount: 64,
       },
     },
-    upcoming: {
+    current: {
+      ...buildProjectionFacts().upcoming,
+      commonWaterBill: { id: "bill-1", amount: "100", bill_date: "2026-08-05", status: "entered" },
       obligations: {
+        ...buildProjectionFacts().upcoming.obligations,
+        obligationMonth: "2026-09",
         components: {
+          ...buildProjectionFacts().upcoming.obligations.components,
           metered_water: { state: "blocked", amount: null, reason: "Metered Water is invalid." },
           common_water: { state: "blocked", amount: null, reason: "Common Water is invalid." },
         },
@@ -673,10 +702,144 @@ test("Sep 8 approved current obligations advance financial focus to upcoming", (
       obligations: { ...base.obligations, obligationMonth: "2026-09", total: "123.45" },
       obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "approved" },
     },
+    sourceWork: {
+      water: { meterReadingExpectedCount: 64 },
+      gas: { gasUnitCount: 58 },
+    },
+    upcoming: {
+      ...base,
+      sourceReadingMonth: "2026-09",
+      obligations: {
+        ...base.obligations,
+        obligationMonth: "2026-10",
+        components: {
+          ...base.obligations.components,
+          gas: { state: "blocked", amount: null, reason: "Required gas readings are missing. Total gas consumption is zero." },
+        },
+      },
+    },
+  }));
+
+  assert.equal(projection.financialFocus, "upcoming");
+  assert.deepEqual(projection.handoff, {
+    obligationMonth: "2026-09",
+    status: "approved_ready_for_dispatch",
+  });
+  assert.deepEqual(projection.attentions, [
+    {
+      source: "water",
+      happened: "Sedapal bill for September is late.",
+      impact: "October water obligations cannot be completed.",
+    },
+    {
+      source: "water",
+      happened: "Water meter readings for September are late. 64 readings are still missing.",
+      impact: "October water obligations cannot be completed.",
+    },
+  ]);
+});
+
+test("approved current obligations keep a Giuliana handoff while October stays in financial focus", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-08",
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-09", total: "29369.79" },
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "approved" },
+    },
     upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
   }));
 
   assert.equal(projection.financialFocus, "upcoming");
+  assert.equal(projection.handoff?.obligationMonth, "2026-09");
+  assert.equal(projection.handoff?.status, "approved_ready_for_dispatch");
+});
+
+test("future approved packages do not become a Giuliana handoff before their month", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-08-31",
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-09", total: "29369.79" },
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "approved" },
+    },
+  }));
+
+  assert.equal(projection.handoff, null);
+});
+
+test("Carlos approval is not overdue through the fifth day", () => {
+  for (const businessDate of ["2026-09-01", "2026-09-05"]) {
+    const base = buildProjectionFacts().upcoming;
+    const projection = projectCarlosDashboard(buildProjectionFacts({
+      businessDate,
+      operatingMonth: "2026-09",
+      upcomingObligationMonth: "2026-10",
+      current: {
+        ...base,
+        obligations: { ...base.obligations, obligationMonth: "2026-09", total: "29369.79" },
+        obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "ready_for_review" },
+      },
+      upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+    }));
+
+    assert.equal(projection.approvalState, "ready");
+  }
+});
+
+test("Carlos approval is overdue from the sixth day", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-09-08",
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-09", total: "29369.79" },
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "ready_for_review" },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+  }));
+
+  assert.equal(projection.approvalState, "overdue");
+});
+
+test("Carlos approved package has no unresolved approval item", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-09-08",
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-09", total: "29369.79" },
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "approved" },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+  }));
+
+  assert.equal(projection.approvalState, "approved");
+});
+
+test("Carlos does not expose a future persisted snapshot before its obligation month", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-08-31",
+    operatingMonth: "2026-08",
+    upcomingObligationMonth: "2026-09",
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-09", total: "29369.79" },
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "ready_for_review" },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+  }));
+
+  assert.equal(projection.approvalState, "not_ready");
 });
 
 test("K dashboard facts read uses exactly one bounded month read", async () => {
@@ -788,8 +951,9 @@ test("K dashboard facts read uses exactly one bounded month read", async () => {
   }
 });
 
-test("L duplicate canonical exceptions are deduplicated deterministically", () => {
+test("L late Water source attentions remain separate and deterministic", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-08-07",
     sourceWork: {
       water: {
         commonWaterBillPresent: false,
@@ -811,12 +975,12 @@ test("L duplicate canonical exceptions are deduplicated deterministically", () =
   assert.deepEqual(projection.attentions, [
     {
       source: "water",
-      happened: "Sedapal bill is missing for August.",
+      happened: "Sedapal bill for August is late.",
       impact: "September water obligations cannot be completed.",
     },
     {
       source: "water",
-      happened: "63 of 64 water readings are missing.",
+      happened: "Water meter readings for August are late. 63 readings are still missing.",
       impact: "September water obligations cannot be completed.",
     },
   ]);

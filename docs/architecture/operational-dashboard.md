@@ -317,6 +317,8 @@ Collections then naturally becomes the dominant dashboard responsibility.
 
 The first Carlos implementation slice is intentionally narrow: review and approval of the existing immutable monthly obligation package. Carlos does not recalculate, generate, finalize, or snapshot the package.
 
+The provisional approval target is the fifth calendar day of the obligation month. A `ready_for_review` package is shown as Ready for your approval through day 5 and as Approval overdue / Dispatch blocked from day 6 onward. This is a provisional operating policy pending Carlos's confirmation, not a September-specific rule.
+
 The happy-path lifecycle is:
 
 - Live Preview before successful finalization
@@ -457,7 +459,7 @@ Do not expand this sprint into:
 
 ## 19. Documentation Status
 
-The snapshot foundation and snapshot-aware bounded financial read are implemented. Automatic month-turn coordination, delayed automatic snapshot coordination, Carlos approval, invoice generation, compressed dispatch-bundle generation, dispatch, and the full Carlos dashboard remain deferred implementation work.
+The snapshot foundation, snapshot-aware bounded financial read, and the first Carlos review/approval dashboard slice are implemented. Automatic month-turn coordination, delayed automatic snapshot coordination, invoice generation, compressed dispatch-bundle generation, dispatch, and the full Carlos dashboard remain deferred implementation work.
 
 Frozen architecture and domain decisions include:
 
@@ -483,6 +485,7 @@ Frozen architecture and domain decisions include:
 - two concurrent monthly timelines and the monthly status/handoff region
 - business-date-coherent lifecycle presentation
 - Carlos approval as Giuliana's financial-focus pivot
+- provisional approval target by the fifth calendar day of the obligation month
 - the narrow Sep 8A to Sep 8B to Sep 8C cross-role acceptance sequence
 
 Implementation or visual details still open include:
