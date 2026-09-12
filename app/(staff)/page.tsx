@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { CaretDown, Warning, Drop, Flame } from "@phosphor-icons/react/dist/ssr";
+import type { ReactNode } from "react";
+import { CaretDown, Warning, Info, FileText, Drop, Flame } from "@phosphor-icons/react/dist/ssr";
 
 import { DashboardGreeting } from "@/components/dashboard-greeting";
 import { getGulianaDashboardFacts, projectCarlosDashboard, projectGulianaDashboard } from "@/server/dashboard";
@@ -97,6 +98,18 @@ function componentLabel(key: string) {
   if (key === "common_water") return "Common water";
   if (key === "gas") return "Gas";
   return "Other charges";
+}
+
+function DashboardNotice({ label, icon, children }: { label: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <div className="space-y-4 ">
+      <div className="flex items-center gap-2 border-b border-zinc-200 py-2">
+        {icon}
+        <p className="text-lg font-medium text-zinc-950">{label}</p>
+      </div>
+      {children}
+    </div>
+  );
 }
 
 const reviewComponentKeys = ["fixed_assessment", "metered_water", "common_water", "gas", "other_charge"] as const;
@@ -200,9 +213,14 @@ export default async function DashboardPage() {
   const gasComplete = result.data.sourceWork.gas.gasReadingCount;
   const gasExpected = result.data.sourceWork.gas.gasUnitCount;
   const components = financialFacts.obligations.components;
-  const hasSourceLatenessAttention = projection.attentions.some((attention) => attention.source !== "obligations" && attention.happened.includes(" late."));
-  const sourceWorkMonthLabel = formatMonthLabel(result.data.upcoming.sourceReadingMonth);
-  const sourceWorkObligationMonthLabel = formatMonthLabel(result.data.upcoming.obligations.obligationMonth);
+  const handoffStatus = projection.handoff
+    ? "Approved · Ready for dispatch"
+    : projection.obligations.readiness === "awaiting_approval"
+      ? "Complete · Awaiting Carlos approval"
+      : null;
+  const handoffMonthLabel = projection.handoff
+    ? formatMonthLabel(projection.handoff.obligationMonth)
+    : financialMonthLabel;
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col space-y-6 px-6 py-6 sm:py-8">
@@ -210,6 +228,15 @@ export default async function DashboardPage() {
         <div className="space-y-4 ">
           <p className="text-md  text-zinc-800">{formatDateLabel(result.data.businessDate)}</p>
             <DashboardGreeting firstName={firstName} />
+          {handoffStatus ? (
+            <p className="flex flex-wrap items-center gap-2 text-lg text-zinc-950">
+              <span>{handoffMonthLabel} obligations {projection.handoff ? "are now" : "are"}</span>
+              <span className="inline-flex items-center gap-2 font-medium">
+                <FileText size={20} weight="regular" aria-hidden="true" />
+                {handoffStatus}
+              </span>
+            </p>
+          ) : null}
         </div>
 
 {/*   Upload Button */}
@@ -225,16 +252,10 @@ export default async function DashboardPage() {
       </div>
 
 {/*   Attention and Worth Noting */}
-      {attentionCount > 0 || worthNoting.length > 0 || projection.obligations.readiness === "awaiting_approval" || projection.handoff ? (
+      {attentionCount > 0 || worthNoting.length > 0 ? (
         <div className="space-y-4 mt-6">
-          {attentionCount > 0 ? <>
-            <div className="space-y-1  border-b border-zinc-200 py-3 ">
-              <div className="flex items-center gap-2  ">
-                <Warning size={20}  weight="bold" aria-hidden="true" />
-                <p className="text-lg text-zinc-950 font-medium ">{hasSourceLatenessAttention ? `${sourceWorkMonthLabel} source inputs need attention for ${sourceWorkObligationMonthLabel} obligations.` : `These inputs are blocking ${financialMonthLabel} obligations.`}</p>
-                
-              </div>
-            </div>
+          {attentionCount > 0 ? (
+            <DashboardNotice label="Needs attention" icon={<Warning size={20} weight="bold" aria-hidden="true" />}>
             <div className="grid gap-14 lg:grid-cols-3  ">
               {projection.attentions.map((attention, index) => (
                 <div key={`${attention.source}:${attention.happened}:${index}`} >
@@ -245,23 +266,9 @@ export default async function DashboardPage() {
                 </div>
               ))}
             </div>
-          </> : null}
-          {attentionCount === 0 && projection.obligations.readiness === "awaiting_approval" ? (
-            <div className="space-y-1 border-b border-zinc-200 py-4">
-              <p className="text-lg font-medium text-zinc-950">{financialMonthLabel} obligations</p>
-              <p className="text-lg text-zinc-950">Complete · Awaiting Carlos approval</p>
-              <p className="text-md text-zinc-600">All {financialMonthLabel} obligations are complete. Once Carlos approves them, they&apos;ll be ready for dispatch.</p>
-            </div>
+            </DashboardNotice>
           ) : null}
-          {projection.handoff ? (
-            <div className="space-y-1 border-b border-zinc-200 py-4">
-              <p className="text-lg font-medium text-zinc-950">{formatMonthLabel(projection.handoff.obligationMonth)} obligations</p>
-              <p className="text-lg text-zinc-950">Approved · Ready for dispatch</p>
-              <p className="text-md text-zinc-600">{formatMonthLabel(projection.handoff.obligationMonth)} obligations have been approved. Dispatch preparation is next.</p>
-            </div>
-          ) : null}
-          {worthNoting.length > 0 ? <div className={attentionCount > 0 ? "space-y-3 border-t border-zinc-200 pt-4" : "space-y-3"}>
-            <p className="text-sm font-semibold uppercase  tracking-wide  text-zinc-500">Worth noting</p>
+          {worthNoting.length > 0 ? <DashboardNotice label="Worth noting" icon={<Info size={20} weight="bold" aria-hidden="true" />}>
             <div className="grid gap-2 lg:grid-cols-3">
               {worthNoting.map((item) => (
                 <div key={`${item.kind}:${item.unitNumber}:${item.obligationMonth}:${item.reason}:${item.amount}`} className="rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3">
@@ -271,11 +278,11 @@ export default async function DashboardPage() {
                 </div>
               ))}
             </div>
-          </div> : null}
+          </DashboardNotice> : null}
         </div>
       ) : null}
 
-      <div className="mt-6 space-y-1">
+      <div className="mt-20 space-y-1">
         <p className="text-lg font-medium text-zinc-950">Source inputs for <span className="font-semibold">{nextCycleMonthLabel} </span> obligations</p>
 
       </div>
