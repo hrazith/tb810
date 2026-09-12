@@ -16,6 +16,7 @@ import { completeGasReadingsAction } from "@/server/gas/actions";
 import { addCommonWaterBillAction, completeWaterReadingsAction } from "@/server/water/actions";
 import { addGasSupplierBillAction } from "@/server/gas/actions";
 import { resetDevTestSessionAction, startDevTestSessionAction } from "@/server/dev-test-session/actions";
+import { resetDevMonthlyObligationApprovalAction } from "@/server/dev-test-session/actions";
 import { addUnitChargeAction } from "@/server/charges/actions";
 
 const STORAGE_KEYS = {
@@ -322,6 +323,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
   const businessDateLabel = businessDateKey ? formatCanonicalDateKey(businessDateKey) : null;
   const dataMonthLabel = dashboardFacts ? formatMonthYearKey(dashboardFacts.operatingMonth) : null;
   const waterReadiness = dashboardFacts?.sourceWork.water.readingsReady ?? false;
+  const currentBillingPeriodStatus = dashboardFacts?.current.obligationLifecycle.billingPeriodStatus ?? null;
 
   const items = useMemo(
     () => [
@@ -642,6 +644,24 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                       </button>
                     )}
                   </div>
+                </div>
+
+                <div className="space-y-2 border-t border-white/10 pt-3">
+                  <p className="text-sm font-medium text-white/90">Obligations</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Status</span>
+                    <span className={currentBillingPeriodStatus === "approved" ? "text-emerald-300" : "text-white/90"}>
+                      {currentBillingPeriodStatus ?? "—"}
+                    </span>
+                  </div>
+                  {state.testSessionActive && currentBillingPeriodStatus === "approved" ? (
+                    <form action={resetDevMonthlyObligationApprovalAction} className="flex justify-end">
+                      <input type="hidden" name="return_to" value={pathname} />
+                      <button type="submit" className="rounded-md border border-red-300/40 px-2.5 py-1 text-[11px] text-red-200 hover:border-red-200/70 hover:text-red-100">
+                        Reset Carlos approval
+                      </button>
+                    </form>
+                  ) : null}
                 </div>
               </div>
 

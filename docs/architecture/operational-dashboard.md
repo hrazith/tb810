@@ -2,7 +2,7 @@
 
 Status: Frozen concept document
 
-Date: September 10, 2026
+Date: September 12, 2026
 
 This document is the canonical architecture reference for the Operational Dashboard domain in TB810.
 It defines the dashboard as a staff-facing operational awareness surface and a server-side projection over canonical domain truth.
@@ -102,6 +102,23 @@ Carlos approval is the financial-focus pivot. Before approval, Giuliana's floati
 
 The behavior of an incomplete package remains no snapshot, a live obligation, and Not Ready. Giuliana sees actionable blockers; Carlos sees oversight/status and has no approval action until the delayed snapshot occurs.
 
+After approval, these three concepts remain visible concurrently and must not be collapsed:
+
+- the September package remains the current handoff as Approved and Ready for Dispatch;
+- September source inputs continue as operational work feeding the October package;
+- October is the live financial preview.
+
+### Top-region communication model
+
+The simplified top region has two high-level communication concepts. Current operational context is presented as a quiet continuation of the greeting, without a user-facing Handoff heading. For example: "September 2026 obligations are now Approved and Ready for Dispatch." A document or bundle icon may accompany this text as a semantic cue only; it must not imply that a PDF, download, or dispatch bundle exists before those capabilities are implemented.
+
+Dashboard notices are one conditional presentation primitive with different meanings or severities:
+
+- Needs attention identifies something Giuliana should act on;
+- Worth noting provides useful situational awareness without requiring immediate action.
+
+Routine progress remains in the Water and Gas domain cards. The floating Obligations utility remains the financial-focus surface. These responsibilities should not be duplicated by separate lifecycle, exception, and noteworthy sections.
+
 ## 5. Monthly Rhythm
 
 The dashboard changes emphasis as the month progresses.
@@ -148,6 +165,15 @@ Exceptions should expand.
 
 At the end of the month, the dashboard may also surface source-fact preparation for the next obligation month.
 That is a month-close boundary for real upstream inputs, not a generic "day X" warning rule.
+
+The current provisional source timing policy is:
+
+- Water meter readings are expected through calendar day 6 and become late beginning on day 7; confidence is high based on 34 historical months, with dates observed from day 3 through day 6 and typically on day 5.
+- Sedapal bills are expected through calendar day 6 and become late beginning on day 7; confidence is medium and provisional because the evidence is supplier/bill dates rather than reliable original operator-entry timestamps.
+- Gas meter readings have no established lateness deadline and remain neutral/incomplete when missing.
+- Gas supplier bills have no calendar lateness deadline and remain an asynchronous unprocessed pool.
+
+Incomplete, late, and blocking are separate states. An incomplete source fact may still be within its expected operating window. A late source fact is missing after an explicit operational expectation. A blocking component is one that prevents the canonical financial package from progressing. An upcoming live preview may therefore be mathematically incomplete without creating a Giuliana operational Attention item; genuine blockers in the current obligation package remain capable of surfacing.
 
 For a complete and valid happy-path package, month close is the automatic
 snapshot boundary. The date alone does not snapshot an incomplete package.
@@ -487,6 +513,10 @@ Frozen architecture and domain decisions include:
 - Carlos approval as Giuliana's financial-focus pivot
 - provisional approval target by the fifth calendar day of the obligation month
 - the narrow Sep 8A to Sep 8B to Sep 8C cross-role acceptance sequence
+- the simplified greeting, handoff, and shared notice presentation model
+- provisional Water and Sedapal source-lateness boundaries
+- source-work lateness kept separate from upcoming financial-preview blockers
+- the narrow DEV Carlos approval reset acceptance control
 
 Implementation or visual details still open include:
 
@@ -502,6 +532,18 @@ Implementation or visual details still open include:
 - exact dashboard server-read shape
 
 These are implementation details, not domain-open questions.
+
+### DEV acceptance controls
+
+The development-only panel has Time, Data, and Style tabs. Time changes the canonical DEV business date; it is not database time travel and does not rewind persisted mutations. Data controls establish narrow deterministic source/domain facts such as Water readings, Sedapal bills, Gas readings, Gas supplier bills, and Unit Charges. Production reads and projection derive the resulting dashboard state; the panel must not manufacture Attention, Worth noting, lifecycle labels, or fake financial state.
+
+The DEV panel also has one narrow Carlos approval replay control. When the current business-month Billing Period is approved, it may be reset to `ready_for_review` while clearing `approved_at` and `approved_by`. It does not delete or regenerate the immutable snapshot, monthly obligation rows, or source facts. This is not a generic lifecycle editor or scenario framework. Because the existing DEV journal records domain source-record mutations rather than Billing Period lifecycle metadata, Reset session must not be assumed to restore Carlos approval state.
+
+The current DEV panel is an acceptance-testing aid, not a production workflow. The reset control is guarded by development mode, an active DEV test session, and the approved status of the current Billing Period.
+
+### Read and invalidation invariants
+
+The dashboard remains a server-side projection over the bounded canonical building-month financial-facts read. A cold dashboard request uses exactly one bounded financial-facts RPC; warm repeated reads add zero underlying financial-facts RPCs. Source-work attention derivation adds no reads, RPCs, client fetching, or N+1 behavior. DEV mutations revalidate the necessary root/layout surfaces and invalidate the relevant bounded facts cache. The module-local cache's invalidation behavior across separately instantiated Next.js runtime/module contexts remains known architectural debt; this document does not claim it is a universal cross-runtime cache mechanism.
 
 ## 20. Relationship to Other Canonical Documents
 

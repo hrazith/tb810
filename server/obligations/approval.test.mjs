@@ -26,6 +26,14 @@ test("approval transition rejects invalid lifecycle states", () => {
   });
 });
 
+test("DEV approval reset only accepts approved periods", () => {
+  assert.deepEqual(approval.validateDevApprovalReset("approved"), { ok: true });
+  assert.deepEqual(approval.validateDevApprovalReset("ready_for_review"), {
+    ok: false,
+    error: "DEV approval reset is only available for an approved Billing Period.",
+  });
+});
+
 test("successful approval invalidates the exact building-month facts cache", { concurrency: false }, async () => {
   const originalCreateClient = supabaseServer.createClient;
   const originalGetStaffContext = staffContextModule.getStaffContext;

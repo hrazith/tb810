@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getFixedBuildingIdentity } from "@/server/building";
 import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
+import { resetCurrentMonthlyObligationApprovalForDev } from "@/server/obligations/approval";
 
 import { getDevTestSessionCookieName, startDevTestSession } from "../dev-test-session";
 
@@ -59,5 +60,16 @@ export async function resetDevTestSessionAction(formData: FormData) {
   revalidatePath("/", "layout");
   const cookieStore = await cookies();
   cookieStore.set(getDevTestSessionCookieName(), "", { path: "/", expires: new Date(0) });
+  redirect(returnTo);
+}
+
+export async function resetDevMonthlyObligationApprovalAction(formData: FormData) {
+  const returnTo = returnToValue(formData);
+  const result = await resetCurrentMonthlyObligationApprovalForDev();
+  if (result.error) {
+    redirect(`${returnTo}?error=${encodeURIComponent(result.error)}`);
+  }
+  revalidatePath("/", "layout");
+  revalidatePath("/obligations");
   redirect(returnTo);
 }
