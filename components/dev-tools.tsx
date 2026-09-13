@@ -616,7 +616,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                 </div>
 
                 <div className="space-y-1.5">
-                  <p className="text-sm font-medium text-white/90">September</p>
+                  <p className="text-sm font-medium text-white/90">{dashboardFacts ? formatMonthYearKey(dashboardFacts.upcomingObligationMonth) : "Upcoming"}</p>
                   <div className="flex items-baseline justify-between gap-3">
                     <span>Unit charges</span>
                     <span className="text-white/90">

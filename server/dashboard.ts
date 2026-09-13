@@ -450,6 +450,7 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
   const sourceWork = monthFacts.sourceWork;
   const financialFocus = deriveFinancialFocus(monthFacts);
   const financialFacts = monthFacts[financialFocus];
+  const operationalWorthNoting = monthFacts.upcoming.worthNoting;
   const sourceWorkActionable = financialFocus === "upcoming" && monthFacts.current.obligationLifecycle.mode !== "snapshotted";
   const obligations = deriveObligationState(financialFacts.obligations, financialFacts.obligationLifecycle, monthFacts.businessDate);
   const water = deriveWaterState(sourceWork, financialFacts.obligations, sourceWorkActionable, monthFacts.businessDate);
@@ -472,7 +473,7 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
     obligations,
     handoff,
     attentions: deriveAttentions(sourceWork, financialFacts, monthFacts.upcoming, financialFocus, sourceWorkActionable, monthFacts.businessDate),
-    worthNoting: financialFacts.worthNoting,
+    worthNoting: operationalWorthNoting,
     completed: deriveCompleted(sourceWork, financialFacts.obligations),
     quickActions: [
       "upload_sedapal_bill",

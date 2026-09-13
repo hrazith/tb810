@@ -138,7 +138,13 @@ Dashboard notices are one conditional presentation primitive with different mean
 - Needs attention identifies something Giuliana should act on;
 - Worth noting provides useful situational awareness without requiring immediate action.
 
-Routine progress remains in the Water and Gas domain cards. The floating Obligations utility remains the financial-focus surface. These responsibilities should not be duplicated by separate lifecycle, exception, and noteworthy sections.
+The broader notice surface is described internally as **Pay attention** and may contain multiple ranked notice frames or pages. Conditions determine whether notice content exists; severity determines its prominence and order. Needs attention is the first available group, followed by Worth noting and any additional lower-priority Worth noting content if pagination is needed. The number of frames is content-driven, not a fixed three-frame product model.
+
+If Needs attention exists, it is the default visible frame and Worth noting remains accessible behind it. If only Worth noting exists, it becomes the first frame; if neither exists, the entire surface disappears without an empty container or reassuring placeholder. A valid Unit Charge remains Worth noting even when late Water, Gas, or Sedapal conditions are more urgent.
+
+Routine progress remains in the Water and Gas domain cards. The floating Obligations utility remains the financial-focus surface. These responsibilities should not be duplicated by separate permanent lifecycle, exception, and noteworthy sections.
+
+The Pay attention surface may eventually provide left/right navigation and a position indicator when multiple meaningful frames exist. Controls appear or enable only when useful, with no decorative dead arrows or empty frames. Exact animation, gesture, carousel-library, and visual implementation details remain open.
 
 ## 5. Monthly Rhythm
 
@@ -297,6 +303,8 @@ Therefore "Upload supplier bill" is an ongoing intake action and should remain a
 
 The accumulated Gas supplier-bill pool may eventually be Worth noting when it is materially different from its historical norm for a comparable period, such as unusually high September supplier costs. This is not automatically an error, Needs attention, or Blocking condition. The comparison method, historical window, comparable-month methodology, seasonality treatment, minimum sample, materiality threshold, and insufficient-history fallback remain TBD; implementation is deferred.
 
+For example, on September 7, late Sedapal, Water readings, and Gas readings appear in the first Needs attention frame while a valid Unit Charge remains available in a subsequent Worth noting frame. Once those source conditions resolve, the Needs attention frame disappears and Worth noting becomes the first frame without preserving an empty first frame. Notice existence and notice ordering are independent.
+
 ## 8. Quick Actions
 
 Quick Actions are a distinct dashboard layer.
@@ -359,6 +367,8 @@ Examples:
 Zero exceptions is a valid and desirable state.
 
 For MVP, prefer deterministic and explainable identification of noteworthy activity over speculative anomaly detection.
+
+Actionability remains condition-specific. Needs attention notices may link directly to their existing operational workspaces. Worth noting items do not need to be clickable unless a real useful destination exists; navigation must not be added merely for visual consistency.
 
 ## 11. Carlos Role
 
@@ -564,6 +574,9 @@ Frozen architecture and domain decisions include:
 - provisional approval target by the fifth calendar day of the obligation month
 - the narrow Sep 8A to Sep 8B to Sep 8C cross-role acceptance sequence
 - the simplified greeting, handoff, and shared notice presentation model
+- the condition-driven ranked Pay attention notice surface
+- Needs attention before Worth noting, with lower-priority content remaining accessible
+- no empty notice frame when a higher-priority group resolves
 - provisional Water, Gas, and Sedapal source-lateness boundaries
 - source-work lateness kept separate from upcoming financial-preview blockers
 - Gas supplier-pool historical variance as a potential Worth Noting concept, with methodology and materiality threshold TBD
@@ -592,6 +605,11 @@ align that projection with the frozen Water/Gas lateness rule. Gas
 supplier-pool historical variance remains a frozen product concept only;
 its calculation and threshold are not implemented.
 
+The ranked notice-frame behavior is a frozen UX rule and is now implemented
+as a small client presentation island. The server projection remains the
+source of notice existence, severity, and content; the client manages only
+the visible frame index and navigation controls.
+
 ### DEV acceptance controls
 
 The development-only panel has Time, Data, and Style tabs. Time changes the canonical DEV business date; it is not database time travel and does not rewind persisted mutations. Data controls establish narrow deterministic source/domain facts such as Water readings, Sedapal bills, Gas readings, Gas supplier bills, and Unit Charges. Production reads and projection derive the resulting dashboard state; the panel must not manufacture Attention, Worth noting, lifecycle labels, or fake financial state.
@@ -603,6 +621,8 @@ The current DEV panel is an acceptance-testing aid, not a production workflow. T
 ### Read and invalidation invariants
 
 The dashboard remains a server-side projection over the bounded canonical building-month financial-facts read. A cold dashboard request uses exactly one bounded financial-facts RPC; warm repeated reads add zero underlying financial-facts RPCs. Source-work attention derivation adds no reads, RPCs, client fetching, or N+1 behavior. DEV mutations revalidate the necessary root/layout surfaces and invalidate the relevant bounded facts cache. The module-local cache's invalidation behavior across separately instantiated Next.js runtime/module contexts remains known architectural debt; this document does not claim it is a universal cross-runtime cache mechanism.
+
+Notice producers use the period context appropriate to their operational meaning rather than inheriting financial focus automatically. In Giuliana's current-work and Pay attention surface, Unit Charge Worth noting follows the upcoming obligation period while an earlier package remains under financial review.
 
 ## 20. Relationship to Other Canonical Documents
 

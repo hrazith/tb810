@@ -322,10 +322,40 @@ test("a Unit Charge remains Worth noting beside an independent blocker", () => {
         },
       },
     },
+    upcoming: { worthNoting },
   }));
 
   assert.deepEqual(projection.worthNoting, worthNoting);
   assert.equal(projection.attentions.length, 1);
+});
+
+test("Guliana Worth noting follows the upcoming operational obligation period", () => {
+  const worthNoting = [{
+    kind: "unit_charge",
+    unitNumber: "201",
+    amount: "25",
+    obligationMonth: "2026-10",
+    reason: "DEV test charge",
+  }];
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-13",
+    upcomingObligationMonth: "2026-10",
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-09" },
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "ready_for_review" },
+      worthNoting: [],
+    },
+    upcoming: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-10" },
+      worthNoting,
+    },
+  }));
+
+  assert.equal(projection.financialFocus, "current");
+  assert.deepEqual(projection.worthNoting, worthNoting);
 });
 
 test("H partial gas work stays active and neutral before the deadline", () => {

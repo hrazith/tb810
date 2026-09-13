@@ -1,8 +1,8 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { CaretDown, Warning, Info, FileText, Drop, Flame } from "@phosphor-icons/react/dist/ssr";
+import { CaretDown, FileText, Drop, Flame } from "@phosphor-icons/react/dist/ssr";
 
 import { DashboardGreeting } from "@/components/dashboard-greeting";
+import { DashboardNoticeCarousel } from "@/components/dashboard-notice-carousel";
 import { getGulianaDashboardFacts, projectCarlosDashboard, projectGulianaDashboard } from "@/server/dashboard";
 import { approveMonthlyObligationAction } from "@/app/(staff)/obligations/actions";
 import { getStaffContext } from "@/server/staff-context";
@@ -105,18 +105,6 @@ function componentLabel(key: string) {
   if (key === "common_water") return "Common water";
   if (key === "gas") return "Gas";
   return "Other charges";
-}
-
-function DashboardNotice({ label, icon, children }: { label: string; icon: ReactNode; children: ReactNode }) {
-  return (
-    <div className="space-y-4 ">
-      <div className="flex items-center gap-2 border-b border-zinc-200 py-2">
-        {icon}
-        <p className="text-lg font-medium text-zinc-950">{label}</p>
-      </div>
-      {children}
-    </div>
-  );
 }
 
 const reviewComponentKeys = ["fixed_assessment", "metered_water", "common_water", "gas", "other_charge"] as const;
@@ -260,33 +248,13 @@ export default async function DashboardPage() {
 
 {/*   Attention and Worth Noting */}
       {attentionCount > 0 || worthNoting.length > 0 ? (
-        <div className="space-y-4 mt-6">
-          {attentionCount > 0 ? (
-            <DashboardNotice label="Needs attention" icon={<Warning size={20} weight="bold" aria-hidden="true" />}>
-            <div className="grid gap-14 lg:grid-cols-3  ">
-              {projection.attentions.map((attention, index) => (
-                <div key={`${attention.source}:${attention.happened}:${index}`} >
-                 
-                  <Link href={uploadHrefForAttention(attention.source, attention.happened)} className="mt-2 inline-block text-lg font-normal leading-snug text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">
-                    {attention.happened}
-                  </Link>
-                </div>
-              ))}
-            </div>
-            </DashboardNotice>
-          ) : null}
-          {worthNoting.length > 0 ? <DashboardNotice label="Worth noting" icon={<Info size={20} weight="bold" aria-hidden="true" />}>
-            <div className="grid gap-2 lg:grid-cols-3">
-              {worthNoting.map((item) => (
-                <div key={`${item.kind}:${item.unitNumber}:${item.obligationMonth}:${item.reason}:${item.amount}`} className="rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3">
-                  <p className="text-sm font-medium text-zinc-950">Unit {item.unitNumber} · Unit charge</p>
-                  <p className="mt-1 text-sm text-zinc-600">{formatMoney(item.amount)} · {formatMonthLabel(item.obligationMonth)} obligations</p>
-                  <p className="mt-1 text-sm text-zinc-600">{item.reason}</p>
-                </div>
-              ))}
-            </div>
-          </DashboardNotice> : null}
-        </div>
+        <DashboardNoticeCarousel
+          attentions={projection.attentions.map((attention) => ({
+            ...attention,
+            href: uploadHrefForAttention(attention.source, attention.happened),
+          }))}
+          worthNoting={worthNoting}
+        />
       ) : null}
 
       <div className="mt-20 space-y-1">
@@ -302,22 +270,37 @@ export default async function DashboardPage() {
 
             <div>
               <Drop size={20} weight="regular" aria-hidden="true" />
-              <p className="text-md font-light text-zinc-950">Water</p>
+              <p className="text-md font-light text-zinc-950">Water meter reading</p>
 
             </div>
             <div>{utilityStatusLabel(projection.water, isOpen) ? <h2 className="mt-1 text-md font-semibold tracking-tight text-zinc-950">{utilityStatusLabel(projection.water, isOpen)}</h2> : null}</div>
           </div>
           <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
             <div className="flex flex-col items-center gap-3 sm:items-start">
-              <p className="text-lg font-medium text-zinc-950">Meter Readings</p>
+              
               <MeterProgress complete={waterComplete} expected={waterExpected} label="Water meter readings" />
             </div>
-            <div className="hidden h-36 w-px bg-zinc-200 sm:block" />
+
+          </div>
+        </Link>
+
+         <Link href="/water" className="group rounded-3xl border  border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
+          <div className="flex items-start justify-between gap-4 ">
+
             <div>
-              <p className="text-lg font-medium text-zinc-950">Sedapal Bill</p>
-              <p className="mt-2 text-lg font-semibold text-zinc-950">{waterBill ? "Present" : isOpen ? "Not received yet" : "Missing"}</p>
-              {waterBill ? <p className="mt-1 text-sm text-zinc-600">{formatMoney(waterBill.amount)}</p> : null}
+              <Drop size={20} weight="regular" aria-hidden="true" />
+             
+
             </div>
+            <div>{utilityStatusLabel(projection.water, isOpen) ? <h2 className="mt-1 test text-md font-semibold tracking-tight text-zinc-950">{utilityStatusLabel(projection.water, isOpen)}</h2> : null}</div>
+          </div>
+          <div className="mt-10 h-36 rounded-3xl  bg-amber-100 w-36 ">
+
+<p className="text-lg font-normal text-zinc-950">Sedepal Bill</p>
+              <p className="mt-2 text-lg font-medium text-zinc-950">{waterBill ? "Present" : isOpen ? "Not received yet" : "Missing"}</p>
+
+
+
           </div>
         </Link>
 
@@ -328,7 +311,7 @@ export default async function DashboardPage() {
 
             <div>
               <Flame size={20} weight="regular" aria-hidden="true" />
-              <p className="text-md font-light text-zinc-950">Gas</p>
+              
 
             </div>
             <div>
@@ -344,15 +327,40 @@ export default async function DashboardPage() {
 
           <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
             <div className="flex flex-col items-center gap-3 sm:items-start">
-              <p className="text-lg font-medium text-zinc-950">Meter Readings</p>
+              <p className="text-lg font-normal text-zinc-950">Gas Meter Readings</p>
               <MeterProgress complete={gasComplete} expected={gasExpected} label="Gas meter readings" />
             </div>
-            <div className="hidden h-36 w-px bg-zinc-200 sm:block" />
+           
+          </div>
+        </Link>
+
+        <Link href="/gas" className="group rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
+
+        <div className="flex items-start justify-between gap-4 ">
+
             <div>
-              <p className="text-lg font-medium text-zinc-950">Supplier Bills</p>
+              <Flame size={20} weight="regular" aria-hidden="true" />
+              
+
+            </div>
+            <div>
+
+              {utilityStatusLabel(projection.gas, isOpen) ? <h2 className="mt-1 text-md font-semibold tracking-tight text-zinc-950">
+                {utilityStatusLabel(projection.gas, isOpen)}
+                </h2> : null}
+
+            </div>
+          </div>
+
+
+
+          <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div className="flex flex-col items-center gap-3 sm:items-start">
+              <p className="text-lg font-normal text-zinc-950">Gas Supplier Bills</p>
               <p className="mt-2 text-lg font-semibold text-zinc-950">{result.data.upcoming.gas.supplierBillCount} bills</p>
               <p className="mt-1 text-sm text-zinc-600">{formatMoney(result.data.upcoming.gas.supplierBillTotal)}</p>
             </div>
+           
           </div>
         </Link>
       </div>
