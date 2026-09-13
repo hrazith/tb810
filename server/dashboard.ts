@@ -284,6 +284,10 @@ export function projectCarlosDashboard(monthFacts: GulianaDashboardFacts): Carlo
   };
 }
 
+function isSourceWorkLate(businessDate: string) {
+  return Number(businessDate.slice(8, 10)) >= 7;
+}
+
 function deriveAttentions(
   sourceWork: SourceWorkFacts,
   facts: UpcomingFacts,
@@ -300,7 +304,7 @@ function deriveAttentions(
   const waterMissingCount = Math.max(sourceWork.water.meterReadingExpectedCount - sourceWork.water.meterReadingCompleteCount, 0);
   const gasMissingCount = Math.max(sourceWork.gas.gasUnitCount - sourceWork.gas.gasReadingCount, 0);
   const currentSedapalMissing = !facts.commonWaterBill && facts.obligations.components.common_water.state === "blocked";
-  const sourceWorkLate = Number(businessDate.slice(8, 10)) >= 7;
+  const sourceWorkLate = isSourceWorkLate(businessDate);
   const sourceSedapalLate = sourceWorkLate
     && !sourceWork.water.commonWaterBillPresent
     && (sourceWork.water.meterReadingExpectedCount > 0 || sourceWork.water.meterReadingCount > 0);
@@ -332,6 +336,14 @@ function deriveAttentions(
     });
   }
 
+  if (sourceWorkLate && gasMissingCount > 0) {
+    attentions.push({
+      source: "gas",
+      happened: `Gas meter readings for ${sourceWorkMonthLabel} are late. ${gasMissingCount} readings are still missing.`,
+      impact: `${sourceWorkObligationMonthLabel} gas obligations cannot be completed.`,
+    });
+  }
+
   const suppressWaterDownstream = sourceWorkActionable
     ? !sourceWork.water.commonWaterBillPresent || waterMissingCount > 0
     : currentSedapalMissing;
@@ -357,15 +369,20 @@ function deriveWaterState(
   sourceWork: SourceWorkFacts,
   obligations: UpcomingFacts["obligations"],
   sourceWorkActionable: boolean,
+  businessDate: string,
 ): GulianaDashboardProjection["water"] {
   const complete = sourceWork.water.commonWaterBillPresent && sourceWork.water.meterReadingCompleteCount >= sourceWork.water.meterReadingExpectedCount;
   const active = sourceWork.water.commonWaterBillPresent || sourceWork.water.meterReadingCount > 0;
   const blocked = sourceWorkActionable && (obligations.components.common_water.state === "blocked" || obligations.components.metered_water.state === "blocked");
+  const missingReadings = sourceWork.water.meterReadingExpectedCount > sourceWork.water.meterReadingCompleteCount;
+  const missingBill = !sourceWork.water.commonWaterBillPresent
+    && (sourceWork.water.meterReadingExpectedCount > 0 || sourceWork.water.meterReadingCount > 0);
+  const late = isSourceWorkLate(businessDate) && (missingReadings || missingBill);
 
   return {
     state: blocked ? "blocked" : complete ? "complete" : active ? "active" : "waiting",
     completion: complete ? "complete" : "incomplete",
-    emphasis: blocked ? "attention" : complete ? "compressed" : "normal",
+    emphasis: blocked || late ? "attention" : complete ? "compressed" : "normal",
     billPresent: sourceWork.water.commonWaterBillPresent,
     meterReadingsComplete: sourceWork.water.meterReadingCompleteCount >= sourceWork.water.meterReadingExpectedCount,
   };
@@ -375,15 +392,17 @@ function deriveGasState(
   sourceWork: SourceWorkFacts,
   obligations: UpcomingFacts["obligations"],
   sourceWorkActionable: boolean,
+  businessDate: string,
 ): GulianaDashboardProjection["gas"] {
   const complete = sourceWork.gas.supplierBillCount > 0 && sourceWork.gas.gasReadingCount >= sourceWork.gas.gasUnitCount;
   const active = sourceWork.gas.supplierBillCount > 0 || sourceWork.gas.gasReadingCount > 0;
   const blocked = sourceWorkActionable && obligations.components.gas.state === "blocked";
+  const late = isSourceWorkLate(businessDate) && sourceWork.gas.gasUnitCount > sourceWork.gas.gasReadingCount;
 
   return {
     state: blocked ? "blocked" : complete ? "complete" : active ? "active" : "waiting",
     completion: complete ? "complete" : "incomplete",
-    emphasis: blocked ? "attention" : complete ? "compressed" : "normal",
+    emphasis: blocked || late ? "attention" : complete ? "compressed" : "normal",
     supplierBillsPresent: sourceWork.gas.supplierBillCount > 0,
     readingsComplete: sourceWork.gas.gasReadingCount >= sourceWork.gas.gasUnitCount,
   };
@@ -433,8 +452,8 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
   const financialFacts = monthFacts[financialFocus];
   const sourceWorkActionable = financialFocus === "upcoming" && monthFacts.current.obligationLifecycle.mode !== "snapshotted";
   const obligations = deriveObligationState(financialFacts.obligations, financialFacts.obligationLifecycle, monthFacts.businessDate);
-  const water = deriveWaterState(sourceWork, financialFacts.obligations, sourceWorkActionable);
-  const gas = deriveGasState(sourceWork, financialFacts.obligations, sourceWorkActionable);
+  const water = deriveWaterState(sourceWork, financialFacts.obligations, sourceWorkActionable, monthFacts.businessDate);
+  const gas = deriveGasState(sourceWork, financialFacts.obligations, sourceWorkActionable, monthFacts.businessDate);
   const currentLifecycle = monthFacts.current.obligationLifecycle;
   const currentObligationMonth = monthFacts.current.obligations.obligationMonth;
   const handoff = monthFacts.businessDate.slice(0, 7) >= currentObligationMonth

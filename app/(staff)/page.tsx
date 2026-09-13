@@ -92,6 +92,13 @@ function uploadHrefForAttention(source: string, happened: string) {
   return "/obligations";
 }
 
+function utilityStatusLabel(section: { state: string; emphasis: string }, isOpen: boolean) {
+  if (section.emphasis === "attention") return "Needs attention";
+  if (section.state === "blocked") return "Blocked";
+  if (section.state === "complete") return "Complete";
+  return isOpen ? null : "Incomplete";
+}
+
 function componentLabel(key: string) {
   if (key === "fixed_assessment") return "Fixed assessments";
   if (key === "metered_water") return "Metered water";
@@ -298,7 +305,7 @@ export default async function DashboardPage() {
               <p className="text-md font-light text-zinc-950">Water</p>
 
             </div>
-            <div>{projection.water.state === "complete" || projection.water.state === "blocked" || !isOpen ? <h2 className="mt-1 text-md font-semibold tracking-tight text-zinc-950">{projection.water.state === "complete" ? "Complete" : projection.water.state === "blocked" ? "Blocked" : "Incomplete"}</h2> : null}</div>
+            <div>{utilityStatusLabel(projection.water, isOpen) ? <h2 className="mt-1 text-md font-semibold tracking-tight text-zinc-950">{utilityStatusLabel(projection.water, isOpen)}</h2> : null}</div>
           </div>
           <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
             <div className="flex flex-col items-center gap-3 sm:items-start">
@@ -326,9 +333,8 @@ export default async function DashboardPage() {
             </div>
             <div>
 
-              {projection.gas.state === "complete" || projection.gas.state === "blocked" || !isOpen ? <h2 className="mt-1 text-md font-semibold tracking-tight text-zinc-950">
-                {projection.gas.state === "complete" ? "Complete" : projection.gas.state === "blocked" ? "Blocked" : "Incomplete"}
-
+              {utilityStatusLabel(projection.gas, isOpen) ? <h2 className="mt-1 text-md font-semibold tracking-tight text-zinc-950">
+                {utilityStatusLabel(projection.gas, isOpen)}
                 </h2> : null}
 
             </div>

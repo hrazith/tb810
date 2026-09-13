@@ -328,9 +328,9 @@ test("a Unit Charge remains Worth noting beside an independent blocker", () => {
   assert.equal(projection.attentions.length, 1);
 });
 
-test("H partial gas work stays active and normal without date-based attention", () => {
+test("H partial gas work stays active and neutral before the deadline", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
-    businessDate: "2026-08-15",
+    businessDate: "2026-08-05",
     sourceWork: {
       gas: {
         supplierBillCount: 1,
@@ -344,6 +344,52 @@ test("H partial gas work stays active and normal without date-based attention", 
   assert.equal(projection.gas.emphasis, "normal");
   assert.equal(projection.gas.completion, "incomplete");
   assert.deepEqual(projection.attentions, []);
+});
+
+test("late source work changes Water and Gas emphasis without financial blocking", () => {
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-08-07",
+    sourceWork: {
+      water: { meterReadingExpectedCount: 64 },
+      gas: { gasUnitCount: 58 },
+    },
+  }));
+
+  assert.equal(projection.water.emphasis, "attention");
+  assert.equal(projection.gas.emphasis, "attention");
+  assert.deepEqual(projection.attentions.map((attention) => attention.happened), [
+    "Sedapal bill for August is late.",
+    "Water meter readings for August are late. 64 readings are still missing.",
+    "Gas meter readings for August are late. 58 readings are still missing.",
+  ]);
+});
+
+test("late Gas readings create attention independently of supplier bills", () => {
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-08-07",
+    sourceWork: {
+      gas: { gasUnitCount: 58 },
+    },
+  }));
+
+  assert.equal(projection.gas.emphasis, "attention");
+  assert.deepEqual(projection.attentions.filter((attention) => attention.source === "gas"), [{
+    source: "gas",
+    happened: "Gas meter readings for August are late. 58 readings are still missing.",
+    impact: "September gas obligations cannot be completed.",
+  }]);
+});
+
+test("complete Gas readings with zero supplier bills have no late attention", () => {
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-08-07",
+    sourceWork: {
+      gas: { gasUnitCount: 58, gasReadingCount: 58 },
+    },
+  }));
+
+  assert.equal(projection.gas.emphasis, "normal");
+  assert.deepEqual(projection.attentions.filter((attention) => attention.source === "gas"), []);
 });
 
 test("I complete gas work compresses", () => {
@@ -735,6 +781,11 @@ test("Sep 8 approved current obligations advance financial focus to upcoming", (
       source: "water",
       happened: "Water meter readings for September are late. 64 readings are still missing.",
       impact: "October water obligations cannot be completed.",
+    },
+    {
+      source: "gas",
+      happened: "Gas meter readings for September are late. 58 readings are still missing.",
+      impact: "October gas obligations cannot be completed.",
     },
   ]);
 });

@@ -108,6 +108,27 @@ After approval, these three concepts remain visible concurrently and must not be
 - September source inputs continue as operational work feeding the October package;
 - October is the live financial preview.
 
+### Source-work vocabulary
+
+These concepts are distinct and must not be collapsed into one generic error state:
+
+- **Incomplete** means a required source fact is absent or not yet complete. By itself, it does not imply lateness, operational failure, attention, or blocking.
+- **Late** means a source remains incomplete after its established operating expectation. Late is time-relative and requires an explicit expected window or deadline.
+- **Blocking** means a required source condition prevents the canonical financial calculation, snapshot, or package from progressing. Blocking is not synonymous with late.
+- **Needs attention** is a dashboard presentation concept meaning Giuliana has something that now warrants action. It is not a persisted Water or Gas lifecycle state created merely for dashboard rendering.
+- **Worth noting** is informational situational awareness. A valid Unit Charge may be worth noting without requiring remediation.
+
+A source can therefore be incomplete but not late, incomplete and late, incomplete and blocking, or late and blocking. Invalid or unusable source data may warrant attention or block calculation before a timing boundary; detailed validation remains owned by the relevant domain logic.
+
+The conceptual model is:
+
+- the operating clock determines Late;
+- validity and actionability determine Needs attention;
+- the financial lifecycle boundary determines Blocking; and
+- unusual but valid information may become Worth noting.
+
+A source does not become financially blocking merely because it becomes late. For example, September Water or Gas readings can be Late and require Giuliana's attention on September 11 while not blocking October obligations until the October package actually needs those facts for production or snapshotting. If the facts remain unusable at that dependent boundary, the condition becomes Blocking and Needs attention.
+
 ### Top-region communication model
 
 The simplified top region has two high-level communication concepts. Current operational context is presented as a quiet continuation of the greeting, without a user-facing Handoff heading. For example: "September 2026 obligations are now Approved and Ready for Dispatch." A document or bundle icon may accompany this text as a semantic cue only; it must not imply that a PDF, download, or dispatch bundle exists before those capabilities are implemented.
@@ -170,10 +191,22 @@ The current provisional source timing policy is:
 
 - Water meter readings are expected through calendar day 6 and become late beginning on day 7; confidence is high based on 34 historical months, with dates observed from day 3 through day 6 and typically on day 5.
 - Sedapal bills are expected through calendar day 6 and become late beginning on day 7; confidence is medium and provisional because the evidence is supplier/bill dates rather than reliable original operator-entry timestamps.
-- Gas meter readings have no established lateness deadline and remain neutral/incomplete when missing.
+- Gas meter readings are expected during calendar days 1 through 6 and become late beginning on day 7. Water and Gas meter readings are operationally aligned under this frozen business rule.
 - Gas supplier bills have no calendar lateness deadline and remain an asynchronous unprocessed pool.
 
+The canonical source-work table is:
+
+| Source | Incomplete | Late | Needs attention | Blocking | Worth noting |
+| --- | --- | --- | --- | --- | --- |
+| Water meter readings | Days 1-6 if fewer than 64 usable | Day 7+ | Late or invalid actionable condition | At dependent month-turn if still unusable | — |
+| Gas meter readings | Days 1-6 if fewer than 58 usable | Day 7+ | Late or invalid actionable condition | At dependent month-turn if still unusable | — |
+| Sedapal bill | Missing days 1-6 | Day 7+ | Late or invalid actionable condition | At dependent month-turn if still unavailable or unusable | — |
+| Gas supplier pool | No incomplete clock; zero can be normal | None | Genuine invalid or blocking condition | At dependent month-turn if canonical Gas calculation cannot proceed | Material historical variance; methodology TBD |
+| Unit Charges | Absence is normal | None | Invalid or unusable charge requiring intervention | At dependent month-turn if unresolved invalid charge prevents a valid package | A valid charge can be noteworthy |
+
 Incomplete, late, and blocking are separate states. An incomplete source fact may still be within its expected operating window. A late source fact is missing after an explicit operational expectation. A blocking component is one that prevents the canonical financial package from progressing. An upcoming live preview may therefore be mathematically incomplete without creating a Giuliana operational Attention item; genuine blockers in the current obligation package remain capable of surfacing.
+
+The timing rules above define operational lateness, while the dependent package boundary defines financial blocking. Detailed domain validation remains authoritative. Existing canonical financial-calculation blockers continue to behave as implemented.
 
 For a complete and valid happy-path package, month close is the automatic
 snapshot boundary. The date alone does not snapshot an incomplete package.
@@ -193,6 +226,21 @@ For example:
 - September source work remains preparation for October regardless of the prior package's handoff state.
 
 Incomplete does not mean late. Calendar passage alone must not create Attention; a real business expectation or blocking rule is required.
+
+### Lateness and attention examples
+
+Before the lateness boundary, such as September 5 or 6:
+
+- missing Water readings are Incomplete, not Late;
+- missing Gas readings are Incomplete, not Late;
+- a missing Sedapal bill is Incomplete, not Late; and
+- no attention is created solely by those absences.
+
+On September 7 or later, unresolved required Water or Gas readings are Late and may surface as Needs attention. A missing Sedapal bill may likewise surface as Late / Needs attention under the provisional Sedapal timing rule. Gas supplier bill count alone never creates date-based Gas attention. If Gas readings are complete and zero supplier bills are available, that absence remains neutral unless the canonical financial calculation identifies a genuine invalid or blocking condition.
+
+Attention is derived from unresolved actionable conditions. For Water, if readings are incomplete after the boundary while Sedapal is present, the notice concerns readings only; if readings are complete while Sedapal is missing, the notice concerns Sedapal only; when both are complete, neither late notice remains. Resolving one condition must not hide an unrelated actionable blocker.
+
+The same month-turn distinction applies across sources. On September 5, incomplete September Water/Gas readings and an unavailable Sedapal bill are normal source work with no date-derived attention. On September 7, unresolved readings and Sedapal are Late and may require attention. On September 11, they remain Late / Needs attention but are not automatically October blockers. If the required September facts remain unusable when the October obligation package reaches its lifecycle boundary, October becomes Blocking / Not Ready.
 
 ### Mid-month
 
@@ -246,6 +294,8 @@ That is a genuine close/posting boundary, not a manufactured overdue state.
 
 Gas supplier bills are different: they can arrive throughout the month.
 Therefore "Upload supplier bill" is an ongoing intake action and should remain available even when no supplier bill is currently expected.
+
+The accumulated Gas supplier-bill pool may eventually be Worth noting when it is materially different from its historical norm for a comparable period, such as unusually high September supplier costs. This is not automatically an error, Needs attention, or Blocking condition. The comparison method, historical window, comparable-month methodology, seasonality treatment, minimum sample, materiality threshold, and insufficient-history fallback remain TBD; implementation is deferred.
 
 ## 8. Quick Actions
 
@@ -514,8 +564,9 @@ Frozen architecture and domain decisions include:
 - provisional approval target by the fifth calendar day of the obligation month
 - the narrow Sep 8A to Sep 8B to Sep 8C cross-role acceptance sequence
 - the simplified greeting, handoff, and shared notice presentation model
-- provisional Water and Sedapal source-lateness boundaries
+- provisional Water, Gas, and Sedapal source-lateness boundaries
 - source-work lateness kept separate from upcoming financial-preview blockers
+- Gas supplier-pool historical variance as a potential Worth Noting concept, with methodology and materiality threshold TBD
 - the narrow DEV Carlos approval reset acceptance control
 
 Implementation or visual details still open include:
@@ -528,10 +579,18 @@ Implementation or visual details still open include:
 - final iconography
 - whether some completed states collapse further
 - exact deterministic noteworthy query implementation
+- Gas supplier-pool variance calculation and materiality threshold
 - exact deep-link behavior
 - exact dashboard server-read shape
 
 These are implementation details, not domain-open questions.
+
+The frozen source-work rules are ahead of the current projection in one
+known respect: the application may still treat missing Gas readings as
+neutral after day 7. The upcoming Giuliana Dashboard Slice 1 is expected to
+align that projection with the frozen Water/Gas lateness rule. Gas
+supplier-pool historical variance remains a frozen product concept only;
+its calculation and threshold are not implemented.
 
 ### DEV acceptance controls
 
