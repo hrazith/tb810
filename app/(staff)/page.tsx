@@ -99,6 +99,17 @@ function utilityStatusLabel(section: { state: string; emphasis: string }, isOpen
   return isOpen ? null : "Incomplete";
 }
 
+function UtilityStatusIndicator({ section, isOpen }: { section: { state: string; emphasis: string }; isOpen: boolean }) {
+  const status = utilityStatusLabel(section, isOpen);
+  if (status === "Complete") {
+    return <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-500" role="img" aria-label="Complete" />;
+  }
+  if (status === "Needs attention") {
+    return <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-red-500" role="img" aria-label="Needs attention" />;
+  }
+  return null;
+}
+
 function componentLabel(key: string) {
   if (key === "fixed_assessment") return "Fixed assessments";
   if (key === "metered_water") return "Metered water";
@@ -263,10 +274,10 @@ export default async function DashboardPage() {
 
       </div>
 
-      <div className={` grid   gap-6 lg:grid-cols-2 ${isOpen ? "order-3" : "order-2"}`}>
+      <div className={`grid gap-8 sm:grid-cols-2 xl:grid-cols-4 ${isOpen ? "order-3" : "order-2"}`}>
 
 {/*   Water insights */}
-        <Link href="/water" className="group rounded-3xl border  border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
+        <Link href="/water" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
           <div className="flex items-start justify-between gap-4 ">
 
             <div>
@@ -274,7 +285,7 @@ export default async function DashboardPage() {
               <p className="text-md font-light text-zinc-950">Water meter reading</p>
 
             </div>
-            <div>{utilityStatusLabel(projection.water, isOpen) ? <h2 className="mt-1 text-md font-semibold tracking-tight text-zinc-950">{utilityStatusLabel(projection.water, isOpen)}</h2> : null}</div>
+            <UtilityStatusIndicator section={projection.water} isOpen={isOpen} />
           </div>
           <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
             <div className="flex flex-col items-center gap-3 sm:items-start">
@@ -285,7 +296,7 @@ export default async function DashboardPage() {
           </div>
         </Link>
 
-         <Link href="/water" className="group rounded-3xl border  border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
+         <Link href="/water" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
           <div className="flex items-start justify-between gap-4 ">
 
             <div>
@@ -293,7 +304,7 @@ export default async function DashboardPage() {
              
 
             </div>
-            <div>{utilityStatusLabel(projection.water, isOpen) ? <h2 className="mt-1 test text-md font-semibold tracking-tight text-zinc-950">{utilityStatusLabel(projection.water, isOpen)}</h2> : null}</div>
+            <UtilityStatusIndicator section={projection.water} isOpen={isOpen} />
           </div>
           <div className="mt-10 h-36 rounded-3xl  bg-amber-100 w-36 ">
 
@@ -306,7 +317,7 @@ export default async function DashboardPage() {
         </Link>
 
 {/*   Gas insights */}
-        <Link href="/gas" className="group rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
+        <Link href="/gas" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
 
         <div className="flex items-start justify-between gap-4 ">
 
@@ -317,9 +328,7 @@ export default async function DashboardPage() {
             </div>
             <div>
 
-              {utilityStatusLabel(projection.gas, isOpen) ? <h2 className="mt-1 text-md font-semibold tracking-tight text-zinc-950">
-                {utilityStatusLabel(projection.gas, isOpen)}
-                </h2> : null}
+              <UtilityStatusIndicator section={projection.gas} isOpen={isOpen} />
 
             </div>
           </div>
@@ -335,7 +344,7 @@ export default async function DashboardPage() {
           </div>
         </Link>
 
-        <Link href="/gas" className="group rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 cursor-pointer">
+        <Link href="/gas" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
 
         <div className="flex items-start justify-between gap-4 ">
 
@@ -346,9 +355,7 @@ export default async function DashboardPage() {
             </div>
             <div>
 
-              {utilityStatusLabel(projection.gas, isOpen) ? <h2 className="mt-1 text-md font-semibold tracking-tight text-zinc-950">
-                {utilityStatusLabel(projection.gas, isOpen)}
-                </h2> : null}
+              <UtilityStatusIndicator section={projection.gas} isOpen={isOpen} />
 
             </div>
           </div>
@@ -371,7 +378,7 @@ export default async function DashboardPage() {
           <span className="text-sm font-semibold text-zinc-950">Obligations</span>
           <span className="text-sm text-zinc-600">{shortMonthLabel(financialFacts.obligations.obligationMonth)}</span>
           <span className="text-xs font-semibold tracking-[0.12em] text-zinc-500">
-            {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready to snapshot" : "Not ready"}
+            {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for approval" : "Not ready"}
           </span>
           <CaretDown size={16} aria-hidden="true" />
         </summary>
@@ -380,7 +387,7 @@ export default async function DashboardPage() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{financialMonthLabel} obligations</p>
               <p className="mt-1 text-lg font-semibold text-zinc-950">
-                {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready to snapshot" : "Not ready"}
+                {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for approval" : "Not ready"}
               </p>
             </div>
             <Link href="/obligations" className="text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">Open obligations →</Link>
