@@ -668,12 +668,16 @@ test("P month-open projects a snapshotted package as awaiting approval", () => {
 
   assert.equal(projection.obligations.readiness, "awaiting_approval");
   assert.equal(projection.obligations.ready, true);
+  assert.deepEqual(projection.handoff, {
+    obligationMonth: "2026-09",
+    status: "awaiting_carlos_approval",
+  });
   assert.deepEqual(projection.attentions, []);
   assert.equal("approved" in projection.obligations, false);
   assert.equal("dispatched" in projection.obligations, false);
 });
 
-test("P2 future snapshots remain live preview before the obligation month starts", () => {
+test("P2 current live package remains in focus before the obligation month starts", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
     businessDate: "2026-08-31",
     context: "close",
@@ -685,11 +689,11 @@ test("P2 future snapshots remain live preview before the obligation month starts
     },
   }));
 
-  assert.equal(projection.financialFocus, "upcoming");
+  assert.equal(projection.financialFocus, "current");
   assert.equal(projection.obligations.readiness, "ready_for_carlos");
 });
 
-test("P3 an equivalent generic month boundary exposes the snapshot on month one", () => {
+test("P3 an unapproved current package remains in focus at a generic month boundary", () => {
   const before = projectGulianaDashboard(buildProjectionFacts({
     businessDate: "2026-10-31",
     context: "close",
@@ -712,7 +716,7 @@ test("P3 an equivalent generic month boundary exposes the snapshot on month one"
     },
   }));
 
-  assert.equal(before.financialFocus, "upcoming");
+  assert.equal(before.financialFocus, "current");
   assert.equal(onBoundary.financialFocus, "current");
   assert.equal(before.obligations.readiness, "ready_for_carlos");
   assert.equal(onBoundary.obligations.readiness, "awaiting_approval");
@@ -839,7 +843,7 @@ test("approved current obligations keep a Giuliana handoff while October stays i
   assert.equal(projection.handoff?.status, "approved_ready_for_dispatch");
 });
 
-test("future approved packages do not become a Giuliana handoff before their month", () => {
+test("future approved packages provide an early Giuliana handoff", () => {
   const base = buildProjectionFacts().upcoming;
   const projection = projectGulianaDashboard(buildProjectionFacts({
     businessDate: "2026-08-31",
@@ -850,7 +854,10 @@ test("future approved packages do not become a Giuliana handoff before their mon
     },
   }));
 
-  assert.equal(projection.handoff, null);
+  assert.deepEqual(projection.handoff, {
+    obligationMonth: "2026-09",
+    status: "approved_ready_for_dispatch",
+  });
 });
 
 test("Carlos approval is not overdue through the fifth day", () => {
@@ -1023,8 +1030,8 @@ test("K dashboard facts read uses exactly one bounded month read", async () => {
     assert.equal(result.data?.upcoming.charges.unitChargeCount, 1);
     assert.equal(result.data?.upcoming.obligations.obligationMonth, "2026-09");
     assert.equal(result.data?.sourceWork.water.commonWaterBillPresent, false);
-    assert.equal(result.data?.sourceWork.water.meterReadingCount, 1);
-    assert.equal(result.data?.sourceWork.gas.gasReadingCount, 1);
+    assert.equal(result.data?.sourceWork.water.meterReadingCount, 0);
+    assert.equal(result.data?.sourceWork.gas.gasReadingCount, 0);
   } finally {
     businessDateModule.getBusinessNow = originalGetBusinessNow;
     buildingModule.getFixedBuildingIdentity = originalGetFixedBuildingIdentity;

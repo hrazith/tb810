@@ -8,7 +8,6 @@ import {
   recordDevTestMutation,
 } from "@/server/dev-test-session";
 import { getBusinessNow } from "@/server/business-date";
-import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 
 import { createUnitCharge } from "./index";
@@ -147,7 +146,6 @@ export async function addUnitChargeForCurrentBusinessMonth(): Promise<QueryResul
       });
       if (journalResult.error) return { data: null as never, error: journalResult.error };
     }
-    invalidateBuildingMonthFinancialFactsCache(fixture.buildingId);
     return { data: { insertedCount: 0, chargeSeriesId: fixture.seriesId }, error: null };
   }
 
@@ -161,6 +159,5 @@ export async function addUnitChargeForCurrentBusinessMonth(): Promise<QueryResul
 
   if (result.error) return { data: null as never, error: result.error };
 
-  invalidateBuildingMonthFinancialFactsCache(fixture.buildingId);
   return { data: { insertedCount: 1, chargeSeriesId: result.data.series_id }, error: null };
 }

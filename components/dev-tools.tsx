@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   useEffect,
   useMemo,
@@ -18,6 +18,7 @@ import { addGasSupplierBillAction } from "@/server/gas/actions";
 import { resetDevTestSessionAction, startDevTestSessionAction } from "@/server/dev-test-session/actions";
 import { resetDevMonthlyObligationApprovalAction } from "@/server/dev-test-session/actions";
 import { addUnitChargeAction } from "@/server/charges/actions";
+import { runMonthlyObligationPulseAction } from "@/server/dev-test-session/actions";
 
 const STORAGE_KEYS = {
   outline: "tb810-dev-outline",
@@ -307,6 +308,7 @@ export function DevToolsToolbar({ dashboardFacts }: { dashboardFacts?: GulianaDa
 function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDashboardFacts | null }) {
   const state = useDevTools();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const showToolbar = process.env.NODE_ENV === "development";
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
@@ -324,6 +326,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
   const dataMonthLabel = dashboardFacts ? formatMonthYearKey(dashboardFacts.operatingMonth) : null;
   const waterReadiness = dashboardFacts?.sourceWork.water.readingsReady ?? false;
   const currentBillingPeriodStatus = dashboardFacts?.current.obligationLifecycle.billingPeriodStatus ?? null;
+  const pulseStatus = searchParams.get("pulse");
 
   const items = useMemo(
     () => [
@@ -662,6 +665,15 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                       </button>
                     </form>
                   ) : null}
+                  {state.testSessionActive ? (
+                    <form action={runMonthlyObligationPulseAction} className="flex justify-end">
+                      <input type="hidden" name="return_to" value={pathname} />
+                      <button type="submit" className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white">
+                        Run monthly pulse
+                      </button>
+                    </form>
+                  ) : null}
+                  {pulseStatus ? <p className="text-right text-white/55">Pulse: {pulseStatus.replaceAll("_", " ")}</p> : null}
                 </div>
               </div>
 

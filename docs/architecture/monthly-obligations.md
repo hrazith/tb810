@@ -7,10 +7,10 @@ Date: August 7, 2026
 This document is the canonical architecture reference for Monthly Obligations.
 It consolidates the frozen decisions that define the month-centric financial workspace for TB810.
 
-The snapshot foundation, snapshot-aware bounded read, and the first Carlos
-review/approval slice are implemented. The automatic month-turn coordinator,
-delayed snapshot coordinator, invoice generation, compressed dispatch bundles,
-and dispatch remain deferred implementation work.
+The snapshot foundation, snapshot-aware bounded read, the first Carlos
+review/approval slice, and a manually invokable production-shaped pulse
+coordinator are implemented. Production scheduling/wake-up, invoice
+generation, compressed dispatch bundles, and dispatch remain deferred.
 
 ## 1. Purpose
 
@@ -110,7 +110,7 @@ become available. There is no separate Giuliana action required to make that
 calculation exist.
 
 At the August-to-September month turn, when the September package is complete
-and valid, the system automatically snapshots the calculated obligations.
+and valid, the monthly pulse attempts to snapshot the calculated obligations.
 That snapshot becomes immutable financial history and is shown as Awaiting
 Carlos Approval. Giuliana does not generate, finalize, snapshot, or close the
 happy-path package.
@@ -129,16 +129,48 @@ This approved snapshot must preserve the financial facts Carlos reviewed so late
 
 The dashboard may preview the next obligation month before that approval boundary is reached.
 That preview remains live and unapproved until Carlos explicitly approves the resulting Monthly Obligation snapshot.
-Month close is the expected automatic snapshot boundary for a complete and
-valid happy-path package. The date alone does not freeze an incomplete package;
-an incomplete package remains live and Not Ready without a snapshot until its
-final blocker resolves.
+Snapshot creation is readiness-driven. Month close is an important guaranteed
+attempt/checkpoint, but it is not the earliest allowed snapshot time: when all
+required financial facts for an upcoming package become ready before month
+turn, the system may snapshot that package early. The date alone does not
+freeze an incomplete package; an incomplete package remains live and Not Ready
+without a snapshot until its final blocker resolves.
 
 The dashboard may show the next obligation package as a live preview while the
 current immutable package awaits approval. Carlos's approval is the event that
 transfers financial focus: before approval, Giuliana's financial utility stays
-on the current package; after approval, it advances to the next live package.
-The calendar alone must not advance that focus.
+on the current package; after approval, it may advance to the next live package.
+The calendar alone must not advance that focus. Calendar/business date,
+financial readiness, snapshot creation, and Carlos approval are coordinated
+lifecycle clocks rather than one universal month clock.
+
+### Coordinated lifecycle clocks
+
+For obligation month M, the relevant preceding source periods are selected by
+the component rules. The lifecycle is:
+
+```text
+source facts accumulating
+  -> live obligation projection
+  -> required facts ready
+  -> canonical snapshot created
+  -> Complete · Awaiting Carlos approval
+  -> Carlos approves
+  -> Approved · Ready for dispatch
+  -> Live Preview may advance to the following obligation month
+```
+
+Calendar/business month is advanced by the business date and drives boundaries
+and month-turn attempts. The canonical obligation package advances when facts
+become ready and a snapshot is created. Live Preview financial focus advances
+when Carlos approves the preceding package. These concepts may point at
+different months by design.
+
+For example, September source facts becoming ready on September 28 may produce
+an October snapshot before October begins. If September facts remain incomplete
+on October 1, October is Not Ready while October source intake proceeds toward
+November. When the final September fact arrives on October 2, a later pulse may
+create the October snapshot without requiring a user to manufacture it.
 
 ## 5. Component Contract
 
@@ -266,7 +298,7 @@ The system never decides when invoices should be generated.
 The frozen happy-path lifecycle is:
 
 - Live Preview before successful finalization;
-- automatic month-turn snapshot when the package is complete and valid;
+- readiness-driven snapshot when the package is complete and valid; month-turn guarantees an attempt;
 - Awaiting Carlos Approval after the immutable snapshot exists;
 - invoice manifestation and compressed dispatch-bundle creation when Carlos approves;
 - Ready for Dispatch after those artifacts become available to Giuliana.
@@ -278,8 +310,8 @@ The incomplete month-turn path is also defined:
 - the state is Not Ready;
 - Giuliana may continue entering or correcting the missing prior-period facts;
 - Carlos can see the package and its blockers but cannot approve it;
-- once the final blocker is resolved and the package is complete and valid, the
-  system automatically performs the delayed snapshot;
+- once the final blocker is resolved and the package is complete and valid, a
+  later pulse performs the delayed snapshot;
 - the resulting package is immutable and enters Awaiting Carlos Approval.
 
 This delayed snapshot rejoins the happy path. The exact persistence and
@@ -346,7 +378,7 @@ does not block capture of the physical fact.
 Carlos retains visibility of the incomplete package, its blockers, and the
 underlying workspaces, but there is no approval action before the package has
 been snapshotted. Once the final blocker resolves and the package is complete
-and valid, the system automatically snapshots it and the package enters
+and valid, a later pulse snapshots it and the package enters
 Awaiting Carlos Approval.
 
 The financial obligation becomes immutable at snapshot. This does not make
@@ -416,7 +448,7 @@ The frozen happy-path product lifecycle is therefore:
 
 ```text
 Live Preview
-  -> automatic month-turn snapshot (complete and valid only)
+  -> readiness-driven snapshot (month-turn guarantees an attempt)
   -> Awaiting Carlos Approval
   -> Carlos approval
   -> invoices + compressed dispatch bundles available to Giuliana
@@ -449,8 +481,8 @@ This document does not:
 - Missing components must not be treated as zero.
 - Zero and missing must remain distinguishable.
 - Finalized Monthly Obligations are immutable historical snapshots.
-- A complete and valid package is automatically snapshotted at the happy-path month turn.
-- The month-turn snapshot precedes Carlos approval.
+- Snapshot eligibility is readiness-driven; month-turn guarantees an attempt but is not the earliest allowed snapshot time.
+- Snapshot creation precedes Carlos approval.
 - A date change alone does not resolve or freeze an incomplete package.
 - Before finalization, live/progressive obligations may be presented as a preview.
 - After finalization, the package is Awaiting Carlos Approval.
@@ -460,7 +492,7 @@ This document does not:
 - Carlos approval manifests invoices and creates compressed dispatch bundles available to Giuliana.
 - After approval and artifact manifestation, the package is Ready for Dispatch.
 - An incomplete package at month turn is not snapshotted and remains live until its final blocker resolves.
-- The delayed complete-and-valid package is automatically snapshotted and then awaits Carlos approval.
+- A delayed complete-and-valid package is snapshotted by a later pulse attempt and then awaits Carlos approval.
 - Carlos cannot approve an incomplete, unsnapshotted package.
 - Invoice generation reads finalized obligations only.
 - Upstream domains own facts and formulas.

@@ -201,15 +201,16 @@ export default async function DashboardPage() {
   const worthNoting = projection.worthNoting;
   const financialFacts = result.data[projection.financialFocus];
   const financialMonthLabel = formatMonthLabel(financialFacts.obligations.obligationMonth);
-  const nextCycleMonthLabel = formatMonthLabel(result.data.upcomingObligationMonth);
-  const waterBill = result.data.upcoming.commonWaterBill;
+  const waterBill = financialFacts.commonWaterBill;
   const waterComplete = result.data.sourceWork.water.meterReadingCompleteCount;
   const waterExpected = result.data.sourceWork.water.meterReadingExpectedCount;
   const gasComplete = result.data.sourceWork.gas.gasReadingCount;
   const gasExpected = result.data.sourceWork.gas.gasUnitCount;
   const components = financialFacts.obligations.components;
   const handoffStatus = projection.handoff
-    ? "Approved · Ready for dispatch"
+    ? projection.handoff.status === "approved_ready_for_dispatch"
+      ? "Approved · Ready for dispatch"
+      : "Complete · Awaiting Carlos approval"
     : projection.obligations.readiness === "awaiting_approval"
       ? "Complete · Awaiting Carlos approval"
       : null;
@@ -258,7 +259,7 @@ export default async function DashboardPage() {
       ) : null}
 
       <div className="mt-20 space-y-1">
-        <p className="text-lg font-medium text-zinc-950">Source inputs for <span className="font-semibold">{nextCycleMonthLabel} </span> obligations</p>
+        <p className="text-lg font-medium text-zinc-950">Source inputs for <span className="font-semibold">{financialMonthLabel} </span> obligations</p>
 
       </div>
 
@@ -357,8 +358,8 @@ export default async function DashboardPage() {
           <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
             <div className="flex flex-col items-center gap-3 sm:items-start">
               <p className="text-lg font-normal text-zinc-950">Gas Supplier Bills</p>
-              <p className="mt-2 text-lg font-semibold text-zinc-950">{result.data.upcoming.gas.supplierBillCount} bills</p>
-              <p className="mt-1 text-sm text-zinc-600">{formatMoney(result.data.upcoming.gas.supplierBillTotal)}</p>
+              <p className="mt-2 text-lg font-semibold text-zinc-950">{financialFacts.gas.supplierBillCount} bills</p>
+              <p className="mt-1 text-sm text-zinc-600">{formatMoney(financialFacts.gas.supplierBillTotal)}</p>
             </div>
            
           </div>
@@ -370,7 +371,7 @@ export default async function DashboardPage() {
           <span className="text-sm font-semibold text-zinc-950">Obligations</span>
           <span className="text-sm text-zinc-600">{shortMonthLabel(financialFacts.obligations.obligationMonth)}</span>
           <span className="text-xs font-semibold tracking-[0.12em] text-zinc-500">
-            {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready"}
+            {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready to snapshot" : "Not ready"}
           </span>
           <CaretDown size={16} aria-hidden="true" />
         </summary>
@@ -379,7 +380,7 @@ export default async function DashboardPage() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{financialMonthLabel} obligations</p>
               <p className="mt-1 text-lg font-semibold text-zinc-950">
-                {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for Carlos" : "Not ready"}
+                {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready to snapshot" : "Not ready"}
               </p>
             </div>
             <Link href="/obligations" className="text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">Open obligations →</Link>

@@ -117,3 +117,23 @@ test("missing source provenance refuses an otherwise complete component", () => 
   assert.equal(result.data, null);
   assert.equal(result.error, "Missing provenance for common_water on 101.");
 });
+
+test("non-Gas condo units do not require Gas provenance", () => {
+  const result = buildSnapshotPayload(
+    {
+      ...completeComposition,
+      units: [{
+        ...completeComposition.units[0],
+        unitNumber: "301",
+        components: completeComposition.units[0].components.filter((component) => component.key !== "gas"),
+      }],
+    },
+    { ...facts, gasBills: [], gasReadings: [] },
+    accounts,
+    "budget-plan-1",
+    new Map([["unit-1", "water-reading-1"]]),
+  );
+
+  assert.equal(result.error, null);
+  assert.ok(result.data?.rows.every((row) => row.obligation_type !== "gas_consumption"));
+});

@@ -114,7 +114,7 @@ export type GulianaDashboardProjection = {
   };
   handoff: {
     obligationMonth: string;
-    status: "approved_ready_for_dispatch";
+    status: "awaiting_carlos_approval" | "approved_ready_for_dispatch";
   } | null;
   attentions: DashboardAttention[];
   worthNoting: DashboardWorthNoting[];
@@ -232,25 +232,20 @@ function isApprovedLifecycleStatus(status: string | null) {
   return status === "approved" || status === "invoices_generated" || status === "closed";
 }
 
+function deriveFinancialFocus(monthFacts: GulianaDashboardFacts): DashboardFinancialFocus {
+  return currentIsApproved(monthFacts.current) ? "upcoming" : "current";
+}
+
+function currentIsApproved(current: UpcomingFacts) {
+  return current.obligationLifecycle?.mode === "snapshotted"
+    && isApprovedLifecycleStatus(current.obligationLifecycle.billingPeriodStatus);
+}
+
 function hasBlockedObligationComponent(obligations: UpcomingFacts["obligations"]) {
   return obligations.components.fixed_assessment.state === "blocked"
     || obligations.components.metered_water.state === "blocked"
     || obligations.components.common_water.state === "blocked"
     || obligations.components.gas.state === "blocked";
-}
-
-function deriveFinancialFocus(monthFacts: GulianaDashboardFacts): DashboardFinancialFocus {
-  const businessMonth = monthFacts.businessDate.slice(0, 7);
-  const current = monthFacts.current;
-
-  if (businessMonth < current.obligations.obligationMonth) return "upcoming";
-
-  if (current.obligationLifecycle.mode === "snapshotted") {
-    return isApprovedLifecycleStatus(current.obligationLifecycle.billingPeriodStatus) ? "upcoming" : "current";
-  }
-
-  if (current.obligations.total === null || hasBlockedObligationComponent(current.obligations)) return "current";
-  return businessMonth < monthFacts.upcoming.obligations.obligationMonth ? "upcoming" : "current";
 }
 
 function isReadyToApprove(facts: UpcomingFacts) {
@@ -451,17 +446,19 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
   const financialFocus = deriveFinancialFocus(monthFacts);
   const financialFacts = monthFacts[financialFocus];
   const operationalWorthNoting = monthFacts.upcoming.worthNoting;
-  const sourceWorkActionable = financialFocus === "upcoming" && monthFacts.current.obligationLifecycle.mode !== "snapshotted";
+  const sourceWorkActionable = monthFacts.context === "close" && monthFacts.current.obligationLifecycle.mode !== "snapshotted";
   const obligations = deriveObligationState(financialFacts.obligations, financialFacts.obligationLifecycle, monthFacts.businessDate);
   const water = deriveWaterState(sourceWork, financialFacts.obligations, sourceWorkActionable, monthFacts.businessDate);
   const gas = deriveGasState(sourceWork, financialFacts.obligations, sourceWorkActionable, monthFacts.businessDate);
   const currentLifecycle = monthFacts.current.obligationLifecycle;
   const currentObligationMonth = monthFacts.current.obligations.obligationMonth;
-  const handoff = monthFacts.businessDate.slice(0, 7) >= currentObligationMonth
-    && currentLifecycle.mode === "snapshotted"
-    && isApprovedLifecycleStatus(currentLifecycle.billingPeriodStatus)
-    ? { obligationMonth: currentObligationMonth, status: "approved_ready_for_dispatch" as const }
-    : null;
+  const handoff = currentLifecycle.mode === "snapshotted"
+    && currentLifecycle.billingPeriodStatus === "ready_for_review"
+    ? { obligationMonth: currentObligationMonth, status: "awaiting_carlos_approval" as const }
+    : currentLifecycle.mode === "snapshotted"
+      && isApprovedLifecycleStatus(currentLifecycle.billingPeriodStatus)
+      ? { obligationMonth: currentObligationMonth, status: "approved_ready_for_dispatch" as const }
+      : null;
 
   return {
     businessDate: monthFacts.businessDate,
@@ -569,7 +566,10 @@ export const getGulianaDashboardFacts = cache(async (): Promise<QueryResult<Guli
   }
 
   const upcomingFacts = factsResult.data.upcoming;
-  const sourceWork = buildSourceWorkFacts(upcomingFacts);
+  const current = buildUpcomingFacts(factsResult.data.current, operatingMonth);
+  const upcoming = buildUpcomingFacts(upcomingFacts, upcomingObligationMonth);
+  const financialFocus = currentIsApproved(current) ? "upcoming" : "current";
+  const sourceWork = buildSourceWorkFacts(financialFocus === "upcoming" ? upcomingFacts : factsResult.data.current);
 
   return {
     data: {
@@ -578,8 +578,8 @@ export const getGulianaDashboardFacts = cache(async (): Promise<QueryResult<Guli
       upcomingObligationMonth,
       context,
       sourceWork,
-      current: buildUpcomingFacts(factsResult.data.current, operatingMonth),
-      upcoming: buildUpcomingFacts(upcomingFacts, upcomingObligationMonth),
+      current,
+      upcoming,
     },
     error: null,
   };

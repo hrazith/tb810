@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessNow } from "@/server/business-date";
 import { getCurrentBuilding } from "@/server/units";
-import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 import {
   getActiveDevTestSessionId,
   getActiveDevTestSessionSummary,
@@ -220,7 +219,6 @@ export async function completeMissingWaterReadingsForCurrentBusinessMonth(): Pro
 
   if (draftsResult.error) return { data: null as never, error: draftsResult.error };
   if (!draftsResult.data || draftsResult.data.length === 0) {
-    invalidateBuildingMonthFinancialFactsCache(building.data.id);
     return { data: { insertedCount: 0 }, error: null };
   }
 
@@ -272,6 +270,5 @@ export async function completeMissingWaterReadingsForCurrentBusinessMonth(): Pro
     }
   }
 
-  invalidateBuildingMonthFinancialFactsCache(building.data.id);
   return { data: { insertedCount: insertedIds.length }, error: null };
 }

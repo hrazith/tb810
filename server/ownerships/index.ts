@@ -3,7 +3,6 @@ import { isPerfLoggingEnabled } from "@/server/perf";
 import type { UnitTypeCode } from "@/server/units/types";
 import { getUnitById } from "@/server/units";
 import { invalidateUnitDirectoryCache } from "@/server/units/cache";
-import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 
 import {
   getCurrentBillingMonth,
@@ -575,7 +574,6 @@ export async function transferOwnership(
     }
 
     invalidateUnitDirectoryCache();
-    invalidateBuildingMonthFinancialFactsCache();
     return { data: data as OwnershipRecord, error: null };
   } catch (error) {
     console.error("Ownership transfer RPC exception", {

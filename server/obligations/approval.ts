@@ -3,7 +3,6 @@ import { getBusinessNow } from "@/server/business-date";
 import { getFixedBuildingIdentity } from "@/server/building";
 import { getActiveDevTestSessionSummary } from "@/server/dev-test-session";
 import { getStaffContext } from "@/server/staff-context";
-import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 
 export function canApproveMonthlyObligation(roleKeys: string[]) {
   return roleKeys.includes("super_admin");
@@ -61,10 +60,6 @@ export async function approveMonthlyObligation({ billingPeriodId }: { billingPer
 
   if (updateResult.error) return { data: null, error: updateResult.error.message };
   if (!updateResult.data) return { data: null, error: "Billing Period changed before approval. Please review it again." };
-  invalidateBuildingMonthFinancialFactsCache(
-    building.id,
-    `${periodResult.data.period_year}-${String(periodResult.data.period_month).padStart(2, "0")}`,
-  );
   return { data: { status: String(updateResult.data.status) }, error: null };
 }
 
@@ -107,9 +102,5 @@ export async function resetCurrentMonthlyObligationApprovalForDev() {
   if (updateResult.error) return { data: null, error: updateResult.error.message };
   if (!updateResult.data) return { data: null, error: "Billing Period changed before DEV approval reset." };
 
-  invalidateBuildingMonthFinancialFactsCache(
-    building.id,
-    `${periodYear}-${String(periodMonth).padStart(2, "0")}`,
-  );
   return { data: { status: String(updateResult.data.status) }, error: null };
 }

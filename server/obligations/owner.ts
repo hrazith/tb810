@@ -131,6 +131,7 @@ export async function getOwnerMonthlyObligationForBuilding({
       unitAccountId: unit.unitId,
       unitTypeCode: unit.unitTypeCode,
       hasMeter: unit.hasMeter,
+      hasGasService: unit.hasGasService,
       participationPercentage: unit.participationPercentage,
     })),
     createMonthlyObligationProviders({

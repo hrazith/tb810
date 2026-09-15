@@ -5,11 +5,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { getFixedBuildingIdentity } from "@/server/building";
-import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 import { resetCurrentMonthlyObligationApprovalForDev } from "@/server/obligations/approval";
+import { runMonthlyObligationPulse } from "@/server/obligations/pulse";
 
-import { getDevTestSessionCookieName, startDevTestSession } from "../dev-test-session";
+import { getActiveDevTestSessionSummary, getDevTestSessionCookieName, startDevTestSession } from "../dev-test-session";
 
 function returnToValue(formData: FormData) {
   return String(formData.get("return_to") ?? "/").trim() || "/";
@@ -28,10 +27,8 @@ export async function startDevTestSessionAction(formData: FormData) {
 export async function resetDevTestSessionAction(formData: FormData) {
   const returnTo = returnToValue(formData);
   const sessionId = String(formData.get("session_id") ?? "").trim();
-  const buildingId = getFixedBuildingIdentity().id;
   const supabase = await createClient();
   if (!sessionId) {
-    invalidateBuildingMonthFinancialFactsCache(buildingId);
     revalidatePath("/", "layout");
     redirect(returnTo);
   }
@@ -56,7 +53,6 @@ export async function resetDevTestSessionAction(formData: FormData) {
     redirect(`${returnTo}?error=${encodeURIComponent(error.message)}`);
   }
 
-  invalidateBuildingMonthFinancialFactsCache(buildingId);
   revalidatePath("/", "layout");
   const cookieStore = await cookies();
   cookieStore.set(getDevTestSessionCookieName(), "", { path: "/", expires: new Date(0) });
@@ -72,4 +68,19 @@ export async function resetDevMonthlyObligationApprovalAction(formData: FormData
   revalidatePath("/", "layout");
   revalidatePath("/obligations");
   redirect(returnTo);
+}
+
+export async function runMonthlyObligationPulseAction(formData: FormData) {
+  const returnTo = returnToValue(formData);
+  if (process.env.NODE_ENV !== "development") {
+    redirect(`${returnTo}?error=${encodeURIComponent("DEV obligation pulse is development-only.")}`);
+  }
+  const session = await getActiveDevTestSessionSummary();
+  if (!session) redirect(`${returnTo}?error=${encodeURIComponent("Start a DEV test session first.")}`);
+
+  const result = await runMonthlyObligationPulse();
+  if (result.status === "error") redirect(`${returnTo}?error=${encodeURIComponent(result.reason ?? "Monthly obligation pulse failed.")}`);
+  revalidatePath("/", "layout");
+  revalidatePath("/obligations");
+  redirect(`${returnTo}?pulse=${result.status}`);
 }

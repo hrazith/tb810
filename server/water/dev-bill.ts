@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getBusinessNow } from "@/server/business-date";
 import { getActiveDevTestSessionId, getActiveDevTestSessionSummary, recordDevTestMutation } from "@/server/dev-test-session";
 import { getCurrentBuilding } from "@/server/units";
-import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 import { loadBuildingMonthFinancialFacts } from "@/server/obligations/owner-facts";
 import { calculateWaterAllocationCents, parseMilliUnits, parseMoneyCents, roundToNearestInteger } from "./index";
 import { hasCompleteWaterReadings } from "./readiness";
@@ -293,6 +292,5 @@ export async function addCommonWaterBillForCurrentBusinessMonth(): Promise<Query
     return { data: null as never, error: journalResult.error };
   }
 
-  invalidateBuildingMonthFinancialFactsCache(building.data.id);
   return { data: { insertedCount: 1, billId: data.id }, error: null };
 }

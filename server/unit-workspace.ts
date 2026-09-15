@@ -553,7 +553,7 @@ export async function loadUnitWorkspace(unitNumber: string, obligationMonth: str
   const compositionStarted = Date.now();
   const monthlyObligation = await composeMonthlyObligation(
     { obligationMonth, buildingId: TB810_BUILDING_ID, buildingName: TB810_BUILDING_NAME },
-    [{ unitId: unit.id, unitNumber: unit.unit_number, unitAccountId: unit.id, unitTypeCode: unit.unit_type_code, hasMeter: Boolean(unit.has_meter), participationPercentage: unit.participation_percentage }],
+    [{ unitId: unit.id, unitNumber: unit.unit_number, unitAccountId: unit.id, unitTypeCode: unit.unit_type_code, hasMeter: Boolean(unit.has_meter), hasGasService: Boolean(unit.has_gas_service), participationPercentage: unit.participation_percentage }],
     createMonthlyObligationProviders({
       fixedAssessmentByUnitId: new Map([[unit.id, fixedAssessment]]),
       waterByUnitId: new Map<string, WaterChargePreviewBundle>([[unit.id, waterResult.water]]),

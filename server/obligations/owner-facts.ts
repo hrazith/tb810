@@ -11,10 +11,6 @@ import { classifyOwnershipRow } from "@/server/ownerships/classification";
 import type { OwnershipRecord } from "@/server/ownerships/types";
 import type { OwnerSummary } from "@/server/owners/types";
 import type { UnitTypeCode } from "@/server/units/types";
-import {
-  getCachedBuildingMonthFinancialFacts,
-  setCachedBuildingMonthFinancialFacts,
-} from "./building-month-cache";
 
 function withRequestCount<T>(result: { data: T | null; error: string | null }, requestCount: number): { data: T | null; error: string | null; requestCount: number } {
   return { ...result, requestCount };
@@ -301,19 +297,6 @@ export async function loadBuildingMonthFinancialFacts({
   buildingId: string;
   obligationMonth: string;
 }): Promise<BuildingMonthFinancialFactsResult> {
-  const cachedStartedAt = process.hrtime.bigint();
-  const cached = getCachedBuildingMonthFinancialFacts(buildingId, obligationMonth);
-  if (cached) {
-    const elapsedMs = Number(process.hrtime.bigint() - cachedStartedAt) / 1_000_000;
-    return {
-      data: cached.data,
-      error: null,
-      requestCount: 0,
-      source: "cached",
-      elapsedMs,
-    };
-  }
-
   const startedAt = process.hrtime.bigint();
   const supabase = await createClient();
   const planYear = Number(obligationMonth.slice(0, 4));
@@ -386,7 +369,6 @@ export async function loadBuildingMonthFinancialFacts({
     elapsedMs: Number(process.hrtime.bigint() - startedAt) / 1_000_000,
   };
 
-  setCachedBuildingMonthFinancialFacts(buildingId, obligationMonth, facts.data, facts.elapsedMs ?? 0);
   return facts;
 }
 

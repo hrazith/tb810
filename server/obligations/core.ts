@@ -180,6 +180,7 @@ export async function composeMonthlyObligation(
     unitAccountId: string;
     unitTypeCode: string;
     hasMeter: boolean;
+    hasGasService: boolean;
     participationPercentage: number | null;
   }>,
   providers: ProviderMap,

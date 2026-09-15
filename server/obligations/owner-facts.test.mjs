@@ -9,7 +9,6 @@ const jiti = createJiti(import.meta.url, {
 });
 
 const { monthKeyToDate, loadBuildingMonthFinancialFacts } = jiti("./owner-facts.ts");
-const cache = jiti("./building-month-cache.ts");
 const supabaseServer = jiti("@/lib/supabase/server");
 
 test("building month facts RPC receives a SQL date for source reading month", () => {
@@ -22,7 +21,6 @@ test("dual-period facts keep Aug 31 and Sep 1 source periods distinct", { concur
   const rpcCalls = [];
   const augustBuildingId = "dual-period-august-building";
   const septemberBuildingId = "dual-period-september-building";
-  cache.invalidateBuildingMonthFinancialFactsCache();
   supabaseServer.createClient = async () => ({
     rpc(name, args) {
       rpcCalls.push([name, args]);
@@ -80,13 +78,13 @@ test("dual-period facts keep Aug 31 and Sep 1 source periods distinct", { concur
     assert.equal(rpcCalls.length, 2);
     assert.equal(rpcCalls[1][1].p_reading_month, "2026-07-01");
 
-    const aug31Cached = await loadBuildingMonthFinancialFacts({
+    const aug31Repeated = await loadBuildingMonthFinancialFacts({
       buildingId: augustBuildingId,
       obligationMonth: "2026-08",
     });
-    assert.equal(aug31Cached.source, "cached");
-    assert.equal(aug31Cached.requestCount, 0);
-    assert.equal(rpcCalls.length, 2);
+    assert.equal(aug31Repeated.source, "remote");
+    assert.equal(aug31Repeated.requestCount, 1);
+    assert.equal(rpcCalls.length, 3);
 
     const sep1 = await loadBuildingMonthFinancialFacts({
       buildingId: septemberBuildingId,
@@ -96,10 +94,9 @@ test("dual-period facts keep Aug 31 and Sep 1 source periods distinct", { concur
     assert.equal(sep1.data?.current.sourceReadingMonth, "2026-08");
     assert.equal(sep1.data?.upcoming.obligationMonth, "2026-10");
     assert.equal(sep1.data?.upcoming.sourceReadingMonth, "2026-09");
-    assert.equal(rpcCalls.length, 3);
-    assert.equal(rpcCalls[2][1].p_reading_month, "2026-08-01");
+    assert.equal(rpcCalls.length, 4);
+    assert.equal(rpcCalls[3][1].p_reading_month, "2026-08-01");
   } finally {
-    cache.invalidateBuildingMonthFinancialFactsCache();
     supabaseServer.createClient = originalCreateClient;
   }
 });

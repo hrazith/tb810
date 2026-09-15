@@ -96,6 +96,7 @@ export type MonthlyObligationProvider = (args: {
     unitAccountId: string;
     unitTypeCode: string;
     hasMeter: boolean;
+    hasGasService: boolean;
     participationPercentage: number | null;
   };
 }) => Promise<MonthlyObligationProviderResult>;

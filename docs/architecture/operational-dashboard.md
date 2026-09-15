@@ -94,7 +94,7 @@ The absence of work should not automatically become a warning.
 The dashboard should not force users to reconcile implementation-level source periods, but it must make the two user-relevant timelines explicit.
 Precise source-period rules remain visible inside Water and Gas workspaces where they belong.
 
-The dashboard also distinguishes the obligation lifecycle from the operating calendar. A date provides context; successful finalization creates lifecycle state. In the normal happy path, a complete and valid package is previewed before its obligation month, automatically snapshotted at the month turn, and shown to Giuliana as Awaiting Carlos Approval.
+The dashboard also distinguishes the obligation lifecycle from the operating calendar. A date provides context; financial readiness and successful snapshot creation create lifecycle state. In the normal happy path, a complete and valid package may be previewed before its obligation month, snapshotted when ready, and shown to Giuliana as Awaiting Carlos Approval.
 
 Persisted future lifecycle state must not leak backward when the DEV business date is rewound. A snapshot is presentation-visible for its obligation month only when the business date has reached that month. Rewinding the business date changes projection only; it does not mutate, reopen, delete, or rewrite persisted lifecycle state.
 
@@ -214,11 +214,13 @@ Incomplete, late, and blocking are separate states. An incomplete source fact ma
 
 The timing rules above define operational lateness, while the dependent package boundary defines financial blocking. Detailed domain validation remains authoritative. Existing canonical financial-calculation blockers continue to behave as implemented.
 
-For a complete and valid happy-path package, month close is the automatic
-snapshot boundary. The date alone does not snapshot an incomplete package.
-An incomplete package remains live while Giuliana enters or corrects the
-missing prior-period facts. When the final blocker resolves, the system
-automatically snapshots the package and returns to Awaiting Carlos Approval.
+For a complete and valid happy-path package, month close is a guaranteed pulse
+checkpoint, not a strict earliest snapshot boundary. If required facts become
+ready earlier, the package may be snapshotted early. The date alone does not
+snapshot an incomplete package. An incomplete package remains live while
+Giuliana enters or corrects the missing prior-period facts; a later pulse may
+snapshot it when the final blocker resolves and return it to Awaiting Carlos
+Approval.
 
 ### Business-date month boundary
 
@@ -232,6 +234,19 @@ For example:
 - September source work remains preparation for October regardless of the prior package's handoff state.
 
 Incomplete does not mean late. Calendar passage alone must not create Attention; a real business expectation or blocking rule is required.
+
+Month-turn is a real calendar/business-date event, but there is no single master
+month clock. Calendar/business date drives boundaries and pulse attempts;
+financial readiness drives snapshot eligibility; snapshot creation freezes the
+canonical package and hands it to Carlos; Carlos approval advances Live Preview
+and hands responsibility back to Giuliana. These transitions may occur before
+or after calendar month-turn.
+
+For example, September source facts becoming ready on September 28 may produce
+an October snapshot before October begins. Conversely, on October 1 unresolved
+September facts leave October obligations Not Ready while October source work
+begins for November. After the final September fact arrives, a subsequent pulse
+may create October and show Complete · Awaiting Carlos approval.
 
 ### Lateness and attention examples
 
@@ -408,7 +423,7 @@ The provisional approval target is the fifth calendar day of the obligation mont
 The happy-path lifecycle is:
 
 - Live Preview before successful finalization
-- automatic month-turn snapshot when complete and valid
+- readiness-driven snapshot when complete and valid; month-turn guarantees an attempt
 - Awaiting Carlos Approval after the immutable package is available
 - Ready for Dispatch after Carlos approval manifests invoices and compressed dispatch bundles
 
@@ -545,7 +560,7 @@ Do not expand this sprint into:
 
 ## 19. Documentation Status
 
-The snapshot foundation, snapshot-aware bounded financial read, and the first Carlos review/approval dashboard slice are implemented. Automatic month-turn coordination, delayed automatic snapshot coordination, invoice generation, compressed dispatch-bundle generation, dispatch, and the full Carlos dashboard remain deferred implementation work.
+The snapshot foundation, snapshot-aware bounded financial read, the first Carlos review/approval dashboard slice, and the narrow manually invokable pulse coordinator are implemented. Automatic production scheduling/wake-up, delayed scheduled coordination, invoice generation, compressed dispatch-bundle generation, dispatch, and the full Carlos dashboard remain deferred implementation work.
 
 Frozen architecture and domain decisions include:
 
@@ -560,9 +575,9 @@ Frozen architecture and domain decisions include:
 - Carlos obligations-first hierarchy
 - successful finalization as the frozen-package boundary
 - Awaiting Carlos Approval and Ready for Dispatch as post-finalization states
-- automatic happy-path month-turn snapshot for complete, valid packages
+- readiness-driven snapshot creation with month-turn as a guaranteed attempt
 - no snapshot for incomplete or invalid packages at month turn
-- automatic delayed snapshot after the final blocker resolves
+- later pulse snapshot after the final blocker resolves
 - approval-triggered invoice and compressed-bundle manifestation
 - operational source intake kept distinct from the next obligation package
 - collections lifecycle semantics
@@ -616,11 +631,19 @@ The development-only panel has Time, Data, and Style tabs. Time changes the cano
 
 The DEV panel also has one narrow Carlos approval replay control. When the current business-month Billing Period is approved, it may be reset to `ready_for_review` while clearing `approved_at` and `approved_by`. It does not delete or regenerate the immutable snapshot, monthly obligation rows, or source facts. This is not a generic lifecycle editor or scenario framework. Because the existing DEV journal records domain source-record mutations rather than Billing Period lifecycle metadata, Reset session must not be assumed to restore Carlos approval state.
 
+The monthly obligation pulse coordinator is also manually invokable through the
+development-only panel. It uses the canonical business date, checks the
+authoritative Billing Period lifecycle first, treats an incomplete package as a
+normal Not Ready outcome, and delegates ready packages to the existing snapshot
+machinery. The production scheduler or wake-up mechanism that would invoke the
+coordinator automatically, including month-turn and later retry cadence, is not
+implemented yet and remains deferred.
+
 The current DEV panel is an acceptance-testing aid, not a production workflow. The reset control is guarded by development mode, an active DEV test session, and the approved status of the current Billing Period.
 
 ### Read and invalidation invariants
 
-The dashboard remains a server-side projection over the bounded canonical building-month financial-facts read. A cold dashboard request uses exactly one bounded financial-facts RPC; warm repeated reads add zero underlying financial-facts RPCs. Source-work attention derivation adds no reads, RPCs, client fetching, or N+1 behavior. DEV mutations revalidate the necessary root/layout surfaces and invalidate the relevant bounded facts cache. The module-local cache's invalidation behavior across separately instantiated Next.js runtime/module contexts remains known architectural debt; this document does not claim it is a universal cross-runtime cache mechanism.
+The dashboard remains a server-side projection over the bounded canonical building-month financial-facts read. Each independent server request may perform exactly one bounded financial-facts RPC, while React `cache()` preserves request-level deduplication when multiple consumers ask for the same dashboard facts in one request. Source-work attention derivation adds no reads, RPCs, client fetching, or N+1 behavior. The process-local financial-facts Map was deliberately removed to eliminate cross-runtime stale-data risk; authoritative database state wins over indefinite cross-request warm caching. Shared remote caching can be reconsidered only if measured performance justifies its deployment and authorization complexity.
 
 Notice producers use the period context appropriate to their operational meaning rather than inheriting financial focus automatically. In Giuliana's current-work and Pay attention surface, Unit Charge Worth noting follows the upcoming obligation period while an earlier package remains under financial review.
 

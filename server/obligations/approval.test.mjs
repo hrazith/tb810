@@ -5,7 +5,6 @@ import createJiti from "jiti";
 const jiti = createJiti(import.meta.url, { alias: { "@": process.cwd() } });
 const { canApproveMonthlyObligation, validateApprovalTransition } = jiti("./approval.ts");
 const approval = jiti("./approval.ts");
-const cache = jiti("./building-month-cache.ts");
 const supabaseServer = jiti("@/lib/supabase/server");
 const staffContextModule = jiti("@/server/staff-context");
 
@@ -34,12 +33,9 @@ test("DEV approval reset only accepts approved periods", () => {
   });
 });
 
-test("successful approval invalidates the exact building-month facts cache", { concurrency: false }, async () => {
+test("successful approval updates the billing period", { concurrency: false }, async () => {
   const originalCreateClient = supabaseServer.createClient;
   const originalGetStaffContext = staffContextModule.getStaffContext;
-  const buildingId = "b7a8c3d4-7b4a-4d7a-8d53-5f18d0c6b810";
-  cache.invalidateBuildingMonthFinancialFactsCache();
-  cache.setCachedBuildingMonthFinancialFacts(buildingId, "2026-09", {}, 1);
   let maybeSingleCalls = 0;
 
   staffContextModule.getStaffContext = async () => ({
@@ -72,9 +68,7 @@ test("successful approval invalidates the exact building-month facts cache", { c
   try {
     const result = await approval.approveMonthlyObligation({ billingPeriodId: "period-1" });
     assert.deepEqual(result, { data: { status: "approved" }, error: null });
-    assert.equal(cache.getCachedBuildingMonthFinancialFacts(buildingId, "2026-09"), null);
   } finally {
-    cache.invalidateBuildingMonthFinancialFactsCache();
     supabaseServer.createClient = originalCreateClient;
     staffContextModule.getStaffContext = originalGetStaffContext;
   }

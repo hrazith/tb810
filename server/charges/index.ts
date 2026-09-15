@@ -4,7 +4,6 @@ import {
   isRecordCreatedByActiveDevTestSession,
   recordDevTestMutation,
 } from "@/server/dev-test-session";
-import { invalidateBuildingMonthFinancialFactsCache } from "@/server/obligations/building-month-cache";
 import { isPerfLoggingEnabled } from "@/server/perf";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 import { getOwnerById } from "@/server/owners";
@@ -195,7 +194,6 @@ export async function editFutureCharge(
     .select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
     .single();
   if (error) return { data: null as never, error: error.message };
-  invalidateBuildingMonthFinancialFactsCache(current.building_id);
   return { data: data as ChargeRecord, error: null };
 }
 
@@ -235,8 +233,6 @@ export async function deleteFutureCharge(chargeId: string): Promise<QueryResult<
     .eq("building_id", buildingId)
     .eq("series_id", current.series_id);
   if (error) return { data: null as never, error: error.message };
-  invalidateBuildingMonthFinancialFactsCache(buildingId);
-
   return { data: { id: current.id, series_id: current.series_id }, error: null };
 }
 
@@ -395,7 +391,6 @@ async function createTargetCharge(input: {
     operation: "create",
     recordIdentity: data.series_id,
   });
-  invalidateBuildingMonthFinancialFactsCache(buildingId);
   return { data, error: null };
 }
 
@@ -473,7 +468,6 @@ export async function changeFutureChargeEconomics(
     .select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
     .single();
   if (insertResult.error) return { data: null as never, error: insertResult.error.message };
-  invalidateBuildingMonthFinancialFactsCache(current.building_id);
   return { data: insertResult.data as ChargeRecord, error: null };
 }
 
@@ -517,7 +511,6 @@ export async function stopFutureCharge(
     .select("id, series_id, building_id, unit_id, owner_id, description, amount, schedule, effective_from_month, effective_to_month, stop_note, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at")
     .single();
   if (error) return { data: null as never, error: error.message };
-  invalidateBuildingMonthFinancialFactsCache(current.building_id);
   return { data, error: null };
 }
 

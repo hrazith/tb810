@@ -108,7 +108,7 @@ export function createMonthlyObligationProviders(deps: MonthlyObligationProvider
       };
     },
     gas: async ({ context, unit }) => {
-      if (unit.unitTypeCode !== "condo") {
+      if (unit.unitTypeCode !== "condo" || !unit.hasGasService) {
         return { status: "not_applicable", provenance: "server/gas/provider", sourceMonth: context.obligationMonth };
       }
 

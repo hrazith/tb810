@@ -18,6 +18,7 @@ import { previousMonthKeyFromMonthKey } from "@/server/water/month-utils";
 type QueryResult<T> = {
   data: T | null;
   error: string | null;
+  failureKind?: "not_ready" | "error";
 };
 
 type SnapshotRow = {
@@ -67,7 +68,7 @@ function buildSnapshotPayload(
   waterReadingIdByUnitId: Map<string, string>,
 ): QueryResult<SnapshotPayload> {
   if (composed.readiness !== "ready" || composed.blockers.length > 0) {
-    return { data: null, error: composed.blockers.join(" ") || "Monthly obligation package is incomplete." };
+    return { data: null, error: composed.blockers.join(" ") || "Monthly obligation package is incomplete.", failureKind: "not_ready" };
   }
 
   const gasBillIds = facts.gasBills.filter((bill) => !bill.processed_at).map((bill) => bill.id);
@@ -81,12 +82,12 @@ function buildSnapshotPayload(
 
   for (const unit of composed.units) {
     const account = accountsByUnitId.get(unit.unitId);
-    if (!account) return { data: null, error: `No active Unit Account found for ${unit.unitNumber}.` };
+    if (!account) return { data: null, error: `No active Unit Account found for ${unit.unitNumber}.`, failureKind: "not_ready" };
 
     for (const component of unit.components) {
       if (component.status === "not_applicable") continue;
       if (component.status !== "available" || component.amount === null) {
-        return { data: null, error: `Monthly obligation package is incomplete for ${unit.unitNumber}.` };
+        return { data: null, error: `Monthly obligation package is incomplete for ${unit.unitNumber}.`, failureKind: "not_ready" };
       }
 
       let obligationType: SnapshotRow["obligation_type"];
@@ -122,7 +123,7 @@ function buildSnapshotPayload(
         sourceId = sourceIds[0] ?? null;
       }
 
-      if (!sourceId) return { data: null, error: `Missing provenance for ${component.key} on ${unit.unitNumber}.` };
+      if (!sourceId) return { data: null, error: `Missing provenance for ${component.key} on ${unit.unitNumber}.`, failureKind: "not_ready" };
 
       const sourceMonth = component.sourceMonth ?? facts.sourceReadingMonth;
       rows.push({
@@ -180,20 +181,20 @@ async function getSnapshotCalculation({
       .eq("reading_month", monthKeyToDate(sourceReadingMonth)),
   ]);
 
-  if (accountsResult.error) return { data: null, error: accountsResult.error.message };
-  if (planResult.error) return { data: null, error: planResult.error.message };
-  if (waterIdentityResult.error) return { data: null, error: waterIdentityResult.error.message };
-  if (!planResult.data) return { data: null, error: "Budget Plan not found." };
+  if (accountsResult.error) return { data: null, error: accountsResult.error.message, failureKind: "error" };
+  if (planResult.error) return { data: null, error: planResult.error.message, failureKind: "error" };
+  if (waterIdentityResult.error) return { data: null, error: waterIdentityResult.error.message, failureKind: "error" };
+  if (!planResult.data) return { data: null, error: "Budget Plan not found.", failureKind: "not_ready" };
 
   const accountsByUnitId = new Map<string, UnitAccountRow>();
   for (const row of (accountsResult.data ?? []) as UnitAccountRow[]) {
-    if (accountsByUnitId.has(row.unit_id)) return { data: null, error: `Multiple active Unit Accounts found for ${row.unit_id}.` };
+    if (accountsByUnitId.has(row.unit_id)) return { data: null, error: `Multiple active Unit Accounts found for ${row.unit_id}.`, failureKind: "not_ready" };
     accountsByUnitId.set(row.unit_id, row);
   }
 
   const waterReadingIdByUnitId = new Map<string, string>();
   for (const row of (waterIdentityResult.data ?? []) as WaterReadingIdentity[]) {
-    if (waterReadingIdByUnitId.has(row.unit_id)) return { data: null, error: `Multiple Water readings found for ${row.unit_id}.` };
+    if (waterReadingIdByUnitId.has(row.unit_id)) return { data: null, error: `Multiple Water readings found for ${row.unit_id}.`, failureKind: "not_ready" };
     waterReadingIdByUnitId.set(row.unit_id, row.id);
   }
 
@@ -238,6 +239,7 @@ async function getSnapshotCalculation({
       unitAccountId: accountsByUnitId.get(unit.id)?.id ?? unit.id,
       unitTypeCode: unit.unit_type_code,
       hasMeter: unit.has_meter,
+      hasGasService: unit.has_gas_service,
       participationPercentage: unit.participation_percentage,
     })),
     createMonthlyObligationProviders({ fixedAssessmentByUnitId, waterByUnitId, gasByUnitId, chargesByUnitId }),
@@ -256,9 +258,9 @@ export async function createMonthlyObligationSnapshot({
   obligationMonth: string;
 }): Promise<QueryResult<{ billingPeriodId: string; status: string; obligationRowCount: number }>> {
   const factsResult = await loadBuildingMonthFinancialFacts({ buildingId, obligationMonth });
-  if (factsResult.error || !factsResult.data) return { data: null, error: factsResult.error ?? "Building month facts unavailable." };
+  if (factsResult.error || !factsResult.data) return { data: null, error: factsResult.error ?? "Building month facts unavailable.", failureKind: "error" };
   const calculation = await getSnapshotCalculation({ buildingId, buildingName, obligationMonth, facts: factsResult.data.current });
-  if (calculation.error || !calculation.data) return { data: null, error: calculation.error ?? "Snapshot calculation unavailable." };
+  if (calculation.error || !calculation.data) return { data: null, error: calculation.error ?? "Snapshot calculation unavailable.", failureKind: calculation.failureKind === "not_ready" ? "not_ready" : "error" };
 
   const supabase = await createClient();
   const periodYear = Number(obligationMonth.slice(0, 4));
@@ -276,7 +278,7 @@ export async function createMonthlyObligationSnapshot({
     p_gas_bill_ids: calculation.data.gasBillIds,
   });
 
-  if (rpc.error) return { data: null, error: rpc.error.message };
+  if (rpc.error) return { data: null, error: rpc.error.message, failureKind: "error" };
   return { data: rpc.data, error: null };
 }
 

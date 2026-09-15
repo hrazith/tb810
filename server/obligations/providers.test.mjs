@@ -24,6 +24,7 @@ function makeUnit(overrides = {}) {
     unitAccountId: "account-1",
     unitTypeCode: "condo",
     hasMeter: true,
+    hasGasService: true,
     participationPercentage: 0.1,
     ...overrides,
   };
@@ -77,6 +78,11 @@ test("parking and storage short-circuit water and gas providers before expensive
   assert.equal(storageCommonWater.status, "not_applicable");
   assert.equal(storageGas.status, "not_applicable");
   assert.equal(waterCalls, 0);
+  assert.equal(gasCalls, 0);
+
+  const nonGasCondo = makeUnit({ unitId: "unit-301", unitNumber: "301", hasGasService: false });
+  const nonGasCondoResult = await providers.gas({ context: baseContext, unit: nonGasCondo });
+  assert.equal(nonGasCondoResult.status, "not_applicable");
   assert.equal(gasCalls, 0);
 });
 
