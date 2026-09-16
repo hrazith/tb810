@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/obligations/pulse",
+      "schedule": "0 11 * * *"
+    }
+  ]
+}

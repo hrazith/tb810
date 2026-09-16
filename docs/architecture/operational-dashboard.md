@@ -560,7 +560,23 @@ Do not expand this sprint into:
 
 ## 19. Documentation Status
 
-The snapshot foundation, snapshot-aware bounded financial read, the first Carlos review/approval dashboard slice, and the narrow manually invokable pulse coordinator are implemented. Automatic production scheduling/wake-up, delayed scheduled coordination, invoice generation, compressed dispatch-bundle generation, dispatch, and the full Carlos dashboard remain deferred implementation work.
+The snapshot foundation, snapshot-aware bounded financial read, the first Carlos review/approval dashboard slice, and the pulse coordinator are implemented. Production scheduling uses a dumb Vercel Cron heartbeat at 06:00 Lima time (11:00 UTC) on the Hobby-plan MVP; the cadence may become `*/15 * * * *` on Vercel Pro without changing application architecture. Invoice generation, compressed dispatch-bundle generation, dispatch, and the full Carlos dashboard remain deferred implementation work.
+
+The pulse uses the same lifecycle-driven progression package selection as the
+dashboard: the current responsibility package remains the candidate until it
+is approved; `ready_for_review` holds the Carlos handoff, and approval advances
+responsibility to the immediate successor. A package may be snapshotted early
+when its source facts are complete. The scheduler does not invoke dashboard
+loaders, scan historical months, poll from the client, or couple progression to
+source mutations.
+
+Production scheduling is authenticated separately from human staff actions.
+Vercel sends `Authorization: Bearer <CRON_SECRET>` to the exact pulse route,
+which invokes a server-only Supabase `SUPABASE_SECRET_KEY` path. Human snapshot
+actions remain governed by the authenticated Supabase user, `auth.uid()`, and
+`has_tb810_role()`. The separate system boundary does not grant `anon` or
+`authenticated` access to the system snapshot entry point; the database remains
+the final concurrency authority.
 
 Frozen architecture and domain decisions include:
 
@@ -631,13 +647,13 @@ The development-only panel has Time, Data, and Style tabs. Time changes the cano
 
 The DEV panel also has one narrow Carlos approval replay control. When the current business-month Billing Period is approved, it may be reset to `ready_for_review` while clearing `approved_at` and `approved_by`. It does not delete or regenerate the immutable snapshot, monthly obligation rows, or source facts. This is not a generic lifecycle editor or scenario framework. Because the existing DEV journal records domain source-record mutations rather than Billing Period lifecycle metadata, Reset session must not be assumed to restore Carlos approval state.
 
-The monthly obligation pulse coordinator is also manually invokable through the
-development-only panel. It uses the canonical business date, checks the
-authoritative Billing Period lifecycle first, treats an incomplete package as a
-normal Not Ready outcome, and delegates ready packages to the existing snapshot
-machinery. The production scheduler or wake-up mechanism that would invoke the
-coordinator automatically, including month-turn and later retry cadence, is not
-implemented yet and remains deferred.
+The monthly obligation pulse coordinator remains manually invokable through the
+development-only panel and is now also invoked by the production Vercel Cron
+route. It uses the canonical business date, checks the authoritative Billing
+Period lifecycle first, treats an incomplete package as a normal Not Ready
+outcome, and delegates ready packages to the existing snapshot machinery. The
+daily Cron is only the production wake-up mechanism; month-turn and later retry
+cadence remain lifecycle-driven rather than source-mutation-triggered.
 
 The current DEV panel is an acceptance-testing aid, not a production workflow. The reset control is guarded by development mode, an active DEV test session, and the approved status of the current Billing Period.
 

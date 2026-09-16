@@ -8,9 +8,11 @@ This document is the canonical architecture reference for Monthly Obligations.
 It consolidates the frozen decisions that define the month-centric financial workspace for TB810.
 
 The snapshot foundation, snapshot-aware bounded read, the first Carlos
-review/approval slice, and a manually invokable production-shaped pulse
-coordinator are implemented. Production scheduling/wake-up, invoice
-generation, compressed dispatch bundles, and dispatch remain deferred.
+review/approval slice, and the production-shaped pulse coordinator are
+implemented. Production scheduling uses a dumb Vercel Cron heartbeat at
+06:00 Lima time (11:00 UTC) on the Hobby-plan MVP; it may later become a
+15-minute schedule on Vercel Pro without changing the application architecture.
+Invoice generation, compressed dispatch bundles, and dispatch remain deferred.
 
 ## 1. Purpose
 
@@ -143,6 +145,16 @@ on the current package; after approval, it may advance to the next live package.
 The calendar alone must not advance that focus. Calendar/business date,
 financial readiness, snapshot creation, and Carlos approval are coordinated
 lifecycle clocks rather than one universal month clock.
+
+The pulse coordinator is invoked automatically in production by a dumb Vercel
+Cron heartbeat at 06:00 Lima time (11:00 UTC) on the Hobby-plan MVP. It may
+later use `*/15 * * * *` on Vercel Pro without changing the application
+architecture. The pulse selects one bounded progression candidate: the current
+responsibility package or its immediate successor after approval. It does not
+scan historical months, invoke dashboard loaders, or couple progression to
+source mutations. Human snapshot actions remain authorized by `auth.uid()` and
+`has_tb810_role()`; automation uses a separate `CRON_SECRET` HTTP boundary and
+server-only `SUPABASE_SECRET_KEY` execution path.
 
 ### Coordinated lifecycle clocks
 

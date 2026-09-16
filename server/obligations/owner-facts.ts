@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/database.types";
 import { getUnitFixedMonthlyAssessmentFromFacts } from "@/server/budget-plans";
 import type { UnitFixedMonthlyAssessmentState } from "@/server/budget-plans/types";
 import { calculateUpcomingUnitChargesFromFacts } from "@/server/charges";
@@ -293,12 +295,14 @@ export function buildChargeMap(
 export async function loadBuildingMonthFinancialFacts({
   buildingId,
   obligationMonth,
+  client,
 }: {
   buildingId: string;
   obligationMonth: string;
+  client?: SupabaseClient<Database>;
 }): Promise<BuildingMonthFinancialFactsResult> {
   const startedAt = process.hrtime.bigint();
-  const supabase = await createClient();
+  const supabase = client ?? await createClient();
   const planYear = Number(obligationMonth.slice(0, 4));
   const sourceReadingMonth = previousMonthKeyFromMonthKey(obligationMonth) ?? "2026-07";
   const rpc = await (supabase as unknown as {

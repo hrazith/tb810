@@ -5,6 +5,7 @@ import { getFixedBuildingIdentity } from "@/server/building";
 import { isChargeEligibleForMonth, nextMonthKey } from "@/server/charges/month";
 import { buildMonthlyObligationSummaryFromFacts, buildMonthlyObligationSummaryFromSnapshot } from "@/server/obligations/summary-facts";
 import { loadBuildingMonthFinancialFacts, type BuildingMonthFinancialFacts } from "@/server/obligations/owner-facts";
+import { isApprovedPackage, selectFinancialFocus } from "@/server/obligations/package-selection";
 import { hasCompleteWaterReadings } from "@/server/water/readiness";
 
 type QueryResult<T> = {
@@ -229,11 +230,14 @@ function monthLabelFromMonthKey(monthKey: string) {
 }
 
 function isApprovedLifecycleStatus(status: string | null) {
-  return status === "approved" || status === "invoices_generated" || status === "closed";
+  return isApprovedPackage({ mode: "snapshotted", status });
 }
 
 function deriveFinancialFocus(monthFacts: GulianaDashboardFacts): DashboardFinancialFocus {
-  return currentIsApproved(monthFacts.current) ? "upcoming" : "current";
+  return selectFinancialFocus({
+    mode: monthFacts.current.obligationLifecycle.mode,
+    status: monthFacts.current.obligationLifecycle.billingPeriodStatus,
+  });
 }
 
 function currentIsApproved(current: UpcomingFacts) {

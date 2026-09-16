@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/database.types";
 import { calculateGasCharges } from "@/server/gas/calculation";
 import { getCurrentBuilding } from "@/server/units";
+import { createSystemClient } from "@/server/supabase/system";
 import { composeMonthlyObligation } from "./core";
 import {
   buildChargeMap,
@@ -49,6 +52,8 @@ type WaterReadingIdentity = {
   id: string;
   unit_id: string;
 };
+
+export type SnapshotExecutionContext = "human" | "system";
 
 function asRecord(value: unknown) {
   return value as Record<string, unknown>;
@@ -153,13 +158,14 @@ async function getSnapshotCalculation({
   buildingName,
   obligationMonth,
   facts,
+  supabase,
 }: {
   buildingId: string;
   buildingName: string;
   obligationMonth: string;
   facts: BuildingMonthFinancialFacts;
+  supabase: SupabaseClient<Database>;
 }) {
-  const supabase = await createClient();
   const sourceReadingMonth = previousMonthKeyFromMonthKey(obligationMonth) ?? facts.sourceReadingMonth;
   const [accountsResult, planResult, waterIdentityResult] = await Promise.all([
     supabase
@@ -252,17 +258,19 @@ export async function createMonthlyObligationSnapshot({
   buildingId,
   buildingName,
   obligationMonth,
+  executionContext = "human",
 }: {
   buildingId: string;
   buildingName: string;
   obligationMonth: string;
+  executionContext?: SnapshotExecutionContext;
 }): Promise<QueryResult<{ billingPeriodId: string; status: string; obligationRowCount: number }>> {
-  const factsResult = await loadBuildingMonthFinancialFacts({ buildingId, obligationMonth });
+  const supabase = executionContext === "system" ? createSystemClient() : await createClient();
+  const factsResult = await loadBuildingMonthFinancialFacts({ buildingId, obligationMonth, client: supabase });
   if (factsResult.error || !factsResult.data) return { data: null, error: factsResult.error ?? "Building month facts unavailable.", failureKind: "error" };
-  const calculation = await getSnapshotCalculation({ buildingId, buildingName, obligationMonth, facts: factsResult.data.current });
+  const calculation = await getSnapshotCalculation({ buildingId, buildingName, obligationMonth, facts: factsResult.data.current, supabase });
   if (calculation.error || !calculation.data) return { data: null, error: calculation.error ?? "Snapshot calculation unavailable.", failureKind: calculation.failureKind === "not_ready" ? "not_ready" : "error" };
 
-  const supabase = await createClient();
   const periodYear = Number(obligationMonth.slice(0, 4));
   const periodMonth = Number(obligationMonth.slice(5, 7));
   const rpc = await (supabase as unknown as {
@@ -270,7 +278,7 @@ export async function createMonthlyObligationSnapshot({
       name: string,
       args: Record<string, unknown>,
     ) => Promise<{ data: { billingPeriodId: string; status: string; obligationRowCount: number } | null; error: { message: string } | null }>;
-  }).rpc("tb810_create_monthly_obligation_snapshot", {
+  }).rpc(executionContext === "system" ? "tb810_create_monthly_obligation_snapshot_system" : "tb810_create_monthly_obligation_snapshot", {
     p_building_id: buildingId,
     p_period_year: periodYear,
     p_period_month: periodMonth,

@@ -30,6 +30,10 @@ export async function proxy(request: NextRequest) {
   const proxyStartedAt = process.hrtime.bigint();
   const { pathname } = request.nextUrl;
 
+  if (pathname === "/api/obligations/pulse") {
+    return NextResponse.next();
+  }
+
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
