@@ -24,6 +24,16 @@ type QueryResult<T> = {
   failureKind?: "not_ready" | "error";
 };
 
+type SnapshotResult = { billingPeriodId: string; status: string; obligationRowCount: number };
+
+export type SnapshotPersistence = (input: {
+  supabase: SupabaseClient<Database>;
+  buildingId: string;
+  obligationMonth: string;
+  rows: SnapshotRow[];
+  gasBillIds: string[];
+}) => Promise<QueryResult<SnapshotResult>>;
+
 type SnapshotRow = {
   unit_id: string;
   unit_account_id: string;
@@ -259,11 +269,13 @@ export async function createMonthlyObligationSnapshot({
   buildingName,
   obligationMonth,
   executionContext = "human",
+  persistence,
 }: {
   buildingId: string;
   buildingName: string;
   obligationMonth: string;
   executionContext?: SnapshotExecutionContext;
+  persistence?: SnapshotPersistence;
 }): Promise<QueryResult<{ billingPeriodId: string; status: string; obligationRowCount: number }>> {
   const supabase = executionContext === "system" ? createSystemClient() : await createClient();
   const factsResult = await loadBuildingMonthFinancialFacts({ buildingId, obligationMonth, client: supabase });
@@ -271,23 +283,24 @@ export async function createMonthlyObligationSnapshot({
   const calculation = await getSnapshotCalculation({ buildingId, buildingName, obligationMonth, facts: factsResult.data.current, supabase });
   if (calculation.error || !calculation.data) return { data: null, error: calculation.error ?? "Snapshot calculation unavailable.", failureKind: calculation.failureKind === "not_ready" ? "not_ready" : "error" };
 
-  const periodYear = Number(obligationMonth.slice(0, 4));
-  const periodMonth = Number(obligationMonth.slice(5, 7));
-  const rpc = await (supabase as unknown as {
-    rpc: (
-      name: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: { billingPeriodId: string; status: string; obligationRowCount: number } | null; error: { message: string } | null }>;
-  }).rpc(executionContext === "system" ? "tb810_create_monthly_obligation_snapshot_system" : "tb810_create_monthly_obligation_snapshot", {
-    p_building_id: buildingId,
-    p_period_year: periodYear,
-    p_period_month: periodMonth,
-    p_rows: calculation.data.rows,
-    p_gas_bill_ids: calculation.data.gasBillIds,
+  const persist = persistence ?? (async ({ supabase: persistenceClient, buildingId: persistenceBuildingId, obligationMonth: persistenceMonth, rows, gasBillIds }) => {
+    const rpc = await (persistenceClient as unknown as {
+      rpc: (
+        name: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: SnapshotResult | null; error: { message: string } | null }>;
+    }).rpc(executionContext === "system" ? "tb810_create_monthly_obligation_snapshot_system" : "tb810_create_monthly_obligation_snapshot", {
+      p_building_id: persistenceBuildingId,
+      p_period_year: Number(persistenceMonth.slice(0, 4)),
+      p_period_month: Number(persistenceMonth.slice(5, 7)),
+      p_rows: rows,
+      p_gas_bill_ids: gasBillIds,
+    });
+    if (rpc.error) return { data: null, error: rpc.error.message, failureKind: "error" as const };
+    return { data: rpc.data, error: null };
   });
 
-  if (rpc.error) return { data: null, error: rpc.error.message, failureKind: "error" };
-  return { data: rpc.data, error: null };
+  return persist({ supabase, buildingId, obligationMonth, rows: calculation.data.rows, gasBillIds: calculation.data.gasBillIds });
 }
 
 export async function createCurrentBuildingMonthlyObligationSnapshot({ obligationMonth }: { obligationMonth: string }) {

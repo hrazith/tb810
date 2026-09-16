@@ -98,7 +98,7 @@ The dashboard also distinguishes the obligation lifecycle from the operating cal
 
 Persisted future lifecycle state must not leak backward when the DEV business date is rewound. A snapshot is presentation-visible for its obligation month only when the business date has reached that month. Rewinding the business date changes projection only; it does not mutate, reopen, delete, or rewrite persisted lifecycle state.
 
-Carlos approval is the financial-focus pivot. Before approval, Giuliana's floating Obligations utility stays on the current immutable package awaiting approval. After approval, that package becomes Ready for Dispatch and the utility advances to the next live obligation preview. The calendar alone must not cause that switch.
+The `ready_for_review` lifecycle state is Giuliana's financial-focus pivot. It means the immutable package is complete, the baton has passed to Carlos for review and approval, and Giuliana's floating Obligations utility advances to the immediate successor live preview. Approval later changes the handed-off package to Ready for Dispatch but does not advance Giuliana again. The calendar alone must not cause that switch.
 
 The behavior of an incomplete package remains no snapshot, a live obligation, and Not Ready. Giuliana sees actionable blockers; Carlos sees oversight/status and has no approval action until the delayed snapshot occurs.
 
@@ -238,9 +238,10 @@ Incomplete does not mean late. Calendar passage alone must not create Attention;
 Month-turn is a real calendar/business-date event, but there is no single master
 month clock. Calendar/business date drives boundaries and pulse attempts;
 financial readiness drives snapshot eligibility; snapshot creation freezes the
-canonical package and hands it to Carlos; Carlos approval advances Live Preview
-and hands responsibility back to Giuliana. These transitions may occur before
-or after calendar month-turn.
+canonical package and hands it to Carlos; that handoff advances Giuliana's
+operational focus to the immediate successor. Carlos approval changes the
+handed-off package's status but does not advance focus again. These transitions
+may occur before or after calendar month-turn.
 
 For example, September source facts becoming ready on September 28 may produce
 an October snapshot before October begins. Conversely, on October 1 unresolved
@@ -505,10 +506,10 @@ The dashboard is a server-side projection over canonical domain truth.
 It should not reconstruct domain calculations or create parallel business logic.
 
 The read model may expose both September obligation facts and September
-operational source intake on September 1. The latter may eventually feed
-October obligations, but it does not make October the primary obligation
-package merely because the calendar advanced. This does not resolve the
-incomplete prior-month snapshot case.
+operational source intake on September 1. Once the September package is handed
+off at `ready_for_review`, October becomes Giuliana's operational and financial
+focus; calendar advancement alone does not cause that transition. This does
+not resolve the incomplete prior-month snapshot case.
 
 ## 17. Role-Aware Surface
 
@@ -522,7 +523,7 @@ The first cross-role handoff sequence is:
 
 ### Sep 8A — Giuliana / Awaiting Carlos
 
-Ordinary in-month Water and Gas intake continues for the next obligation package while the prior package remains Complete and Awaiting Carlos Approval. Partial or zero source-work progress is neutral unless an actual business rule makes it actionable. The floating utility remains on the current package.
+Ordinary in-month Water and Gas intake continues for the next obligation package while the prior package remains Complete and Awaiting Carlos Approval. Partial or zero source-work progress is neutral unless an actual business rule makes it actionable. The floating utility advances to the next package at the handoff boundary.
 
 ### Sep 8B — Carlos / Review and Approve
 
@@ -530,7 +531,7 @@ Carlos sees the immutable September package, its status, total, and a review act
 
 ### Sep 8C — Giuliana / Approved and Ready for Dispatch
 
-After approval, the package is Approved and Ready for Dispatch. The next operational source-work cycle continues, and Giuliana's floating Obligations utility advances to the next live obligation preview. Invoice and compressed dispatch-bundle details belong in this region once their implementation exists.
+After approval, the already-handed-off package is Approved and Ready for Dispatch. The next operational source-work cycle continues, and Giuliana's floating Obligations utility remains on the same successor live obligation preview. Invoice and compressed dispatch-bundle details belong in this region once their implementation exists.
 
 Sep 8 is an acceptance point, not product timing logic. No production behavior should depend on a fixed date or on an arbitrary "after eight days" rule.
 
@@ -563,9 +564,10 @@ Do not expand this sprint into:
 The snapshot foundation, snapshot-aware bounded financial read, the first Carlos review/approval dashboard slice, and the pulse coordinator are implemented. Production scheduling uses a dumb Vercel Cron heartbeat at 06:00 Lima time (11:00 UTC) on the Hobby-plan MVP; the cadence may become `*/15 * * * *` on Vercel Pro without changing application architecture. Invoice generation, compressed dispatch-bundle generation, dispatch, and the full Carlos dashboard remain deferred implementation work.
 
 The pulse uses the same lifecycle-driven progression package selection as the
-dashboard: the current responsibility package remains the candidate until it
-is approved; `ready_for_review` holds the Carlos handoff, and approval advances
-responsibility to the immediate successor. A package may be snapshotted early
+dashboard: a live package remains the candidate while Giuliana owns its
+preparation; `ready_for_review` hands the package to Carlos and advances the
+candidate to the immediate successor. Later approval does not advance it again.
+A package may be snapshotted early
 when its source facts are complete. The scheduler does not invoke dashboard
 loaders, scan historical months, poll from the client, or couple progression to
 source mutations.
@@ -601,7 +603,7 @@ Frozen architecture and domain decisions include:
 - role-aware dashboard and shared shell
 - two concurrent monthly timelines and the monthly status/handoff region
 - business-date-coherent lifecycle presentation
-- Carlos approval as Giuliana's financial-focus pivot
+- `ready_for_review` handoff as Giuliana's financial-focus pivot
 - provisional approval target by the fifth calendar day of the obligation month
 - the narrow Sep 8A to Sep 8B to Sep 8C cross-role acceptance sequence
 - the simplified greeting, handoff, and shared notice presentation model

@@ -5,7 +5,7 @@ import { getFixedBuildingIdentity } from "@/server/building";
 import { isChargeEligibleForMonth, nextMonthKey } from "@/server/charges/month";
 import { buildMonthlyObligationSummaryFromFacts, buildMonthlyObligationSummaryFromSnapshot } from "@/server/obligations/summary-facts";
 import { loadBuildingMonthFinancialFacts, type BuildingMonthFinancialFacts } from "@/server/obligations/owner-facts";
-import { isApprovedPackage, selectFinancialFocus } from "@/server/obligations/package-selection";
+import { isApprovedPackage, isHandedOffPackage, selectFinancialFocus } from "@/server/obligations/package-selection";
 import { hasCompleteWaterReadings } from "@/server/water/readiness";
 
 type QueryResult<T> = {
@@ -96,6 +96,8 @@ export type GulianaDashboardProjection = {
     state: DashboardSectionState;
     completion: "incomplete" | "complete";
     emphasis: "normal" | "compressed" | "attention";
+    meterReadingsEmphasis: "normal" | "compressed" | "attention";
+    billEmphasis: "normal" | "compressed" | "attention";
     billPresent: boolean;
     meterReadingsComplete: boolean;
   };
@@ -103,6 +105,8 @@ export type GulianaDashboardProjection = {
     state: DashboardSectionState;
     completion: "incomplete" | "complete";
     emphasis: "normal" | "compressed" | "attention";
+    readingsEmphasis: "normal" | "compressed" | "attention";
+    supplierBillsEmphasis: "normal" | "compressed" | "attention";
     supplierBillsPresent: boolean;
     readingsComplete: boolean;
   };
@@ -240,9 +244,12 @@ function deriveFinancialFocus(monthFacts: GulianaDashboardFacts): DashboardFinan
   });
 }
 
-function currentIsApproved(current: UpcomingFacts) {
+function currentHasHandoff(current: UpcomingFacts) {
   return current.obligationLifecycle?.mode === "snapshotted"
-    && isApprovedLifecycleStatus(current.obligationLifecycle.billingPeriodStatus);
+    && isHandedOffPackage({
+      mode: current.obligationLifecycle.mode,
+      status: current.obligationLifecycle.billingPeriodStatus,
+    });
 }
 
 function hasBlockedObligationComponent(obligations: UpcomingFacts["obligations"]) {
@@ -377,11 +384,21 @@ function deriveWaterState(
   const missingBill = !sourceWork.water.commonWaterBillPresent
     && (sourceWork.water.meterReadingExpectedCount > 0 || sourceWork.water.meterReadingCount > 0);
   const late = isSourceWorkLate(businessDate) && (missingReadings || missingBill);
+  const meterReadingsEmphasis = isSourceWorkLate(businessDate) && missingReadings
+    ? "attention"
+    : sourceWork.water.meterReadingCompleteCount >= sourceWork.water.meterReadingExpectedCount
+      ? "compressed"
+      : "normal";
+  const billEmphasis = isSourceWorkLate(businessDate) && missingBill
+    ? "attention"
+    : sourceWork.water.commonWaterBillPresent ? "compressed" : "normal";
 
   return {
     state: blocked ? "blocked" : complete ? "complete" : active ? "active" : "waiting",
     completion: complete ? "complete" : "incomplete",
     emphasis: blocked || late ? "attention" : complete ? "compressed" : "normal",
+    meterReadingsEmphasis,
+    billEmphasis,
     billPresent: sourceWork.water.commonWaterBillPresent,
     meterReadingsComplete: sourceWork.water.meterReadingCompleteCount >= sourceWork.water.meterReadingExpectedCount,
   };
@@ -397,11 +414,17 @@ function deriveGasState(
   const active = sourceWork.gas.supplierBillCount > 0 || sourceWork.gas.gasReadingCount > 0;
   const blocked = sourceWorkActionable && obligations.components.gas.state === "blocked";
   const late = isSourceWorkLate(businessDate) && sourceWork.gas.gasUnitCount > sourceWork.gas.gasReadingCount;
+  const readingsEmphasis = late
+    ? "attention"
+    : sourceWork.gas.gasReadingCount >= sourceWork.gas.gasUnitCount ? "compressed" : "normal";
+  const supplierBillsEmphasis = sourceWork.gas.supplierBillCount > 0 ? "compressed" : "normal";
 
   return {
     state: blocked ? "blocked" : complete ? "complete" : active ? "active" : "waiting",
     completion: complete ? "complete" : "incomplete",
     emphasis: blocked || late ? "attention" : complete ? "compressed" : "normal",
+    readingsEmphasis,
+    supplierBillsEmphasis,
     supplierBillsPresent: sourceWork.gas.supplierBillCount > 0,
     readingsComplete: sourceWork.gas.gasReadingCount >= sourceWork.gas.gasUnitCount,
   };
@@ -502,7 +525,7 @@ function buildSourceWorkFacts(
       }),
     },
     gas: {
-      supplierBillCount: financialFacts.gasBills.length,
+      supplierBillCount: financialFacts.gasBills.filter((bill) => bill.processed_at === null).length,
       gasReadingCount: financialFacts.gasReadings.length,
       gasUnitCount: financialFacts.unitRows.filter((row) => row.has_gas_service).length,
     },
@@ -572,7 +595,7 @@ export const getGulianaDashboardFacts = cache(async (): Promise<QueryResult<Guli
   const upcomingFacts = factsResult.data.upcoming;
   const current = buildUpcomingFacts(factsResult.data.current, operatingMonth);
   const upcoming = buildUpcomingFacts(upcomingFacts, upcomingObligationMonth);
-  const financialFocus = currentIsApproved(current) ? "upcoming" : "current";
+  const financialFocus = currentHasHandoff(current) ? "upcoming" : "current";
   const sourceWork = buildSourceWorkFacts(financialFocus === "upcoming" ? upcomingFacts : factsResult.data.current);
 
   return {

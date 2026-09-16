@@ -138,19 +138,32 @@ turn, the system may snapshot that package early. The date alone does not
 freeze an incomplete package; an incomplete package remains live and Not Ready
 without a snapshot until its final blocker resolves.
 
+Snapshot creation is also the responsibility handoff boundary. While a package
+is live, Giuliana owns its preparation. Once it reaches `ready_for_review`, the
+package is immutable and Carlos owns review and approval; Giuliana immediately
+begins preparing the immediate successor package. Carlos approval does not cause
+a second Giuliana focus advance. Calendar month, package lifecycle, Giuliana's
+operational focus, and Carlos's review state are related but independent clocks.
+
+For example, on September 28, September may be `ready_for_review` while October
+has no snapshot yet. The dashboard may simultaneously show September obligations
+as Complete and Awaiting Carlos Approval and show source inputs for October
+obligations. September source facts feed that October package.
+
 The dashboard may show the next obligation package as a live preview while the
-current immutable package awaits approval. Carlos's approval is the event that
-transfers financial focus: before approval, Giuliana's financial utility stays
-on the current package; after approval, it may advance to the next live package.
-The calendar alone must not advance that focus. Calendar/business date,
-financial readiness, snapshot creation, and Carlos approval are coordinated
-lifecycle clocks rather than one universal month clock.
+current immutable package awaits approval. Carlos's approval changes the
+handed-off package's status, not the focus transfer: `ready_for_review` already
+advances Giuliana's financial utility to the next live package. The calendar
+alone must not advance that focus. Calendar/business date, financial readiness,
+snapshot creation, and Carlos approval are coordinated lifecycle clocks rather
+than one universal month clock.
 
 The pulse coordinator is invoked automatically in production by a dumb Vercel
 Cron heartbeat at 06:00 Lima time (11:00 UTC) on the Hobby-plan MVP. It may
 later use `*/15 * * * *` on Vercel Pro without changing the application
 architecture. The pulse selects one bounded progression candidate: the current
-responsibility package or its immediate successor after approval. It does not
+responsibility package or its immediate successor after handoff at
+`ready_for_review`. It does not
 scan historical months, invoke dashboard loaders, or couple progression to
 source mutations. Human snapshot actions remain authorized by `auth.uid()` and
 `has_tb810_role()`; automation uses a separate `CRON_SECRET` HTTP boundary and
@@ -500,7 +513,7 @@ This document does not:
 - After finalization, the package is Awaiting Carlos Approval.
 - Carlos approves the existing immutable snapshot without recalculating it.
 - A future snapshot is not presentation-visible before its obligation month begins.
-- Carlos approval advances Giuliana's primary financial focus to the next live obligation preview.
+- `ready_for_review` advances Giuliana's primary financial focus to the immediate successor live obligation preview; later Carlos approval does not advance it again.
 - Carlos approval manifests invoices and creates compressed dispatch bundles available to Giuliana.
 - After approval and artifact manifestation, the package is Ready for Dispatch.
 - An incomplete package at month turn is not snapshotted and remains live until its final blocker resolves.

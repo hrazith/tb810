@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resetCurrentMonthlyObligationApprovalForDev } from "@/server/obligations/approval";
 import { runMonthlyObligationPulse } from "@/server/obligations/pulse";
+import type { SnapshotPersistence } from "@/server/obligations/snapshot";
 
 import { getActiveDevTestSessionSummary, getDevTestSessionCookieName, startDevTestSession } from "../dev-test-session";
 
@@ -78,7 +79,24 @@ export async function runMonthlyObligationPulseAction(formData: FormData) {
   const session = await getActiveDevTestSessionSummary();
   if (!session) redirect(`${returnTo}?error=${encodeURIComponent("Start a DEV test session first.")}`);
 
-  const result = await runMonthlyObligationPulse();
+  const persistence: SnapshotPersistence = async ({ supabase, buildingId, obligationMonth, rows, gasBillIds }) => {
+    const rpc = await (supabase as unknown as {
+      rpc: (
+        name: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: { billingPeriodId: string; status: string; obligationRowCount: number } | null; error: { message: string } | null }>;
+    }).rpc("tb810_create_dev_monthly_obligation_snapshot", {
+      p_session_id: session.id,
+      p_building_id: buildingId,
+      p_period_year: Number(obligationMonth.slice(0, 4)),
+      p_period_month: Number(obligationMonth.slice(5, 7)),
+      p_rows: rows,
+      p_gas_bill_ids: gasBillIds,
+    });
+    if (rpc.error) return { data: null, error: rpc.error.message, failureKind: "error" as const };
+    return { data: rpc.data, error: null };
+  };
+  const result = await runMonthlyObligationPulse("human", persistence);
   if (result.status === "error") redirect(`${returnTo}?error=${encodeURIComponent(result.reason ?? "Monthly obligation pulse failed.")}`);
   revalidatePath("/", "layout");
   revalidatePath("/obligations");

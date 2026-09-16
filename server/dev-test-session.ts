@@ -68,7 +68,7 @@ export async function startDevTestSession() {
 }
 
 export async function recordDevTestMutation(input: {
-  domain: "water" | "charge" | "gas";
+  domain: "water" | "charge" | "gas" | "obligations";
   recordType: "meter_reading" | "utility_bill" | "charge_series";
   operation: "create" | "update";
   recordIdentity: string;
@@ -92,7 +92,7 @@ export async function recordDevTestMutation(input: {
 }
 
 export async function isRecordCreatedByActiveDevTestSession(args: {
-  domain: "water" | "charge" | "gas";
+  domain: "water" | "charge" | "gas" | "obligations";
   recordType: "meter_reading" | "utility_bill" | "charge_series";
   recordIdentity: string;
 }) {

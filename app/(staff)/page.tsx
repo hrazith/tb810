@@ -92,19 +92,11 @@ function uploadHrefForAttention(source: string, happened: string) {
   return "/obligations";
 }
 
-function utilityStatusLabel(section: { state: string; emphasis: string }, isOpen: boolean) {
-  if (section.emphasis === "attention") return "Needs attention";
-  if (section.state === "blocked") return "Blocked";
-  if (section.state === "complete") return "Complete";
-  return isOpen ? null : "Incomplete";
-}
-
-function UtilityStatusIndicator({ section, isOpen }: { section: { state: string; emphasis: string }; isOpen: boolean }) {
-  const status = utilityStatusLabel(section, isOpen);
-  if (status === "Complete") {
+function UtilityStatusIndicator({ emphasis, complete }: { emphasis: string; complete: boolean }) {
+  if (complete && emphasis !== "attention") {
     return <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-500" role="img" aria-label="Complete" />;
   }
-  if (status === "Needs attention") {
+  if (emphasis === "attention") {
     return <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-red-500" role="img" aria-label="Needs attention" />;
   }
   return null;
@@ -285,7 +277,7 @@ export default async function DashboardPage() {
               <p className="text-md font-light text-zinc-950">Water meter reading</p>
 
             </div>
-            <UtilityStatusIndicator section={projection.water} isOpen={isOpen} />
+            <UtilityStatusIndicator emphasis={projection.water.meterReadingsEmphasis} complete={projection.water.meterReadingsComplete} />
           </div>
           <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
             <div className="flex flex-col items-center gap-3 sm:items-start">
@@ -304,7 +296,7 @@ export default async function DashboardPage() {
              
 
             </div>
-            <UtilityStatusIndicator section={projection.water} isOpen={isOpen} />
+            <UtilityStatusIndicator emphasis={projection.water.billEmphasis} complete={projection.water.billPresent} />
           </div>
           <div className="mt-10 h-36 rounded-3xl  bg-amber-100 w-36 ">
 
@@ -328,7 +320,7 @@ export default async function DashboardPage() {
             </div>
             <div>
 
-              <UtilityStatusIndicator section={projection.gas} isOpen={isOpen} />
+              <UtilityStatusIndicator emphasis={projection.gas.readingsEmphasis} complete={projection.gas.readingsComplete} />
 
             </div>
           </div>
@@ -355,7 +347,7 @@ export default async function DashboardPage() {
             </div>
             <div>
 
-              <UtilityStatusIndicator section={projection.gas} isOpen={isOpen} />
+              <UtilityStatusIndicator emphasis={projection.gas.supplierBillsEmphasis} complete={projection.gas.supplierBillsPresent} />
 
             </div>
           </div>

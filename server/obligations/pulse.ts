@@ -3,7 +3,7 @@ import { getBusinessNow } from "@/server/business-date";
 import { getFixedBuildingIdentity } from "@/server/building";
 import { createSystemClient } from "@/server/supabase/system";
 import { selectProgressionPackage } from "./package-selection";
-import { createMonthlyObligationSnapshot } from "./snapshot";
+import { createMonthlyObligationSnapshot, type SnapshotPersistence } from "./snapshot";
 
 const PROGRESSED_STATUSES = new Set(["ready_for_review", "approved", "invoices_generated", "closed"]);
 
@@ -47,7 +47,7 @@ export function mapSnapshotResult({
 
 export type PulseExecutionContext = "human" | "system";
 
-export async function runMonthlyObligationPulse(executionContext: PulseExecutionContext = "human"): Promise<MonthlyObligationPulseResult> {
+export async function runMonthlyObligationPulse(executionContext: PulseExecutionContext = "human", persistence?: SnapshotPersistence): Promise<MonthlyObligationPulseResult> {
   const building = getFixedBuildingIdentity();
   const businessNow = await getBusinessNow();
   const year = businessNow.getUTCFullYear();
@@ -75,6 +75,6 @@ export async function runMonthlyObligationPulse(executionContext: PulseExecution
     return { status: "already_progressed", buildingId: building.id, obligationMonth: candidate.obligationMonth, billingPeriodId: existing.id, billingPeriodStatus: existing.status };
   }
 
-  const snapshotResult = await createMonthlyObligationSnapshot({ buildingId: building.id, buildingName: building.name, obligationMonth: candidate.obligationMonth, executionContext });
+  const snapshotResult = await createMonthlyObligationSnapshot({ buildingId: building.id, buildingName: building.name, obligationMonth: candidate.obligationMonth, executionContext, persistence });
   return mapSnapshotResult({ buildingId: building.id, obligationMonth: candidate.obligationMonth, result: snapshotResult });
 }
