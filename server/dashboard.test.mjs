@@ -1184,3 +1184,60 @@ test("future source work is not late before its collection month", () => {
   assert.equal(projection.water.meterReadingsEmphasis, "normal");
   assert.equal(projection.gas.readingsEmphasis, "normal");
 });
+
+test("future Gas calculation blockers stay out of Attention during month open", () => {
+  for (const businessDate of ["2026-10-01", "2026-10-03"]) {
+    const base = buildProjectionFacts().upcoming;
+    const projection = projectGulianaDashboard(buildProjectionFacts({
+      businessDate,
+      sourceWork: {
+        gas: { gasUnitCount: 58, gasReadingCount: 0 },
+      },
+      current: {
+        ...base,
+        sourceReadingMonth: "2026-10",
+        obligations: {
+          ...base.obligations,
+          obligationMonth: "2026-11",
+          components: {
+            ...base.obligations.components,
+            gas: { state: "blocked", amount: null, reason: "Required gas readings are missing. Total gas consumption is zero." },
+          },
+        },
+      },
+    }));
+
+    assert.equal(projection.obligations.blocked, true);
+    assert.equal(projection.gas.readingsEmphasis, "normal");
+    assert.deepEqual(projection.attentions, []);
+  }
+});
+
+test("future Gas calculation blockers become attention after the source deadline", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-10-07",
+    sourceWork: {
+      gas: { gasUnitCount: 58, gasReadingCount: 0 },
+    },
+    current: {
+      ...base,
+      sourceReadingMonth: "2026-10",
+      obligations: {
+        ...base.obligations,
+        obligationMonth: "2026-11",
+        components: {
+          ...base.obligations.components,
+          gas: { state: "blocked", amount: null, reason: "Required gas readings are missing. Total gas consumption is zero." },
+        },
+      },
+    },
+  }));
+
+  assert.deepEqual(projection.attentions, [{
+    source: "gas",
+    happened: "Gas meter readings for October are late. 58 readings are still missing.",
+    impact: "November gas obligations cannot be completed.",
+  }]);
+  assert.equal(projection.gas.readingsEmphasis, "attention");
+});

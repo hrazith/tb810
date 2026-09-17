@@ -351,7 +351,9 @@ function deriveAttentions(
     ? !sourceWork.water.commonWaterBillPresent || waterMissingCount > 0
     : currentSedapalMissing;
   const suppressGasDownstream = sourceWorkActionable && gasMissingCount > 0;
-  const financialBlockers = financialFocus === "current" ? [
+  const financialBlockers = financialFocus === "current" && (
+    facts.obligations.obligationMonth === businessDate.slice(0, 7) || sourceWorkActionable
+  ) ? [
     facts.obligations.components.fixed_assessment.reason,
     suppressWaterDownstream ? null : facts.obligations.components.metered_water.reason,
     suppressWaterDownstream || sharedWaterReconciliationFailure ? null : facts.obligations.components.common_water.reason,
