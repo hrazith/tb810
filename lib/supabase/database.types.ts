@@ -2264,6 +2264,10 @@ export type Database = {
         Args: { p_session_id: string }
         Returns: undefined
       }
+      tb810_get_giuliana_package_progression: {
+        Args: { p_building_id: string; p_start_month: number; p_start_year: number }
+        Returns: Json
+      }
       tb810_ensure_unit_account_for_unit: {
         Args: { target_unit_id: string }
         Returns: string

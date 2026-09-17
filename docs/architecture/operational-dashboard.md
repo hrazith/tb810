@@ -100,6 +100,12 @@ Persisted future lifecycle state must not leak backward when the DEV business da
 
 The `ready_for_review` lifecycle state is Giuliana's financial-focus pivot. It means the immutable package is complete, the baton has passed to Carlos for review and approval, and Giuliana's floating Obligations utility advances to the immediate successor live preview. Approval later changes the handed-off package to Ready for Dispatch but does not advance Giuliana again. The calendar alone must not cause that switch.
 
+Giuliana's active package is the first obligation month that has not crossed
+that handoff boundary. The dashboard resolves the active package and the most
+recent handoff separately, so multiple consecutive packages may await Carlos
+without pinning Giuliana to Carlos's backlog. An absent Billing Period is the
+first live candidate and stops the progression lookup.
+
 The behavior of an incomplete package remains no snapshot, a live obligation, and Not Ready. Giuliana sees actionable blockers; Carlos sees oversight/status and has no approval action until the delayed snapshot occurs.
 
 After approval, these three concepts remain visible concurrently and must not be collapsed:

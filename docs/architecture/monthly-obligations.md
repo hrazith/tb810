@@ -150,6 +150,11 @@ has no snapshot yet. The dashboard may simultaneously show September obligations
 as Complete and Awaiting Carlos Approval and show source inputs for October
 obligations. September source facts feed that October package.
 
+If consecutive packages are handed off, Giuliana continues to the first
+obligation month not yet handed off. The dashboard keeps `mostRecentHandoff`
+separate from `activePackage`; Carlos's approval backlog never pins Giuliana,
+and an absent Billing Period is the live candidate that terminates progression.
+
 The dashboard may show the next obligation package as a live preview while the
 current immutable package awaits approval. Carlos's approval changes the
 handed-off package's status, not the focus transfer: `ready_for_review` already

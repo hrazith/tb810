@@ -71,7 +71,7 @@ function MeterProgress({ complete, expected, label }: { complete: number; expect
   const circumference = 2 * Math.PI * 50;
 
   return (
-    <div className="relative h-32 w-32" role="progressbar" aria-label={`${label} completeness`} aria-valuemin={0} aria-valuemax={expected} aria-valuenow={complete}>
+    <div className=" relative h-32 w-32" role="progressbar" aria-label={`${label} completeness`} aria-valuemin={0} aria-valuemax={expected} aria-valuenow={complete}>
       <svg className="h-full w-full" viewBox="0 0 120 120" aria-hidden="true">
         <circle cx="60" cy="60" r="50" fill="none" stroke="#e4e4e7" strokeWidth="10" />
         <circle cx="60" cy="60" r="50" fill="none" stroke="#09090b" strokeDasharray={circumference} strokeDashoffset={circumference - (circumference * percent) / 100} strokeLinecap="round" strokeWidth="10" transform="rotate(-90 60 60)" />
@@ -94,10 +94,10 @@ function uploadHrefForAttention(source: string, happened: string) {
 
 function UtilityStatusIndicator({ emphasis, complete }: { emphasis: string; complete: boolean }) {
   if (complete && emphasis !== "attention") {
-    return <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-500" role="img" aria-label="Complete" />;
+    return <span className="absolute right-0 -top-2 h-3 w-3 rounded-full bg-emerald-500 border-2 border-zinc-50" role="img" aria-label="Complete" />;
   }
   if (emphasis === "attention") {
-    return <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-red-500" role="img" aria-label="Needs attention" />;
+    return <span className="absolute right-0 -top-2 h-3 w-3 rounded-full bg-red-500 border-2 border-zinc-50" role="img" aria-label="Needs attention" />;
   }
   return null;
 }

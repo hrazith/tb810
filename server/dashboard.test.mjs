@@ -13,6 +13,7 @@ const dashboard = jiti("./dashboard.ts");
 const businessDateModule = jiti("@/server/business-date");
 const buildingModule = jiti("@/server/building");
 const ownerFactsModule = jiti("@/server/obligations/owner-facts");
+const progressionModule = jiti("@/server/obligations/progression");
 
 const { projectCarlosDashboard, projectGulianaDashboard, deriveUnitChargeWorthNoting, deriveGulianaDashboardMonths, deriveDashboardContext, getGulianaDashboardFacts } = dashboard;
 
@@ -84,6 +85,7 @@ function buildProjectionFacts(overrides = {}) {
     upcomingObligationMonth: "2026-09",
     context: overrides.context ?? (businessDate.endsWith("-09-01") ? "open" : "close"),
     sourceWork,
+    mostRecentHandoff: overrides.mostRecentHandoff ?? null,
     current: overrides.current ?? upcoming,
     upcoming,
   };
@@ -770,6 +772,28 @@ test("P3 a handed-off current package advances focus at a generic month boundary
   assert.equal(onBoundary.handoff?.status, "awaiting_carlos_approval");
 });
 
+test("consecutive handoffs keep the latest handoff separate from Giuliana's active package", () => {
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-28",
+    mostRecentHandoff: { obligationMonth: "2026-10", status: "ready_for_review" },
+    current: {
+      ...buildProjectionFacts().upcoming,
+      obligations: { ...buildProjectionFacts().upcoming.obligations, obligationMonth: "2026-11" },
+      obligationLifecycle: { mode: "live", billingPeriodId: null, billingPeriodStatus: null },
+    },
+    upcoming: {
+      ...buildProjectionFacts().upcoming,
+      obligations: { ...buildProjectionFacts().upcoming.obligations, obligationMonth: "2026-12" },
+    },
+  }));
+
+  assert.equal(projection.financialFocus, "current");
+  assert.deepEqual(projection.handoff, {
+    obligationMonth: "2026-10",
+    status: "awaiting_carlos_approval",
+  });
+});
+
 test("Sep 1 unresolved current obligations keep the current package in focus", () => {
   const base = buildProjectionFacts().upcoming;
   const projection = projectGulianaDashboard(buildProjectionFacts({
@@ -983,10 +1007,19 @@ test("K dashboard facts read uses exactly one bounded month read", async () => {
   const originalGetBusinessNow = businessDateModule.getBusinessNow;
   const originalGetFixedBuildingIdentity = buildingModule.getFixedBuildingIdentity;
   const originalLoadBuildingMonthFinancialFacts = ownerFactsModule.loadBuildingMonthFinancialFacts;
+  const originalLoadGiulianaPackageProgression = progressionModule.loadGiulianaPackageProgression;
   const obligationMonths = [];
 
   businessDateModule.getBusinessNow = async () => new Date("2026-08-31T00:00:00Z");
   buildingModule.getFixedBuildingIdentity = () => ({ id: "building-1", name: "Building One" });
+  progressionModule.loadGiulianaPackageProgression = async () => ({
+    data: {
+      activePackage: { obligationMonth: "2026-08", mode: "live", status: null },
+      mostRecentHandoff: null,
+    },
+    error: null,
+    requestCount: 1,
+  });
   ownerFactsModule.loadBuildingMonthFinancialFacts = async ({ obligationMonth }) => {
     obligationMonths.push(obligationMonth);
     const shared = {
@@ -1087,6 +1120,7 @@ test("K dashboard facts read uses exactly one bounded month read", async () => {
     businessDateModule.getBusinessNow = originalGetBusinessNow;
     buildingModule.getFixedBuildingIdentity = originalGetFixedBuildingIdentity;
     ownerFactsModule.loadBuildingMonthFinancialFacts = originalLoadBuildingMonthFinancialFacts;
+    progressionModule.loadGiulianaPackageProgression = originalLoadGiulianaPackageProgression;
   }
 });
 
@@ -1123,4 +1157,30 @@ test("L late Water source attentions remain separate and deterministic", () => {
       impact: "September water obligations cannot be completed.",
     },
   ]);
+});
+
+test("future source work is not late before its collection month", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-09-28",
+    sourceWork: {
+      water: {
+        meterReadingExpectedCount: 64,
+        meterReadingCompleteCount: 0,
+      },
+      gas: {
+        gasUnitCount: 58,
+        gasReadingCount: 0,
+      },
+    },
+    current: {
+      ...base,
+      sourceReadingMonth: "2026-10",
+      obligations: { ...base.obligations, obligationMonth: "2026-11" },
+    },
+  }));
+
+  assert.deepEqual(projection.attentions, []);
+  assert.equal(projection.water.meterReadingsEmphasis, "normal");
+  assert.equal(projection.gas.readingsEmphasis, "normal");
 });
