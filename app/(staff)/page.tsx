@@ -3,7 +3,7 @@ import { CaretDown, FileText, Drop, Flame } from "@phosphor-icons/react/dist/ssr
 
 import { DashboardGreeting } from "@/components/dashboard-greeting";
 import { DashboardNoticeCarousel } from "@/components/dashboard-notice-carousel";
-import { getGulianaDashboardFacts, projectCarlosDashboard, projectGulianaDashboard } from "@/server/dashboard";
+import { getCarlosDashboardFacts, getGulianaDashboardFacts, projectCarlosDashboard, projectGulianaDashboard } from "@/server/dashboard";
 import { approveMonthlyObligationAction } from "@/app/(staff)/obligations/actions";
 import { getStaffContext } from "@/server/staff-context";
 
@@ -113,7 +113,7 @@ function componentLabel(key: string) {
 const reviewComponentKeys = ["fixed_assessment", "metered_water", "common_water", "gas", "other_charge"] as const;
 
 async function CarlosDashboardPage({ firstName }: { firstName: string }) {
-  const result = await getGulianaDashboardFacts();
+  const result = await getCarlosDashboardFacts();
   if (result.error) throw new Error(result.error);
   if (!result.data) throw new Error("Dashboard facts unavailable.");
 
@@ -162,6 +162,7 @@ async function CarlosDashboardPage({ firstName }: { firstName: string }) {
               <p className="text-sm text-zinc-600">All required source inputs complete.</p>
               <form action={approveMonthlyObligationAction}>
                 <input type="hidden" name="billingPeriodId" value={projection.billingPeriodId ?? ""} />
+                <input type="hidden" name="reviewFingerprint" value={result.data.current.reviewFingerprint} />
                 <button type="submit" className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-zinc-950 bg-zinc-950 px-6 py-3 text-base font-medium text-white transition hover:bg-zinc-800">Approve {formatMonthLabel(projection.obligationMonth)} obligations</button>
               </form>
             </div>

@@ -6,6 +6,7 @@ const jiti = createJiti(import.meta.url, {
   alias: { "@": process.cwd() },
 });
 const { buildSnapshotPayload } = jiti("./snapshot.ts");
+const { buildChargeMap } = jiti("./owner-facts.ts");
 
 const accounts = new Map([
   ["unit-1", { id: "account-1", unit_id: "unit-1", building_id: "building-1", status: "active" }],
@@ -41,6 +42,41 @@ const completeComposition = {
     },
   ],
 };
+
+function makeCharge(overrides = {}) {
+  return {
+    id: "charge-1",
+    series_id: "series-1",
+    building_id: "building-1",
+    unit_id: "unit-1",
+    owner_id: null,
+    description: "Repair",
+    amount: 25,
+    schedule: "one_off",
+    effective_from_month: "2026-10-01",
+    effective_to_month: null,
+    stop_note: null,
+    legacy_table: null,
+    legacy_id: null,
+    legacy_metadata: null,
+    created_by: null,
+    updated_by: null,
+    created_at: "2026-09-17T00:00:00.000Z",
+    updated_at: "2026-09-17T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+test("snapshot charge composition includes charges eligible for the target obligation month", () => {
+  const result = buildChargeMap([
+    makeCharge(),
+    makeCharge({ id: "future", effective_from_month: "2026-11-01" }),
+    makeCharge({ id: "expired", effective_from_month: "2026-09-01", effective_to_month: "2026-09-30" }),
+  ], "2026-10", ["unit-1"]);
+
+  assert.equal(result.get("unit-1")?.amount, "25.00");
+  assert.deepEqual(result.get("unit-1")?.lineItems.map((item) => item.chargeId), ["charge-1"]);
+});
 
 test("complete composition maps the canonical component vocabulary and provenance", () => {
   const result = buildSnapshotPayload(

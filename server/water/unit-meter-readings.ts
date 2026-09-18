@@ -143,6 +143,44 @@ function monthKeyFromDate(date: string) {
   return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+function obligationMonthForSourceMonth(sourceMonth: string) {
+  const parsed = parseDate(`${sourceMonth}-01`);
+  if (!parsed) return null;
+  parsed.setUTCMonth(parsed.getUTCMonth() + 1);
+  return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+async function isLatestReadyForReviewSourceMonth(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  buildingId: string,
+  sourceMonth: string,
+) {
+  const obligationMonth = obligationMonthForSourceMonth(sourceMonth);
+  if (!obligationMonth) return { allowed: false, error: null };
+
+  const { data, error } = await supabase
+    .from("tb810_billing_periods")
+    .select("period_year, period_month")
+    .eq("building_id", buildingId)
+    .eq("status", "ready_for_review")
+    .order("period_year", { ascending: false })
+    .order("period_month", { ascending: false })
+    .limit(1);
+  if (error) return { allowed: false, error: error.message };
+
+  const latestReadyMonth = data?.[0]
+    ? `${data[0].period_year}-${String(data[0].period_month).padStart(2, "0")}`
+    : null;
+  return { allowed: latestReadyMonth === obligationMonth, error: null };
+}
+
+export async function canEditReadyForReviewSourceMonth(sourceMonth: string) {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { allowed: false, error: buildingResult.error };
+  if (!buildingResult.data) return { allowed: false, error: null };
+  return isLatestReadyForReviewSourceMonth(await createClient(), buildingResult.data.id, sourceMonth);
+}
+
 function monthStartFromKey(monthKey: string) {
   return `${monthKey}-01`;
 }
@@ -570,7 +608,9 @@ async function validateReading(
   const readingMonthKey = monthKeyFromDate(readingDate);
   if (!readingMonthKey) return { error: "Reading date is required and must be valid." };
   if (readingMonthKey !== active.key && !allowHistoricalEditing) {
-    return { error: "Reading date must belong to the active reading month." };
+    const correction = await isLatestReadyForReviewSourceMonth(supabase, buildingId, readingMonthKey);
+    if (correction.error) return { error: correction.error };
+    if (!correction.allowed) return { error: "Reading date must belong to the active reading month." };
   }
 
   const readingEnd = parseNumberValue(input.reading_end);
@@ -808,7 +848,13 @@ export async function deleteUnitMeterReading(
 
   const active = getActiveReadingMonth();
   if (monthKeyFromDate(reading.reading_date) !== active.key && !allowHistoricalEditing) {
-    return { data: null as never, error: "Only current-month meter readings can be deleted." };
+    const correction = await isLatestReadyForReviewSourceMonth(
+      supabase,
+      buildingResult.data.id,
+      monthKeyFromDate(reading.reading_date) ?? "",
+    );
+    if (correction.error) return { data: null as never, error: correction.error };
+    if (!correction.allowed) return { data: null as never, error: "Only current-month meter readings can be deleted." };
   }
 
   const unitsResult = await getCondoUnits();

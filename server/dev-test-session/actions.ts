@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resetCurrentMonthlyObligationApprovalForDev } from "@/server/obligations/approval";
 import { runMonthlyObligationPulse } from "@/server/obligations/pulse";
-import type { SnapshotPersistence } from "@/server/obligations/snapshot";
+import type { HandoffPersistence } from "@/server/obligations/snapshot";
 
 import { getActiveDevTestSessionSummary, getDevTestSessionCookieName, startDevTestSession } from "../dev-test-session";
 
@@ -47,6 +47,15 @@ export async function resetDevTestSessionAction(formData: FormData) {
     redirect(returnTo);
   }
 
+  const { error: snapshotResetError } = await (supabase as unknown as {
+    rpc: (name: string, args: Record<string, string>) => Promise<{ error: { message: string } | null }>;
+  }).rpc("tb810_prepare_dev_monthly_obligation_reset", {
+    p_session_id: sessionId,
+  });
+  if (snapshotResetError) {
+    redirect(`${returnTo}?error=${encodeURIComponent(snapshotResetError.message)}`);
+  }
+
   const { error } = await supabase.rpc("tb810_reset_dev_test_session", {
     p_session_id: sessionId,
   });
@@ -79,19 +88,19 @@ export async function runMonthlyObligationPulseAction(formData: FormData) {
   const session = await getActiveDevTestSessionSummary();
   if (!session) redirect(`${returnTo}?error=${encodeURIComponent("Start a DEV test session first.")}`);
 
-  const persistence: SnapshotPersistence = async ({ supabase, buildingId, obligationMonth, rows, gasBillIds }) => {
+  const persistence: HandoffPersistence = async ({ supabase, buildingId, obligationMonth, operatingMonth }) => {
     const rpc = await (supabase as unknown as {
       rpc: (
         name: string,
         args: Record<string, unknown>,
       ) => Promise<{ data: { billingPeriodId: string; status: string; obligationRowCount: number } | null; error: { message: string } | null }>;
-    }).rpc("tb810_create_dev_monthly_obligation_snapshot", {
+    }).rpc("tb810_mark_dev_monthly_obligation_ready_for_review", {
       p_session_id: session.id,
       p_building_id: buildingId,
       p_period_year: Number(obligationMonth.slice(0, 4)),
       p_period_month: Number(obligationMonth.slice(5, 7)),
-      p_rows: rows,
-      p_gas_bill_ids: gasBillIds,
+      p_operating_year: Number(operatingMonth.slice(0, 4)),
+      p_operating_month: Number(operatingMonth.slice(5, 7)),
     });
     if (rpc.error) return { data: null, error: rpc.error.message, failureKind: "error" as const };
     return { data: rpc.data, error: null };

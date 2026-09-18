@@ -14,7 +14,7 @@ export function isApprovedPackage(lifecycle: Pick<ObligationPackageLifecycle, "m
 }
 
 export function isHandedOffPackage(lifecycle: Pick<ObligationPackageLifecycle, "mode" | "status">) {
-  return lifecycle.mode === "snapshotted" && lifecycle.status !== null && HANDED_OFF_STATUSES.has(lifecycle.status);
+  return lifecycle.status !== null && HANDED_OFF_STATUSES.has(lifecycle.status);
 }
 
 export function selectFinancialFocus(currentLifecycle: Pick<ObligationPackageLifecycle, "mode" | "status">) {

@@ -21,6 +21,7 @@ type Props = {
   readingDate: string;
   previousByUnitId: Record<string, { previous_reading: number | null; previous_reading_date: string | null }>;
   historicalEditingAvailable?: boolean;
+  packageCorrectionAvailable?: boolean;
   isHistoricalMonth?: boolean;
 };
 
@@ -42,6 +43,7 @@ export function AddMeterReadingRow({
   readingDate,
   previousByUnitId,
   historicalEditingAvailable = false,
+  packageCorrectionAvailable = false,
   isHistoricalMonth = false,
 }: Props) {
   const { historicalEditingEnabled } = useDevTools();
@@ -65,7 +67,7 @@ export function AddMeterReadingRow({
       ? null
       : toNumber(currentReading)! - previous;
   const canEditHistoricalReadings =
-    historicalEditingAvailable && historicalEditingEnabled && isHistoricalMonth;
+    isHistoricalMonth && (packageCorrectionAvailable || (historicalEditingAvailable && historicalEditingEnabled));
   const visible = !isHistoricalMonth || canEditHistoricalReadings;
 
   useEffect(() => {

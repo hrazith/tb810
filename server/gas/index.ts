@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
 
 import { createClient } from "@/lib/supabase/server";
-import { getBusinessNow } from "@/server/business-date";
 import { getActiveDevTestSessionId, getActiveDevTestSessionSummary, recordDevTestMutation } from "@/server/dev-test-session";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 import { parseGasWorkbook, type GasImportPreflight } from "./import";
-import { buildMissingGasReadingDrafts } from "./dev-completion";
+import { buildMissingGasReadingDrafts, gasReadingDateForSourceMonth } from "./dev-completion";
 
 import type {
   GasBillInput,
@@ -209,15 +208,9 @@ export async function createGasReading(input: GasReadingInput): Promise<QueryRes
   return { data, error: null };
 }
 
-function utcDateKey(date: Date) {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
-}
-
-function businessMonthKey(date: Date) {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-export async function completeMissingGasReadingsForCurrentBusinessMonth(): Promise<QueryResult<{ insertedCount: number }>> {
+export async function completeMissingGasReadingsForCurrentBusinessMonth(
+  sourceReadingMonth: string,
+): Promise<QueryResult<{ insertedCount: number }>> {
   if (process.env.NODE_ENV !== "development") {
     return { data: null as never, error: "DEV test actions are development-only." };
   }
@@ -236,9 +229,8 @@ export async function completeMissingGasReadingsForCurrentBusinessMonth(): Promi
   if (building.error) return { data: null as never, error: building.error };
   if (!building.data) return { data: null as never, error: "Building not found." };
 
-  const businessNow = await getBusinessNow();
-  const sourceReadingMonth = businessMonthKey(businessNow);
-  const readingDate = utcDateKey(businessNow);
+  const readingDate = gasReadingDateForSourceMonth(sourceReadingMonth);
+  if (!readingDate) return { data: null as never, error: "Gas source month is invalid." };
 
   const supabase = await createClient();
   const unitsResult = await listUnits();

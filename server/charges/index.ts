@@ -33,6 +33,26 @@ function isUnitCharge(row: ChargeRecord) {
   return row.unit_id != null && row.owner_id == null;
 }
 
+async function isLatestReadyForReviewUnitChargeMonth(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  buildingId: string,
+  month: string,
+) {
+  const { data, error } = await supabase
+    .from("tb810_billing_periods")
+    .select("period_year, period_month")
+    .eq("building_id", buildingId)
+    .eq("status", "ready_for_review")
+    .order("period_year", { ascending: false })
+    .order("period_month", { ascending: false })
+    .limit(1);
+  if (error) return { allowed: false, error: error.message };
+  const latestReadyMonth = data?.[0]
+    ? `${data[0].period_year}-${String(data[0].period_month).padStart(2, "0")}`
+    : null;
+  return { allowed: latestReadyMonth === month, error: null };
+}
+
 async function summarizeState(row: ChargeRecord) {
   const currentMonth = await currentMonthKey();
   if (row.effective_from_month.slice(0, 7) > currentMonth) return "future" as const;
@@ -93,9 +113,9 @@ export function validateFutureChargeInput(input: {
   starts_month: string;
   ends_month?: string | null;
   currentMonth: string;
-}): ChargeLifecycleValidationResult {
+}, allowReadyForReviewCorrection = false): ChargeLifecycleValidationResult {
   const defaultStartMonth = defaultStartMonthForNewCharge(input.currentMonth);
-  if (input.starts_month < defaultStartMonth) {
+  if (input.starts_month < defaultStartMonth && !allowReadyForReviewCorrection) {
     return { error: `Start month cannot be before ${defaultStartMonth}.` };
   }
   if (input.schedule === "one_off" && input.ends_month) {
@@ -128,9 +148,9 @@ export function validateChargeLifecycleInput(input: {
   starts_month: string;
   ends_month?: string | null;
   currentMonth: string;
-}): ChargeLifecycleValidationResult {
+}, allowReadyForReviewCorrection = false): ChargeLifecycleValidationResult {
   const defaultStartMonth = defaultStartMonthForNewCharge(input.currentMonth);
-  if (input.starts_month < defaultStartMonth) {
+  if (input.starts_month < defaultStartMonth && !allowReadyForReviewCorrection) {
     return { error: `Start month cannot be before ${defaultStartMonth}.` };
   }
   if (input.schedule === "one_off" && input.ends_month) {
@@ -166,8 +186,15 @@ export async function editFutureCharge(
 
   const currentMonth = await currentMonthKey();
   const current = chargeResult.data;
-  if (!isFutureEffectiveCharge(current, currentMonth)) {
+  const isCorrection = isUnitCharge(current) && !isFutureEffectiveCharge(current, currentMonth)
+    ? await isLatestReadyForReviewUnitChargeMonth(await createClient(), current.building_id, monthKeyFromDate(current.effective_from_month))
+    : { allowed: false, error: null };
+  if (isCorrection.error) return { data: null as never, error: isCorrection.error };
+  if (!isFutureEffectiveCharge(current, currentMonth) && !isCorrection.allowed) {
     return { data: null as never, error: "Future charges only can be edited." };
+  }
+  if (isCorrection.allowed && input.starts_month !== monthKeyFromDate(current.effective_from_month)) {
+    return { data: null as never, error: "A handed-off charge must remain in its obligation month." };
   }
 
   const validated = validateFutureChargeInput({
@@ -175,7 +202,7 @@ export async function editFutureCharge(
     starts_month: input.starts_month,
     ends_month: input.ends_month ?? null,
     currentMonth,
-  });
+  }, isCorrection.allowed);
   if (validated.error) return { data: null as never, error: validated.error };
 
   const supabase = await createClient();
@@ -204,7 +231,11 @@ export async function deleteFutureCharge(chargeId: string): Promise<QueryResult<
 
   const currentMonth = await currentMonthKey();
   const current = chargeResult.data;
-  if (!isFutureEffectiveCharge(current, currentMonth)) {
+  const isCorrection = isUnitCharge(current) && !isFutureEffectiveCharge(current, currentMonth)
+    ? await isLatestReadyForReviewUnitChargeMonth(await createClient(), current.building_id, monthKeyFromDate(current.effective_from_month))
+    : { allowed: false, error: null };
+  if (isCorrection.error) return { data: null as never, error: isCorrection.error };
+  if (!isFutureEffectiveCharge(current, currentMonth) && !isCorrection.allowed) {
     return { data: null as never, error: "Future charges only can be deleted." };
   }
 
@@ -223,7 +254,10 @@ export async function deleteFutureCharge(chargeId: string): Promise<QueryResult<
   if (seriesError) return { data: null as never, error: seriesError.message };
 
   const rows = (seriesRows ?? []) as ChargeRecord[];
-  if (!canDeleteFutureChargeSeries(rows, currentMonth)) {
+  if (isCorrection.allowed && rows.some((row) => monthKeyFromDate(row.effective_from_month) !== monthKeyFromDate(current.effective_from_month))) {
+    return { data: null as never, error: "Only a single-month charge can be removed from a handed-off package." };
+  }
+  if (!isCorrection.allowed && !canDeleteFutureChargeSeries(rows, currentMonth)) {
     return { data: null as never, error: "Future charges only can be deleted." };
   }
 
@@ -346,12 +380,18 @@ async function createTargetCharge(input: {
 
   const startMonth = input.starts_month;
   const currentMonth = await currentMonthKey();
+  let allowReadyForReviewCorrection = false;
+  if (input.unitId && startMonth < (defaultStartMonthForNewCharge(currentMonth) ?? currentMonth)) {
+    const correction = await isLatestReadyForReviewUnitChargeMonth(supabase, buildingId, startMonth);
+    if (correction.error) return { data: null as never, error: correction.error };
+    allowReadyForReviewCorrection = correction.allowed;
+  }
   const validated = validateChargeLifecycleInput({
     schedule: input.schedule,
     starts_month: startMonth,
     ends_month: input.ends_month ?? null,
     currentMonth,
-  });
+  }, allowReadyForReviewCorrection);
   if (validated.error) return { data: null as never, error: validated.error };
   const successValidated = validated as Extract<ChargeLifecycleValidationResult, { error: null }>;
   const effectiveFromMonth = successValidated.effectiveFromMonth;

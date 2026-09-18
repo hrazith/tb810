@@ -55,8 +55,9 @@ export function buildDevUnitChargeFixture(input: {
   unitId: string;
   unitNumber: string;
   currentMonth: string;
+  upcomingMonth?: string;
 }): DevUnitChargeFixture {
-  const upcomingMonth = nextMonthKey(input.currentMonth) ?? input.currentMonth;
+  const upcomingMonth = input.upcomingMonth ?? nextMonthKey(input.currentMonth) ?? input.currentMonth;
   return {
     buildingId: input.buildingId,
     unitId: input.unitId,
@@ -78,7 +79,7 @@ export function buildDevUnitChargeFixture(input: {
   };
 }
 
-export async function addUnitChargeForCurrentBusinessMonth(): Promise<QueryResult<{ insertedCount: number; chargeSeriesId: string }>> {
+export async function addUnitChargeForCurrentBusinessMonth(targetMonth?: string): Promise<QueryResult<{ insertedCount: number; chargeSeriesId: string }>> {
   if (process.env.NODE_ENV !== "development") {
     return { data: null as never, error: "DEV test actions are development-only." };
   }
@@ -120,6 +121,7 @@ export async function addUnitChargeForCurrentBusinessMonth(): Promise<QueryResul
     unitId: targetUnit.id,
     unitNumber: targetUnit.unit_number,
     currentMonth,
+    ...(targetMonth ? { upcomingMonth: targetMonth } : {}),
   });
 
   const { data: existing, error: existingError } = await supabase

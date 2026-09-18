@@ -21,6 +21,7 @@ type Props = {
   readingDefaults?: UnitMeterReadingDefaults | null;
   readOnly?: boolean;
   historicalEditingAvailable?: boolean;
+  packageCorrectionAvailable?: boolean;
   isHistoricalMonth?: boolean;
 };
 
@@ -44,6 +45,7 @@ export function UnitMeterReadingForm({
   readingDefaults,
   readOnly = false,
   historicalEditingAvailable = false,
+  packageCorrectionAvailable = false,
   isHistoricalMonth = false,
 }: Props) {
   const { historicalEditingEnabled } = useDevTools();
@@ -69,7 +71,7 @@ export function UnitMeterReadingForm({
   const previousReading = readingDefaults?.previousReading ?? null;
   const previousReadingDate = readingDefaults?.previousReadingDate ?? null;
   const canEditHistoricalReadings =
-    historicalEditingAvailable && historicalEditingEnabled && isHistoricalMonth;
+    isHistoricalMonth && (packageCorrectionAvailable || (historicalEditingAvailable && historicalEditingEnabled));
   const editable = !readOnly || canEditHistoricalReadings;
   const consumption = useMemo(() => {
     const previous = previousReading;

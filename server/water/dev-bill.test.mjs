@@ -8,8 +8,12 @@ const jiti = createJiti(import.meta.url, {
     "@": path.resolve(process.cwd()),
   },
 });
-const { buildCommonWaterBillDraft, findLatestValidWaterSource } = jiti("./dev-bill.ts");
+const { buildCommonWaterBillDraft, findLatestValidWaterSource, sourceMonthEndDate } = jiti("./dev-bill.ts");
 const { hasCompleteWaterReadings } = jiti("./readiness.ts");
+
+test("dates the October obligation Sedapal fixture in its September source period", () => {
+  assert.equal(sourceMonthEndDate("2026-09"), "2026-09-30");
+});
 
 test("derives Sedapal consumption from current readings plus prior common water", () => {
   const result = buildCommonWaterBillDraft({

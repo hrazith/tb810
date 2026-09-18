@@ -37,6 +37,7 @@ test("successful approval updates the billing period", { concurrency: false }, a
   const originalCreateClient = supabaseServer.createClient;
   const originalGetStaffContext = staffContextModule.getStaffContext;
   let maybeSingleCalls = 0;
+  let rpcCalls = 0;
 
   staffContextModule.getStaffContext = async () => ({
     user: { id: "staff-1" },
@@ -63,11 +64,43 @@ test("successful approval updates the billing period", { concurrency: false }, a
         ? { data: { id: "period-1", status: "ready_for_review", period_year: 2026, period_month: 9 }, error: null }
         : { data: { status: "approved" }, error: null });
     },
+    rpc(name) {
+      rpcCalls += 1;
+      if (name === "tb810_get_building_month_financial_facts") {
+        return Promise.resolve({
+          data: {
+            currentPlan: null,
+            upcomingPlan: null,
+            commonWaterType: null,
+            unitRows: [],
+            gasBills: [],
+            charges: [],
+            current: {
+              commonWaterBill: null,
+              waterReadings: [],
+              gasReadings: [],
+              obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "ready_for_review" },
+              obligationSnapshot: { billingPeriodId: "period-1", status: "ready_for_review", components: {}, total: "0" },
+            },
+            upcoming: {
+              commonWaterBill: null,
+              waterReadings: [],
+              gasReadings: [],
+              obligationLifecycle: { mode: "live", billingPeriodId: null, billingPeriodStatus: null },
+              obligationSnapshot: null,
+            },
+          },
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: { status: "approved" }, error: null });
+    },
   });
 
   try {
     const result = await approval.approveMonthlyObligation({ billingPeriodId: "period-1" });
     assert.deepEqual(result, { data: { status: "approved" }, error: null });
+    assert.equal(rpcCalls, 2);
   } finally {
     supabaseServer.createClient = originalCreateClient;
     staffContextModule.getStaffContext = originalGetStaffContext;

@@ -28,6 +28,7 @@ type Props = {
   deleteAction: (prevState: FormState, formData: FormData) => Promise<FormState>;
   readOnly?: boolean;
   historicalEditingAvailable?: boolean;
+  packageCorrectionAvailable?: boolean;
   isHistoricalMonth?: boolean;
 };
 
@@ -44,6 +45,7 @@ export function CurrentMeterReadingRow({
   deleteAction,
   readOnly = false,
   historicalEditingAvailable = false,
+  packageCorrectionAvailable = false,
   isHistoricalMonth = false,
 }: Props) {
   const { historicalEditingEnabled } = useDevTools();
@@ -56,7 +58,7 @@ export function CurrentMeterReadingRow({
   const formId = `unit-meter-reading-${row.id}`;
   const deleteFormId = `unit-meter-reading-delete-${row.id}`;
   const canEditHistoricalReadings =
-    historicalEditingAvailable && historicalEditingEnabled && isHistoricalMonth;
+    isHistoricalMonth && (packageCorrectionAvailable || (historicalEditingAvailable && historicalEditingEnabled));
   const editable = !readOnly || canEditHistoricalReadings;
 
   /* eslint-disable react-hooks/set-state-in-effect */

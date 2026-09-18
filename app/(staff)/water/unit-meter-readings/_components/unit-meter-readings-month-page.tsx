@@ -25,9 +25,10 @@ type Props = {
   query?: string;
   deleted?: string;
   historicalEditingAvailable: boolean;
+  packageCorrectionAvailable: boolean;
 };
 
-export async function UnitMeterReadingsMonthPage({ month, query, deleted, historicalEditingAvailable }: Props) {
+export async function UnitMeterReadingsMonthPage({ month, query, deleted, historicalEditingAvailable, packageCorrectionAvailable }: Props) {
   const activeMonth = getActiveReadingMonth();
   const pageStartedAt = process.hrtime.bigint();
   const populationPromise = (async () => {
@@ -126,6 +127,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
                 readingDate={activeMonth.start}
                 previousByUnitId={previousByUnitId}
                 historicalEditingAvailable={historicalEditingAvailable}
+                packageCorrectionAvailable={packageCorrectionAvailable}
                 isHistoricalMonth={false}
               />
             ) : canShowHistoricalEditing ? (
@@ -135,6 +137,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
                 readingDate={month ? `${month}-01` : activeMonth.start}
                 previousByUnitId={previousByUnitId}
                 historicalEditingAvailable={historicalEditingAvailable}
+                packageCorrectionAvailable={packageCorrectionAvailable}
                 isHistoricalMonth
               />
             ) : null}
@@ -146,6 +149,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
                 deleteAction={deleteUnitMeterReadingAction}
                 readOnly={!isActiveMonth}
                 historicalEditingAvailable={historicalEditingAvailable}
+                packageCorrectionAvailable={packageCorrectionAvailable}
                 isHistoricalMonth={!isActiveMonth}
               />
             ))}

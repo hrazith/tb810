@@ -722,6 +722,28 @@ test("P month-open projects a snapshotted package as awaiting approval", () => {
   assert.equal("dispatched" in projection.obligations, false);
 });
 
+test("live ready-for-review package advances focus before approval snapshot", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectGulianaDashboard(buildProjectionFacts({
+    businessDate: "2026-10-01",
+    operatingMonth: "2026-10",
+    upcomingObligationMonth: "2026-11",
+    context: "open",
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-10", total: "123.45" },
+      obligationLifecycle: { mode: "live", billingPeriodId: "period-1", billingPeriodStatus: "ready_for_review" },
+    },
+    upcoming: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-11", total: null },
+    },
+  }));
+
+  assert.equal(projection.financialFocus, "upcoming");
+  assert.deepEqual(projection.handoff, { obligationMonth: "2026-10", status: "awaiting_carlos_approval" });
+});
+
 test("P2 current live package remains in focus before the obligation month starts", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
     businessDate: "2026-08-31",

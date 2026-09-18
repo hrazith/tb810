@@ -94,11 +94,11 @@ The absence of work should not automatically become a warning.
 The dashboard should not force users to reconcile implementation-level source periods, but it must make the two user-relevant timelines explicit.
 Precise source-period rules remain visible inside Water and Gas workspaces where they belong.
 
-The dashboard also distinguishes the obligation lifecycle from the operating calendar. A date provides context; financial readiness and successful snapshot creation create lifecycle state. In the normal happy path, a complete and valid package may be previewed before its obligation month, snapshotted when ready, and shown to Giuliana as Awaiting Carlos Approval.
+The dashboard also distinguishes the obligation lifecycle from the operating calendar. A date provides context; financial readiness and successful handoff create lifecycle state. In the normal happy path, a complete and valid package may be previewed before its obligation month, handed off when ready, and shown to Giuliana as Awaiting Carlos Approval while Carlos reviews it.
 
 Persisted future lifecycle state must not leak backward when the DEV business date is rewound. A snapshot is presentation-visible for its obligation month only when the business date has reached that month. Rewinding the business date changes projection only; it does not mutate, reopen, delete, or rewrite persisted lifecycle state.
 
-The `ready_for_review` lifecycle state is Giuliana's financial-focus pivot. It means the immutable package is complete, the baton has passed to Carlos for review and approval, and Giuliana's floating Obligations utility advances to the immediate successor live preview. Approval later changes the handed-off package to Ready for Dispatch but does not advance Giuliana again. The calendar alone must not cause that switch.
+The `ready_for_review` lifecycle state is Giuliana's financial-focus pivot. It means the live package is complete, the baton has passed to Carlos for review and approval, and Giuliana's floating Obligations utility advances to the immediate successor live preview. Carlos approval creates the immutable package and changes the handed-off package to Ready for Dispatch, but does not advance Giuliana again. The calendar alone must not cause that switch.
 
 Giuliana's active package is the first obligation month that has not crossed
 that handoff boundary. The dashboard resolves the active package and the most
@@ -221,12 +221,12 @@ Incomplete, late, and blocking are separate states. An incomplete source fact ma
 The timing rules above define operational lateness, while the dependent package boundary defines financial blocking. Detailed domain validation remains authoritative. Existing canonical financial-calculation blockers continue to behave as implemented.
 
 For a complete and valid happy-path package, month close is a guaranteed pulse
-checkpoint, not a strict earliest snapshot boundary. If required facts become
-ready earlier, the package may be snapshotted early. The date alone does not
-snapshot an incomplete package. An incomplete package remains live while
+checkpoint, not a strict earliest handoff boundary. If required facts become
+ready earlier, the package may be handed off early. The date alone does not
+hand off an incomplete package. An incomplete package remains live while
 Giuliana enters or corrects the missing prior-period facts; a later pulse may
 snapshot it when the final blocker resolves and return it to Awaiting Carlos
-Approval.
+Approval. Carlos approval then creates the immutable financial snapshot.
 
 ### Business-date month boundary
 
@@ -243,17 +243,17 @@ Incomplete does not mean late. Calendar passage alone must not create Attention;
 
 Month-turn is a real calendar/business-date event, but there is no single master
 month clock. Calendar/business date drives boundaries and pulse attempts;
-financial readiness drives snapshot eligibility; snapshot creation freezes the
-canonical package and hands it to Carlos; that handoff advances Giuliana's
+financial readiness drives handoff eligibility; Carlos approval creates the
+snapshot and freezes the canonical package; the earlier handoff advances Giuliana's
 operational focus to the immediate successor. Carlos approval changes the
 handed-off package's status but does not advance focus again. These transitions
 may occur before or after calendar month-turn.
 
 For example, September source facts becoming ready on September 28 may produce
-an October snapshot before October begins. Conversely, on October 1 unresolved
+an October handoff before October begins. Conversely, on October 1 unresolved
 September facts leave October obligations Not Ready while October source work
 begins for November. After the final September fact arrives, a subsequent pulse
-may create October and show Complete · Awaiting Carlos approval.
+may hand October to Carlos and show Complete · Awaiting Carlos approval.
 
 ### Lateness and attention examples
 
@@ -423,15 +423,15 @@ If the current month's obligations require Carlos's review, that actionable stat
 Once Carlos has reviewed or approved the obligations, this section compresses.
 Collections then naturally becomes the dominant dashboard responsibility.
 
-The first Carlos implementation slice is intentionally narrow: review and approval of the existing immutable monthly obligation package. Carlos does not recalculate, generate, finalize, or snapshot the package.
+The first Carlos implementation slice is intentionally narrow: review and approval of the live monthly obligation package. Carlos does not redefine its amounts; approval atomically creates the immutable snapshot for new packages. Legacy persisted packages are approved without re-snapshotting.
 
 The provisional approval target is the fifth calendar day of the obligation month. A `ready_for_review` package is shown as Ready for your approval through day 5 and as Approval overdue / Dispatch blocked from day 6 onward. This is a provisional operating policy pending Carlos's confirmation, not a September-specific rule.
 
 The happy-path lifecycle is:
 
-- Live Preview before successful finalization
-- readiness-driven snapshot when complete and valid; month-turn guarantees an attempt
-- Awaiting Carlos Approval after the immutable package is available
+- Live Preview before the approval boundary
+- readiness-driven handoff when complete and valid; month-turn guarantees an attempt
+- Awaiting Carlos Approval after the live package is handed off
 - Ready for Dispatch after Carlos approval manifests invoices and compressed dispatch bundles
 
 The incomplete month-turn path is Not Ready rather than a normal lifecycle
@@ -597,11 +597,11 @@ Frozen architecture and domain decisions include:
 - Completed Work as compressed confirmation
 - Worth Noting versus Exceptions
 - Carlos obligations-first hierarchy
-- successful finalization as the frozen-package boundary
-- Awaiting Carlos Approval and Ready for Dispatch as post-finalization states
-- readiness-driven snapshot creation with month-turn as a guaranteed attempt
+- Carlos approval as the frozen-package boundary
+- Awaiting Carlos Approval and Ready for Dispatch around the approval boundary
+- readiness-driven handoff with month-turn as a guaranteed attempt
 - no snapshot for incomplete or invalid packages at month turn
-- later pulse snapshot after the final blocker resolves
+- later pulse handoff after the final blocker resolves
 - approval-triggered invoice and compressed-bundle manifestation
 - operational source intake kept distinct from the next obligation package
 - collections lifecycle semantics

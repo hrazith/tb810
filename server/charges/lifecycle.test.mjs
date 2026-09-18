@@ -60,6 +60,24 @@ test("future one-off edit and delete remain allowed while current/past months ar
   assert.equal(canDeleteFutureChargeSeries([currentOneOff], "2026-08"), false);
 });
 
+test("ready-for-review Unit Charge corrections can use the handed-off month", () => {
+  const correction = validateFutureChargeInput({
+    schedule: "one_off",
+    starts_month: "2026-10",
+    ends_month: null,
+    currentMonth: "2026-10",
+  }, true);
+  assert.equal(correction.error, null);
+
+  const ordinary = validateFutureChargeInput({
+    schedule: "one_off",
+    starts_month: "2026-10",
+    ends_month: null,
+    currentMonth: "2026-10",
+  });
+  assert.match(ordinary.error ?? "", /Start month cannot be before 2026-11\./);
+});
+
 test("future recurring edit/delete remain allowed and series safety rejects mixed history", () => {
   const futureRecurring = validateFutureChargeInput({
     schedule: "recurring",

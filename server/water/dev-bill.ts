@@ -1,8 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
-import { getBusinessNow } from "@/server/business-date";
 import { getActiveDevTestSessionId, getActiveDevTestSessionSummary, recordDevTestMutation } from "@/server/dev-test-session";
 import { getCurrentBuilding } from "@/server/units";
 import { loadBuildingMonthFinancialFacts } from "@/server/obligations/owner-facts";
+import { previousMonthKeyFromMonthKey } from "@/server/water/month-utils";
 import { calculateWaterAllocationCents, parseMilliUnits, parseMoneyCents, roundToNearestInteger } from "./index";
 import { hasCompleteWaterReadings } from "./readiness";
 
@@ -55,6 +55,14 @@ function roundToThree(value: number) {
 
 function getMonthKey(value: string) {
   return value.slice(0, 7);
+}
+
+export function sourceMonthEndDate(sourceMonth: string) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(sourceMonth)) return null;
+  const date = new Date(`${sourceMonth}-01T00:00:00Z`);
+  date.setUTCMonth(date.getUTCMonth() + 1);
+  date.setUTCDate(0);
+  return date.toISOString().slice(0, 10);
 }
 
 function calculateCommonConsumption(bill: CommonWaterBillHistoryRow, readings: WaterReadingFact[], eligibleUnitIds: Set<string>) {
@@ -159,7 +167,10 @@ export function buildCommonWaterBillDraft(input: {
   };
 }
 
-export async function addCommonWaterBillForCurrentBusinessMonth(): Promise<QueryResult<{ insertedCount: number; billId: string }>> {
+export async function addCommonWaterBillForCurrentBusinessMonth(
+  obligationMonth: string,
+  sourceBillingMonth: string,
+): Promise<QueryResult<{ insertedCount: number; billId: string }>> {
   if (process.env.NODE_ENV !== "development") {
     return { data: null as never, error: "DEV test actions are development-only." };
   }
@@ -178,17 +189,19 @@ export async function addCommonWaterBillForCurrentBusinessMonth(): Promise<Query
   if (building.error) return { data: null as never, error: building.error };
   if (!building.data) return { data: null as never, error: "Current building not found." };
 
-  const businessNow = await getBusinessNow();
-  const billDate = businessNow.toISOString().slice(0, 10);
-  const billMonth = getMonthKey(billDate);
+  if (previousMonthKeyFromMonthKey(obligationMonth) !== sourceBillingMonth) {
+    return { data: null as never, error: "Water source month does not match the obligation month." };
+  }
+  const billDate = sourceMonthEndDate(sourceBillingMonth);
+  if (!billDate) return { data: null as never, error: "Water source month is invalid." };
   const factsResult = await loadBuildingMonthFinancialFacts({
     buildingId: building.data.id,
-    obligationMonth: billMonth,
+    obligationMonth,
   });
   if (factsResult.error) return { data: null as never, error: factsResult.error };
   if (!factsResult.data) return { data: null as never, error: "Building month facts unavailable." };
 
-  const waterFacts = factsResult.data.upcoming;
+  const waterFacts = factsResult.data.current;
   if (!waterFacts.commonWaterType) return { data: null as never, error: "Common Water utility type is missing." };
   const eligibleUnitIds = waterFacts.unitRows
     .filter((unit) => unit.unit_type_code === "condo")
@@ -199,8 +212,8 @@ export async function addCommonWaterBillForCurrentBusinessMonth(): Promise<Query
       .from("tb810_billing_periods")
       .select("id, status, period_year, period_month")
       .eq("building_id", building.data.id)
-      .eq("period_year", Number(billMonth.slice(0, 4)))
-      .eq("period_month", Number(billMonth.slice(5, 7)))
+      .eq("period_year", Number(sourceBillingMonth.slice(0, 4)))
+      .eq("period_month", Number(sourceBillingMonth.slice(5, 7)))
       .maybeSingle(),
     supabase
       .from("tb810_utility_bills")
@@ -214,7 +227,7 @@ export async function addCommonWaterBillForCurrentBusinessMonth(): Promise<Query
       .select("unit_id, reading_month, consumption")
       .eq("building_id", building.data.id)
       .eq("utility_type_id", waterFacts.commonWaterType?.id ?? "")
-      .lt("reading_month", `${billMonth}-01`),
+      .lt("reading_month", `${sourceBillingMonth}-01`),
     supabase
       .from("tb810_dev_test_mutations")
       .select("record_identity")

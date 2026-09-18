@@ -3,8 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { getUnitFixedMonthlyAssessmentFromFacts } from "@/server/budget-plans";
 import type { UnitFixedMonthlyAssessmentState } from "@/server/budget-plans/types";
-import { calculateUpcomingUnitChargesFromFacts } from "@/server/charges";
-import { nextMonthKey } from "@/server/charges/month";
+import { nextMonthKey, isChargeEligibleForMonth } from "@/server/charges/month";
 import type { ChargeRecord } from "@/server/charges/types";
 import { type GasCalculationInput } from "@/server/gas/calculation";
 import { calculateWaterChargePreviewsForUnit, type WaterChargePreviewBundle } from "@/server/water";
@@ -287,7 +286,27 @@ export function buildChargeMap(
 ) {
   const map = new Map<string, { amount: string; lineItems: Array<{ chargeId: string; description: string; amount: string; effectiveFromMonth: string; effectiveToMonth: string | null; }> }>();
   for (const unitId of unitIds) {
-    map.set(unitId, calculateUpcomingUnitChargesFromFacts(charges, unitId, obligationMonth));
+    const lineItems = charges
+      .filter((row) => {
+        if (row.unit_id !== unitId || row.owner_id !== null) return false;
+        return isChargeEligibleForMonth({
+          schedule: row.schedule,
+          effectiveFromMonth: row.effective_from_month.slice(0, 7),
+          effectiveToMonth: row.effective_to_month ? row.effective_to_month.slice(0, 7) : null,
+          obligationMonth,
+        });
+      })
+      .map((row) => ({
+        chargeId: row.id,
+        description: row.description,
+        amount: row.amount.toFixed(2),
+        effectiveFromMonth: row.effective_from_month.slice(0, 7),
+        effectiveToMonth: row.effective_to_month ? row.effective_to_month.slice(0, 7) : null,
+      }));
+    map.set(unitId, {
+      amount: lineItems.reduce((sum, item) => sum + Number(item.amount), 0).toFixed(2),
+      lineItems,
+    });
   }
   return map;
 }

@@ -112,14 +112,15 @@ become available. There is no separate Giuliana action required to make that
 calculation exist.
 
 At the August-to-September month turn, when the September package is complete
-and valid, the monthly pulse attempts to snapshot the calculated obligations.
-That snapshot becomes immutable financial history and is shown as Awaiting
-Carlos Approval. Giuliana does not generate, finalize, snapshot, or close the
-happy-path package.
+and valid, the monthly pulse establishes `ready_for_review` and hands the live
+package to Carlos without creating obligation rows or consuming Gas bills.
+Carlos's approval is the atomic snapshot boundary: it persists the reviewed
+rows, consumes the selected Gas bills, and marks the package approved.
 
-Carlos's approval is the financial authority boundary. He approves the
-existing immutable snapshot; he does not create it, recalculate it, or redefine
-its amounts.
+Carlos's approval is the financial authority boundary. He reviews the live
+package, verifies that it has not changed since review, and creates the
+immutable snapshot on approval. Existing legacy snapshots are approved without
+being recreated.
 
 The provisional approval target is the fifth calendar day of the obligation
 month. A `ready_for_review` snapshot is Ready for Carlos approval through day 5;
@@ -138,9 +139,10 @@ turn, the system may snapshot that package early. The date alone does not
 freeze an incomplete package; an incomplete package remains live and Not Ready
 without a snapshot until its final blocker resolves.
 
-Snapshot creation is also the responsibility handoff boundary. While a package
-is live, Giuliana owns its preparation. Once it reaches `ready_for_review`, the
-package is immutable and Carlos owns review and approval; Giuliana immediately
+The `ready_for_review` transition is the responsibility handoff boundary.
+While a package is live, Giuliana owns its preparation. At `ready_for_review`,
+Carlos owns review and approval while the package remains live and correctable;
+approval creates the immutable snapshot. Giuliana immediately
 begins preparing the immediate successor package. Carlos approval does not cause
 a second Giuliana focus advance. Calendar month, package lifecycle, Giuliana's
 operational focus, and Carlos's review state are related but independent clocks.
@@ -156,7 +158,7 @@ separate from `activePackage`; Carlos's approval backlog never pins Giuliana,
 and an absent Billing Period is the live candidate that terminates progression.
 
 The dashboard may show the next obligation package as a live preview while the
-current immutable package awaits approval. Carlos's approval changes the
+current live package awaits approval. Carlos's approval creates the immutable
 handed-off package's status, not the focus transfer: `ready_for_review` already
 advances Giuliana's financial utility to the next live package. The calendar
 alone must not advance that focus. Calendar/business date, financial readiness,
@@ -183,8 +185,9 @@ the component rules. The lifecycle is:
 source facts accumulating
   -> live obligation projection
   -> required facts ready
-  -> canonical snapshot created
-  -> Complete · Awaiting Carlos approval
+  -> ready_for_review handoff
+  -> Carlos reviews live facts
+  -> canonical snapshot created on approval
   -> Carlos approves
   -> Approved · Ready for dispatch
   -> Live Preview may advance to the following obligation month
@@ -327,10 +330,10 @@ The system never decides when invoices should be generated.
 
 The frozen happy-path lifecycle is:
 
-- Live Preview before successful finalization;
-- readiness-driven snapshot when the package is complete and valid; month-turn guarantees an attempt;
-- Awaiting Carlos Approval after the immutable snapshot exists;
-- invoice manifestation and compressed dispatch-bundle creation when Carlos approves;
+- Live Preview before the approval boundary;
+- readiness-driven handoff when the package is complete and valid; month-turn guarantees an attempt;
+- Awaiting Carlos Approval while the live package is under review;
+- immutable snapshot creation and invoice manifestation when Carlos approves;
 - Ready for Dispatch after those artifacts become available to Giuliana.
 
 The incomplete month-turn path is also defined:
@@ -341,8 +344,8 @@ The incomplete month-turn path is also defined:
 - Giuliana may continue entering or correcting the missing prior-period facts;
 - Carlos can see the package and its blockers but cannot approve it;
 - once the final blocker is resolved and the package is complete and valid, a
-  later pulse performs the delayed snapshot;
-- the resulting package is immutable and enters Awaiting Carlos Approval.
+  later pulse performs the delayed handoff;
+- Carlos approval creates the immutable package and enters the approved state.
 
 This delayed snapshot rejoins the happy path. The exact persistence and
 transaction implementation remains deferred.
@@ -407,11 +410,11 @@ does not block capture of the physical fact.
 
 Carlos retains visibility of the incomplete package, its blockers, and the
 underlying workspaces, but there is no approval action before the package has
-been snapshotted. Once the final blocker resolves and the package is complete
-and valid, a later pulse snapshots it and the package enters
-Awaiting Carlos Approval.
+been handed off. Once the final blocker resolves and the package is complete
+and valid, a later pulse hands it off and the package enters Awaiting Carlos
+Approval.
 
-The financial obligation becomes immutable at snapshot. This does not make
+The financial obligation becomes immutable at Carlos approval. This does not make
 every underlying source record globally immutable. Later source corrections
 must not silently rewrite the snapshotted financial obligation; the method for
 handling such corrections remains unresolved.
@@ -478,9 +481,9 @@ The frozen happy-path product lifecycle is therefore:
 
 ```text
 Live Preview
-  -> readiness-driven snapshot (month-turn guarantees an attempt)
+  -> readiness-driven handoff (month-turn guarantees an attempt)
   -> Awaiting Carlos Approval
-  -> Carlos approval
+  -> Carlos approval creates the snapshot
   -> invoices + compressed dispatch bundles available to Giuliana
   -> Ready for Dispatch
 ```
@@ -512,17 +515,17 @@ This document does not:
 - Zero and missing must remain distinguishable.
 - Finalized Monthly Obligations are immutable historical snapshots.
 - Snapshot eligibility is readiness-driven; month-turn guarantees an attempt but is not the earliest allowed snapshot time.
-- Snapshot creation precedes Carlos approval.
+- Snapshot creation occurs atomically with Carlos approval for new packages.
 - A date change alone does not resolve or freeze an incomplete package.
 - Before finalization, live/progressive obligations may be presented as a preview.
 - After finalization, the package is Awaiting Carlos Approval.
-- Carlos approves the existing immutable snapshot without recalculating it.
+- Carlos approves the live reviewed package; legacy immutable snapshots are approved without being recreated.
 - A future snapshot is not presentation-visible before its obligation month begins.
 - `ready_for_review` advances Giuliana's primary financial focus to the immediate successor live obligation preview; later Carlos approval does not advance it again.
 - Carlos approval manifests invoices and creates compressed dispatch bundles available to Giuliana.
 - After approval and artifact manifestation, the package is Ready for Dispatch.
 - An incomplete package at month turn is not snapshotted and remains live until its final blocker resolves.
-- A delayed complete-and-valid package is snapshotted by a later pulse attempt and then awaits Carlos approval.
+- A delayed complete-and-valid package is handed off by a later pulse attempt and then awaits Carlos approval.
 - Carlos cannot approve an incomplete, unsnapshotted package.
 - Invoice generation reads finalized obligations only.
 - Upstream domains own facts and formulas.

@@ -152,8 +152,14 @@ export async function stopFutureChargeAction(formData: FormData): Promise<void> 
 
 export async function addUnitChargeAction(formData: FormData): Promise<void> {
   const returnTo = pickString(formData, "return_to") || "/";
-  const result = await addUnitChargeForCurrentBusinessMonth();
+  const targetMonth = pickString(formData, "target_month") || undefined;
+  const result = await addUnitChargeForCurrentBusinessMonth(targetMonth);
   if (result.error) redirectWithError(returnTo, result.error);
   revalidatePath("/", "layout");
+  if (targetMonth) {
+    const url = new URL(returnTo, "http://localhost");
+    url.searchParams.set("dev_correction", "added");
+    redirect(url.pathname + url.search);
+  }
   redirectBack(returnTo);
 }

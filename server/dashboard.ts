@@ -5,8 +5,9 @@ import { getFixedBuildingIdentity } from "@/server/building";
 import { isChargeEligibleForMonth, nextMonthKey } from "@/server/charges/month";
 import { buildMonthlyObligationSummaryFromFacts, buildMonthlyObligationSummaryFromSnapshot } from "@/server/obligations/summary-facts";
 import { loadBuildingMonthFinancialFacts, type BuildingMonthFinancialFacts } from "@/server/obligations/owner-facts";
-import { isApprovedPackage, selectFinancialFocus } from "@/server/obligations/package-selection";
+import { isApprovedPackage, isHandedOffPackage, selectFinancialFocus } from "@/server/obligations/package-selection";
 import { loadGiulianaPackageProgression } from "@/server/obligations/progression";
+import { buildFinancialReviewFingerprint } from "@/server/obligations/snapshot";
 import { hasCompleteWaterReadings } from "@/server/water/readiness";
 
 type QueryResult<T> = {
@@ -30,6 +31,7 @@ type SourceWorkFacts = {
 };
 
 type UpcomingFacts = {
+  reviewFingerprint: string;
   sourceReadingMonth: string;
   obligations: ReturnType<typeof buildMonthlyObligationSummaryFromFacts>;
   commonWaterBill: {
@@ -263,12 +265,12 @@ function isReadyToApprove(facts: UpcomingFacts) {
 export function projectCarlosDashboard(monthFacts: GulianaDashboardFacts): CarlosDashboardProjection {
   const financialFocus = deriveFinancialFocus(monthFacts);
   const currentLifecycle = monthFacts.current.obligationLifecycle;
-  const hasCurrentApprovalLifecycle = currentLifecycle.mode === "snapshotted"
+  const hasCurrentApprovalLifecycle = currentLifecycle.billingPeriodId !== null
     && (currentLifecycle.billingPeriodStatus === "ready_for_review" || isApprovedLifecycleStatus(currentLifecycle.billingPeriodStatus));
   const financialFacts = hasCurrentApprovalLifecycle ? monthFacts.current : monthFacts[financialFocus];
   const lifecycle = financialFacts.obligationLifecycle;
   const currentMonth = monthFacts.businessDate.slice(0, 7) === financialFacts.obligations.obligationMonth;
-  const readyForApproval = currentMonth && lifecycle.mode === "snapshotted"
+  const readyForApproval = currentMonth
     && lifecycle.billingPeriodStatus === "ready_for_review"
     && isReadyToApprove(financialFacts);
   const approvalState = readyForApproval
@@ -448,7 +450,7 @@ function deriveObligationState(
     emphasis: blocked ? "attention" : ready ? "compressed" : "normal",
     ready,
     blocked,
-    readiness: ready ? lifecycleVisible && lifecycle?.mode === "snapshotted" ? "awaiting_approval" : "ready_for_carlos" : "not_ready",
+    readiness: ready ? lifecycleVisible && lifecycle?.billingPeriodStatus === "ready_for_review" ? "awaiting_approval" : "ready_for_carlos" : "not_ready",
   };
 }
 
@@ -474,14 +476,17 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
   const financialFocus = deriveFinancialFocus(monthFacts);
   const financialFacts = monthFacts[financialFocus];
   const operationalWorthNoting = monthFacts.upcoming.worthNoting;
-  const sourceWorkActionable = monthFacts.context === "close" && monthFacts.current.obligationLifecycle.mode !== "snapshotted";
+  const sourceWorkActionable = monthFacts.context === "close" && !isHandedOffPackage({
+    mode: monthFacts.current.obligationLifecycle.mode,
+    status: monthFacts.current.obligationLifecycle.billingPeriodStatus,
+  });
   const obligations = deriveObligationState(financialFacts.obligations, financialFacts.obligationLifecycle, monthFacts.businessDate);
   const water = deriveWaterState(sourceWork, financialFacts.obligations, financialFacts.sourceReadingMonth, sourceWorkActionable, monthFacts.businessDate);
   const gas = deriveGasState(sourceWork, financialFacts.obligations, financialFacts.sourceReadingMonth, sourceWorkActionable, monthFacts.businessDate);
   const currentLifecycle = monthFacts.current.obligationLifecycle;
   const currentObligationMonth = monthFacts.current.obligations.obligationMonth;
   const handoffSource = monthFacts.mostRecentHandoff ?? (
-    currentLifecycle.mode === "snapshotted" && currentLifecycle.billingPeriodStatus
+    currentLifecycle.billingPeriodStatus
       ? { obligationMonth: currentObligationMonth, status: currentLifecycle.billingPeriodStatus }
       : null
   );
@@ -551,6 +556,7 @@ function buildUpcomingFacts(
   const charges = countChargeRows(financialFacts, upcomingObligationMonth);
 
   return {
+    reviewFingerprint: buildFinancialReviewFingerprint(financialFacts),
     sourceReadingMonth: financialFacts.sourceReadingMonth,
     obligations,
     commonWaterBill: waterBill
@@ -581,7 +587,7 @@ export function deriveDashboardContext(businessNow: Date): DashboardContext {
   return businessNow.getUTCDate() === 1 ? "open" : "close";
 }
 
-export const getGulianaDashboardFacts = cache(async (): Promise<QueryResult<GulianaDashboardFacts>> => {
+async function loadDashboardFacts(forCarlos: boolean): Promise<QueryResult<GulianaDashboardFacts>> {
   const businessNow = await getBusinessNow();
   const { operatingMonth, upcomingObligationMonth } = deriveGulianaDashboardMonths(businessNow);
   const context = deriveDashboardContext(businessNow);
@@ -594,7 +600,9 @@ export const getGulianaDashboardFacts = cache(async (): Promise<QueryResult<Guli
     return { data: null as never, error: progressionResult.error ?? "Giuliana package progression unavailable." };
   }
 
-  const activeObligationMonth = progressionResult.data.activePackage.obligationMonth;
+  const activeObligationMonth = forCarlos && progressionResult.data.mostRecentHandoff
+    ? progressionResult.data.mostRecentHandoff.obligationMonth
+    : progressionResult.data.activePackage.obligationMonth;
   const activeUpcomingObligationMonth = nextMonthKey(activeObligationMonth) ?? activeObligationMonth;
   const factsResult = await loadBuildingMonthFinancialFacts({
     buildingId: building.id,
@@ -626,7 +634,11 @@ export const getGulianaDashboardFacts = cache(async (): Promise<QueryResult<Guli
     },
     error: null,
   };
-});
+}
+
+export const getGulianaDashboardFacts = cache(async (): Promise<QueryResult<GulianaDashboardFacts>> => loadDashboardFacts(false));
+
+export const getCarlosDashboardFacts = cache(async (): Promise<QueryResult<GulianaDashboardFacts>> => loadDashboardFacts(true));
 
 export async function getDashboardMonthFacts() {
   return getGulianaDashboardFacts();

@@ -7,7 +7,7 @@ const jiti = createJiti(import.meta.url, {
     "@": process.cwd(),
   },
 });
-const { buildMissingWaterReadingDrafts, getCommonWaterUtilityTypeId } = jiti("./dev-completion.ts");
+const { buildMissingWaterReadingDrafts, getCommonWaterUtilityTypeId, readingDateForSourceMonth } = jiti("./dev-completion.ts");
 const supabaseServer = jiti("@/lib/supabase/server");
 
 test("builds drafts only for missing water readings", () => {
@@ -44,6 +44,13 @@ test("builds drafts only for missing water readings", () => {
     { unit_id: "u2", reading_date: "2026-07-31", reading_end: 220, reading_start: 200, consumption: 20, created_at: "2026-08-01T00:00:00Z" },
     { unit_id: "u3", reading_date: "2026-08-31", reading_end: 305, reading_start: 300, consumption: 5, created_at: "2026-09-04T00:00:00Z" },
   ]);
+});
+
+test("uses the supplied canonical source month at and before month turn", () => {
+  for (const businessMonth of ["2026-09", "2026-10"]) {
+    const sourceReadingMonth = "2026-09";
+    assert.equal(readingDateForSourceMonth(sourceReadingMonth), "2026-09-30", businessMonth);
+  }
 });
 
 test("returns zero drafts when water readings are already complete", () => {

@@ -8,7 +8,13 @@ const jiti = createJiti(import.meta.url, {
     "@": path.resolve(process.cwd()),
   },
 });
-const { buildGasSupplierBillDraft } = jiti("./dev-bill.ts");
+const { buildGasSupplierBillDraft, invoiceDateForObligationMonth } = jiti("./dev-bill.ts");
+
+test("dates the October fixture before the October eligibility boundary", () => {
+  const invoiceDate = invoiceDateForObligationMonth("2026-10");
+  assert.equal(invoiceDate, "2026-09-30");
+  assert.ok(invoiceDate < "2026-10-01");
+});
 
 test("builds a test gas supplier bill from the latest prior valid bill", () => {
   const result = buildGasSupplierBillDraft({

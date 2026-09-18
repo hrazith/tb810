@@ -27,6 +27,14 @@ function monthKeyFromDateKey(value: string) {
   return value.slice(0, 7);
 }
 
+export function gasReadingDateForSourceMonth(sourceReadingMonth: string) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(sourceReadingMonth)) return null;
+  const date = new Date(`${sourceReadingMonth}-01T00:00:00Z`);
+  date.setUTCMonth(date.getUTCMonth() + 1);
+  date.setUTCDate(0);
+  return date.toISOString().slice(0, 10);
+}
+
 function roundToThree(value: number) {
   return Number(value.toFixed(3));
 }

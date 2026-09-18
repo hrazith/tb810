@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import { getBusinessNow } from "@/server/business-date";
 import { getActiveDevTestSessionId, getActiveDevTestSessionSummary, recordDevTestMutation } from "@/server/dev-test-session";
 import { getCurrentBuilding } from "@/server/units";
+import { firstDayOfMonth } from "./month-utils";
 
 type QueryResult<T> = {
   data: T | null;
@@ -26,6 +26,14 @@ function parseNumber(value: number | string | null | undefined) {
   if (value === null || value === undefined) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function invoiceDateForObligationMonth(obligationMonth: string) {
+  const boundary = firstDayOfMonth(obligationMonth);
+  if (!boundary) return null;
+  const date = new Date(`${boundary}T00:00:00Z`);
+  date.setUTCDate(0);
+  return date.toISOString().slice(0, 10);
 }
 
 export function buildGasSupplierBillDraft(input: {
@@ -54,7 +62,9 @@ export function buildGasSupplierBillDraft(input: {
   };
 }
 
-export async function addGasSupplierBillForCurrentBusinessMonth(): Promise<QueryResult<{ insertedCount: number; billId: string }>> {
+export async function addGasSupplierBillForCurrentBusinessMonth(
+  obligationMonth: string,
+): Promise<QueryResult<{ insertedCount: number; billId: string }>> {
   if (process.env.NODE_ENV !== "development") {
     return { data: null as never, error: "DEV test actions are development-only." };
   }
@@ -73,8 +83,8 @@ export async function addGasSupplierBillForCurrentBusinessMonth(): Promise<Query
   if (building.error) return { data: null as never, error: building.error };
   if (!building.data) return { data: null as never, error: "Current building not found." };
 
-  const businessNow = await getBusinessNow();
-  const billDate = businessNow.toISOString().slice(0, 10);
+  const billDate = invoiceDateForObligationMonth(obligationMonth);
+  if (!billDate) return { data: null as never, error: "Gas obligation month is invalid." };
   const supabase = await createClient();
 
   const { data: history, error: historyError } = await supabase

@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import createJiti from "jiti";
 
 const jiti = createJiti(import.meta.url);
-const { buildMissingGasReadingDrafts } = jiti("./dev-completion.ts");
+const { buildMissingGasReadingDrafts, gasReadingDateForSourceMonth } = jiti("./dev-completion.ts");
+
+test("dates generated readings at the source month boundary", () => {
+  assert.equal(gasReadingDateForSourceMonth("2026-09"), "2026-09-30");
+  assert.equal(gasReadingDateForSourceMonth("2026-10"), "2026-10-31");
+});
 
 test("builds drafts only for missing gas readings", () => {
   const units = [

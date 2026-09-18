@@ -127,15 +127,20 @@ export function buildMissingWaterReadingDrafts(input: {
   return { data: drafts, error: null };
 }
 
-function businessMonthKeyFromDate(date: Date) {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
 function nextMonthStartFromMonthKey(monthKey: string) {
   const year = Number(monthKey.slice(0, 4));
   const month = Number(monthKey.slice(5, 7));
   const next = new Date(Date.UTC(year, month, 1));
   return next.toISOString().slice(0, 10);
+}
+
+export function readingDateForSourceMonth(sourceReadingMonth: string) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(sourceReadingMonth)) return null;
+
+  const nextMonthStart = new Date(`${sourceReadingMonth}-01T00:00:00Z`);
+  nextMonthStart.setUTCMonth(nextMonthStart.getUTCMonth() + 1);
+  nextMonthStart.setUTCDate(0);
+  return nextMonthStart.toISOString().slice(0, 10);
 }
 
 export async function getCommonWaterUtilityTypeId() {
@@ -151,7 +156,9 @@ export async function getCommonWaterUtilityTypeId() {
   return { data: data.id, error: null };
 }
 
-export async function completeMissingWaterReadingsForCurrentBusinessMonth(): Promise<QueryResult<{ insertedCount: number }>> {
+export async function completeMissingWaterReadingsForCurrentBusinessMonth(
+  sourceReadingMonth: string,
+): Promise<QueryResult<{ insertedCount: number }>> {
   if (process.env.NODE_ENV !== "development") {
     return { data: null as never, error: "DEV test actions are development-only." };
   }
@@ -171,8 +178,8 @@ export async function completeMissingWaterReadingsForCurrentBusinessMonth(): Pro
   if (!building.data) return { data: null as never, error: "Current building not found." };
 
   const businessNow = await getBusinessNow();
-  const sourceReadingMonth = businessMonthKeyFromDate(businessNow);
-  const readingDate = businessNow.toISOString().slice(0, 10);
+  const readingDate = readingDateForSourceMonth(sourceReadingMonth);
+  if (!readingDate) return { data: null as never, error: "Water source month is invalid." };
   const nextMonthStart = nextMonthStartFromMonthKey(sourceReadingMonth);
 
   const supabase = await createClient();

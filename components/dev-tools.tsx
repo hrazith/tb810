@@ -326,6 +326,15 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
   const dataMonthLabel = dashboardFacts ? formatMonthYearKey(dashboardFacts.operatingMonth) : null;
   const waterReadiness = dashboardFacts?.sourceWork.water.readingsReady ?? false;
   const currentBillingPeriodStatus = dashboardFacts?.current.obligationLifecycle.billingPeriodStatus ?? null;
+  const correctionHandoff = dashboardFacts?.mostRecentHandoff?.status === "ready_for_review"
+    ? dashboardFacts.mostRecentHandoff
+    : null;
+  const correctionFacts = correctionHandoff
+    ? [dashboardFacts?.current, dashboardFacts?.upcoming].find(
+        (facts) => facts?.obligations.obligationMonth === correctionHandoff.obligationMonth,
+      )
+    : null;
+  const correctionAcknowledged = searchParams.get("dev_correction") === "added";
   const pulseStatus = searchParams.get("pulse");
 
   const items = useMemo(
@@ -487,6 +496,8 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                         {state.testSessionActive && waterReadiness ? (
                           <form action={addCommonWaterBillAction}>
                             <input type="hidden" name="return_to" value={pathname} />
+                            <input type="hidden" name="obligation_month" value={dashboardFacts?.current.obligations.obligationMonth ?? ""} />
+                            <input type="hidden" name="source_billing_month" value={dashboardFacts?.current.sourceReadingMonth ?? ""} />
                             <button
                               type="submit"
                               className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
@@ -521,6 +532,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                             state.testSessionActive ? (
                               <form action={completeWaterReadingsAction}>
                                 <input type="hidden" name="return_to" value={pathname} />
+                                <input type="hidden" name="source_reading_month" value={dashboardFacts.current.sourceReadingMonth} />
                                 <button
                                   type="submit"
                                   className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
@@ -562,6 +574,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                         {state.testSessionActive ? (
                           <form action={addGasSupplierBillAction}>
                             <input type="hidden" name="return_to" value={pathname} />
+                            <input type="hidden" name="obligation_month" value={dashboardFacts?.current.obligations.obligationMonth ?? ""} />
                             <button
                               type="submit"
                               className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
@@ -594,6 +607,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                           state.testSessionActive ? (
                             <form action={completeGasReadingsAction}>
                               <input type="hidden" name="return_to" value={pathname} />
+                              <input type="hidden" name="source_reading_month" value={dashboardFacts.current.sourceReadingMonth} />
                               <button
                                 type="submit"
                                 className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
@@ -619,6 +633,31 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                 </div>
 
                 <div className="space-y-1.5">
+                  {correctionHandoff ? (
+                    <div className="space-y-1.5 border-b border-white/10 pb-3">
+                      <p className="text-sm font-medium text-white/90">
+                        {formatMonthYearKey(correctionHandoff.obligationMonth)} · Awaiting Carlos
+                      </p>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span>Correction unit charges</span>
+                        <span className="text-white/90">{correctionAcknowledged ? "Added" : correctionFacts?.charges.unitChargeCount ?? "—"}</span>
+                      </div>
+                      <div className="flex justify-end">
+                        {state.testSessionActive && !correctionAcknowledged ? (
+                          <form action={addUnitChargeAction}>
+                            <input type="hidden" name="return_to" value={pathname} />
+                            <input type="hidden" name="target_month" value={correctionHandoff.obligationMonth} />
+                            <button
+                              type="submit"
+                              className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
+                            >
+                              + Add correction test charge
+                            </button>
+                          </form>
+                        ) : correctionAcknowledged ? <span className="text-emerald-300">Added</span> : null}
+                      </div>
+                    </div>
+                  ) : null}
                   <p className="text-sm font-medium text-white/90">{dashboardFacts ? formatMonthYearKey(dashboardFacts.upcomingObligationMonth) : "Upcoming"}</p>
                   <div className="flex items-baseline justify-between gap-3">
                     <span>Unit charges</span>

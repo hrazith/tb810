@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { calculateGasCharges } from "@/server/gas/calculation";
@@ -21,10 +22,14 @@ import { previousMonthKeyFromMonthKey } from "@/server/water/month-utils";
 type QueryResult<T> = {
   data: T | null;
   error: string | null;
-  failureKind?: "not_ready" | "error";
+  failureKind?: "not_ready" | "not_eligible" | "error";
 };
 
 type SnapshotResult = { billingPeriodId: string; status: string; obligationRowCount: number };
+
+export function isHandoffCalendarEligible(obligationMonth: string, operatingMonth: string) {
+  return obligationMonth <= operatingMonth;
+}
 
 export type SnapshotPersistence = (input: {
   supabase: SupabaseClient<Database>;
@@ -32,6 +37,13 @@ export type SnapshotPersistence = (input: {
   obligationMonth: string;
   rows: SnapshotRow[];
   gasBillIds: string[];
+}) => Promise<QueryResult<SnapshotResult>>;
+
+export type HandoffPersistence = (input: {
+  supabase: SupabaseClient<Database>;
+  buildingId: string;
+  obligationMonth: string;
+  operatingMonth: string;
 }) => Promise<QueryResult<SnapshotResult>>;
 
 type SnapshotRow = {
@@ -50,6 +62,20 @@ type SnapshotPayload = {
   rows: SnapshotRow[];
   gasBillIds: string[];
 };
+
+export function buildFinancialReviewFingerprint(facts: BuildingMonthFinancialFacts) {
+  const stableFacts = {
+    plan: facts.plan,
+    commonWaterType: facts.commonWaterType,
+    commonWaterBill: facts.commonWaterBill,
+    unitRows: [...facts.unitRows].sort((left, right) => left.id.localeCompare(right.id)),
+    waterReadings: [...facts.waterReadings].sort((left, right) => `${left.unit_id}:${left.reading_date}`.localeCompare(`${right.unit_id}:${right.reading_date}`)),
+    gasBills: [...facts.gasBills].sort((left, right) => left.id.localeCompare(right.id)),
+    gasReadings: [...facts.gasReadings].sort((left, right) => `${left.unit_id}:${left.reading_month}`.localeCompare(`${right.unit_id}:${right.reading_month}`)),
+    charges: [...facts.charges].sort((left, right) => left.id.localeCompare(right.id)),
+  };
+  return createHash("sha256").update(JSON.stringify(stableFacts)).digest("hex");
+}
 
 type UnitAccountRow = {
   id: string;
@@ -163,7 +189,7 @@ function buildSnapshotPayload(
   return { data: { rows, gasBillIds }, error: null };
 }
 
-async function getSnapshotCalculation({
+export async function getSnapshotCalculation({
   buildingId,
   buildingName,
   obligationMonth,
@@ -301,6 +327,48 @@ export async function createMonthlyObligationSnapshot({
   });
 
   return persist({ supabase, buildingId, obligationMonth, rows: calculation.data.rows, gasBillIds: calculation.data.gasBillIds });
+}
+
+export async function createMonthlyObligationHandoff({
+  buildingId,
+  buildingName,
+  obligationMonth,
+  operatingMonth,
+  executionContext = "human",
+  persistence,
+}: {
+  buildingId: string;
+  buildingName: string;
+  obligationMonth: string;
+  operatingMonth: string;
+  executionContext?: SnapshotExecutionContext;
+  persistence?: HandoffPersistence;
+}): Promise<QueryResult<SnapshotResult>> {
+  const supabase = executionContext === "system" ? createSystemClient() : await createClient();
+  const factsResult = await loadBuildingMonthFinancialFacts({ buildingId, obligationMonth, client: supabase });
+  if (factsResult.error || !factsResult.data) return { data: null, error: factsResult.error ?? "Building month facts unavailable.", failureKind: "error" };
+  const calculation = await getSnapshotCalculation({ buildingId, buildingName, obligationMonth, facts: factsResult.data.current, supabase });
+  if (calculation.error || !calculation.data) return { data: null, error: calculation.error ?? "Snapshot calculation unavailable.", failureKind: calculation.failureKind === "not_ready" ? "not_ready" : "error" };
+
+  if (!isHandoffCalendarEligible(obligationMonth, operatingMonth)) {
+    return { data: null, error: `${obligationMonth} is not eligible for handoff before its obligation month.`, failureKind: "not_eligible" as const };
+  }
+
+  const persist = persistence ?? (async ({ supabase: handoffClient, buildingId: handoffBuildingId, obligationMonth: handoffMonth, operatingMonth: handoffOperatingMonth }) => {
+    const rpc = await (handoffClient as unknown as {
+      rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: SnapshotResult | null; error: { message: string } | null }>;
+    }).rpc(executionContext === "system" ? "tb810_mark_monthly_obligation_ready_for_review_system" : "tb810_mark_monthly_obligation_ready_for_review", {
+      p_building_id: handoffBuildingId,
+      p_period_year: Number(handoffMonth.slice(0, 4)),
+      p_period_month: Number(handoffMonth.slice(5, 7)),
+      p_operating_year: Number(handoffOperatingMonth.slice(0, 4)),
+      p_operating_month: Number(handoffOperatingMonth.slice(5, 7)),
+    });
+    if (rpc.error) return { data: null, error: rpc.error.message, failureKind: "error" as const };
+    return { data: rpc.data, error: null };
+  });
+
+  return persist({ supabase, buildingId, obligationMonth, operatingMonth });
 }
 
 export async function createCurrentBuildingMonthlyObligationSnapshot({ obligationMonth }: { obligationMonth: string }) {

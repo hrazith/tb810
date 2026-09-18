@@ -3,11 +3,11 @@ import { getBusinessNow } from "@/server/business-date";
 import { getFixedBuildingIdentity } from "@/server/building";
 import { createSystemClient } from "@/server/supabase/system";
 import { loadGiulianaPackageProgression } from "./progression";
-import { createMonthlyObligationSnapshot, type SnapshotPersistence } from "./snapshot";
+import { createMonthlyObligationHandoff, isHandoffCalendarEligible, type HandoffPersistence } from "./snapshot";
 
 const PROGRESSED_STATUSES = new Set(["ready_for_review", "approved", "invoices_generated", "closed"]);
 
-export type MonthlyObligationPulseStatus = "snapshotted" | "not_ready" | "already_progressed" | "error";
+export type MonthlyObligationPulseStatus = "handed_off" | "not_ready" | "not_eligible" | "already_progressed" | "error";
 
 export type MonthlyObligationPulseResult = {
   status: MonthlyObligationPulseStatus;
@@ -23,6 +23,8 @@ export function isSnapshotProgressedStatus(status: string | null | undefined) {
   return status ? PROGRESSED_STATUSES.has(status) : false;
 }
 
+export { isHandoffCalendarEligible };
+
 export function mapSnapshotResult({
   buildingId,
   obligationMonth,
@@ -33,21 +35,21 @@ export function mapSnapshotResult({
   result: {
     data: { billingPeriodId: string; status: string; obligationRowCount: number } | null;
     error: string | null;
-    failureKind?: "not_ready" | "error";
+    failureKind?: "not_ready" | "not_eligible" | "error";
   };
 }): MonthlyObligationPulseResult {
   if (result.data?.status === "already_snapshotted") {
     return { status: "already_progressed", buildingId, obligationMonth, billingPeriodId: result.data.billingPeriodId, billingPeriodStatus: result.data.status, obligationRowCount: result.data.obligationRowCount };
   }
   if (result.data) {
-    return { status: "snapshotted", buildingId, obligationMonth, billingPeriodId: result.data.billingPeriodId, billingPeriodStatus: result.data.status, obligationRowCount: result.data.obligationRowCount };
+    return { status: "handed_off", buildingId, obligationMonth, billingPeriodId: result.data.billingPeriodId, billingPeriodStatus: result.data.status, obligationRowCount: result.data.obligationRowCount };
   }
-  return { status: result.failureKind === "not_ready" ? "not_ready" : "error", buildingId, obligationMonth, reason: result.error ?? "Monthly obligation pulse failed." };
+  return { status: result.failureKind === "not_ready" ? "not_ready" : result.failureKind === "not_eligible" ? "not_eligible" : "error", buildingId, obligationMonth, reason: result.error ?? "Monthly obligation pulse failed." };
 }
 
 export type PulseExecutionContext = "human" | "system";
 
-export async function runMonthlyObligationPulse(executionContext: PulseExecutionContext = "human", persistence?: SnapshotPersistence): Promise<MonthlyObligationPulseResult> {
+export async function runMonthlyObligationPulse(executionContext: PulseExecutionContext = "human", persistence?: HandoffPersistence): Promise<MonthlyObligationPulseResult> {
   const building = getFixedBuildingIdentity();
   const businessNow = await getBusinessNow();
   const year = businessNow.getUTCFullYear();
@@ -60,6 +62,6 @@ export async function runMonthlyObligationPulse(executionContext: PulseExecution
   }
   const candidate = progressionResult.data.activePackage;
 
-  const snapshotResult = await createMonthlyObligationSnapshot({ buildingId: building.id, buildingName: building.name, obligationMonth: candidate.obligationMonth, executionContext, persistence });
-  return mapSnapshotResult({ buildingId: building.id, obligationMonth: candidate.obligationMonth, result: snapshotResult });
+  const handoffResult = await createMonthlyObligationHandoff({ buildingId: building.id, buildingName: building.name, obligationMonth: candidate.obligationMonth, operatingMonth: obligationMonth, executionContext, persistence });
+  return mapSnapshotResult({ buildingId: building.id, obligationMonth: candidate.obligationMonth, result: handoffResult });
 }

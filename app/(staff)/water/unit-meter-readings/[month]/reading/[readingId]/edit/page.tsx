@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 
-import { getReadingDefaults, getUnitMeterReadingById, getUnitOptions } from "@/server/water/unit-meter-readings";
+import { canEditReadyForReviewSourceMonth, getReadingDefaults, getUnitMeterReadingById, getUnitOptions } from "@/server/water/unit-meter-readings";
 import { getActiveReadingMonth } from "@/server/water/unit-meter-readings";
 import { parseWaterMonthKey } from "@/server/water/month";
 
@@ -32,6 +32,8 @@ export default async function EditUnitMeterReadingPage({ params }: PageProps) {
   const historicalEditingAvailable =
     process.env.NODE_ENV === "development" &&
     process.env.TB810_ALLOW_HISTORICAL_READING_EDITS === "true";
+  const correctionResult = await canEditReadyForReviewSourceMonth(resolvedMonth);
+  if (correctionResult.error) throw new Error(correctionResult.error);
   const isHistoricalMonth = readingResult.data.reading_date.slice(0, 7) !== getActiveReadingMonth().key;
 
   return (
@@ -46,6 +48,7 @@ export default async function EditUnitMeterReadingPage({ params }: PageProps) {
         units={unitsResult.data}
         readingDefaults={defaults.data}
         historicalEditingAvailable={historicalEditingAvailable}
+        packageCorrectionAvailable={correctionResult.allowed}
         isHistoricalMonth={isHistoricalMonth}
         initialValues={{
           reading_id: readingResult.data.id,

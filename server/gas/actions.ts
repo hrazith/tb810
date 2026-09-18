@@ -156,7 +156,8 @@ export async function importGasWorkbookAction(_prev: GasFormState, formData: For
 
 export async function completeGasReadingsAction(formData: FormData): Promise<void> {
   const returnTo = String(formData.get("return_to") ?? "/").trim() || "/";
-  const result = await completeMissingGasReadingsForCurrentBusinessMonth();
+  const sourceReadingMonth = String(formData.get("source_reading_month") ?? "").trim();
+  const result = await completeMissingGasReadingsForCurrentBusinessMonth(sourceReadingMonth);
   if (result.error) {
     redirect(`${returnTo}?error=${encodeURIComponent(result.error)}`);
   }
@@ -166,7 +167,8 @@ export async function completeGasReadingsAction(formData: FormData): Promise<voi
 
 export async function addGasSupplierBillAction(formData: FormData): Promise<void> {
   const returnTo = String(formData.get("return_to") ?? "/").trim() || "/";
-  const result = await addGasSupplierBillForCurrentBusinessMonth();
+  const obligationMonth = String(formData.get("obligation_month") ?? "").trim();
+  const result = await addGasSupplierBillForCurrentBusinessMonth(obligationMonth);
   if (result.error) {
     redirect(`${returnTo}?error=${encodeURIComponent(result.error)}`);
   }
