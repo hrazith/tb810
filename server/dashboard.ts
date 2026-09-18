@@ -141,8 +141,11 @@ export type CarlosDashboardProjection = {
   businessDate: string;
   financialFocus: DashboardFinancialFocus;
   obligationMonth: string;
+  eligibleUnitCount: number;
   total: string | null;
   components: UpcomingFacts["obligations"]["components"];
+  financialReadiness: "ready" | "blocked";
+  financialBlockers: string[];
   billingPeriodId: string | null;
   billingPeriodStatus: string | null;
   approvalState: CarlosApprovalState;
@@ -262,6 +265,21 @@ function isReadyToApprove(facts: UpcomingFacts) {
   return facts.obligations.total !== null && !hasBlockedObligationComponent(facts.obligations);
 }
 
+function getFinancialBlockers(facts: UpcomingFacts) {
+  const reasons = [
+    facts.obligations.components.fixed_assessment.reason,
+    facts.obligations.components.metered_water.reason,
+    facts.obligations.components.common_water.reason,
+    facts.obligations.components.gas.reason,
+  ].filter((reason): reason is string => Boolean(reason));
+
+  return reasons.length > 0
+    ? [...new Set(reasons)]
+    : facts.obligations.total === null
+      ? ["Monthly obligation total is unavailable."]
+      : [];
+}
+
 export function projectCarlosDashboard(monthFacts: GulianaDashboardFacts): CarlosDashboardProjection {
   const financialFocus = deriveFinancialFocus(monthFacts);
   const currentLifecycle = monthFacts.current.obligationLifecycle;
@@ -270,9 +288,10 @@ export function projectCarlosDashboard(monthFacts: GulianaDashboardFacts): Carlo
   const financialFacts = hasCurrentApprovalLifecycle ? monthFacts.current : monthFacts[financialFocus];
   const lifecycle = financialFacts.obligationLifecycle;
   const currentMonth = monthFacts.businessDate.slice(0, 7) === financialFacts.obligations.obligationMonth;
+  const financiallyReady = isReadyToApprove(financialFacts);
   const readyForApproval = currentMonth
     && lifecycle.billingPeriodStatus === "ready_for_review"
-    && isReadyToApprove(financialFacts);
+    && financiallyReady;
   const approvalState = readyForApproval
     ? currentMonth && Number(monthFacts.businessDate.slice(8, 10)) > MONTHLY_OBLIGATION_APPROVAL_CUTOFF_DAY ? "overdue" : "ready"
     : currentMonth && lifecycle.mode === "snapshotted" && isApprovedLifecycleStatus(lifecycle.billingPeriodStatus) ? "approved" : "not_ready";
@@ -281,8 +300,11 @@ export function projectCarlosDashboard(monthFacts: GulianaDashboardFacts): Carlo
     businessDate: monthFacts.businessDate,
     financialFocus,
     obligationMonth: financialFacts.obligations.obligationMonth,
+    eligibleUnitCount: financialFacts.obligations.eligibleUnitCount,
     total: financialFacts.obligations.total,
     components: financialFacts.obligations.components,
+    financialReadiness: financiallyReady ? "ready" : "blocked",
+    financialBlockers: getFinancialBlockers(financialFacts),
     billingPeriodId: lifecycle.billingPeriodId,
     billingPeriodStatus: lifecycle.billingPeriodStatus,
     approvalState,
@@ -587,6 +609,24 @@ export function deriveDashboardContext(businessNow: Date): DashboardContext {
   return businessNow.getUTCDate() === 1 ? "open" : "close";
 }
 
+export function selectCarlosTargetObligationMonth({
+  operatingMonth,
+  upcomingObligationMonth,
+  context,
+  activePackage,
+  mostRecentHandoff,
+}: {
+  operatingMonth: string;
+  upcomingObligationMonth: string;
+  context: DashboardContext;
+  activePackage: { obligationMonth: string };
+  mostRecentHandoff: { obligationMonth: string } | null;
+}) {
+  if (mostRecentHandoff) return mostRecentHandoff.obligationMonth;
+  if (context === "close" && activePackage.obligationMonth === operatingMonth) return upcomingObligationMonth;
+  return activePackage.obligationMonth;
+}
+
 async function loadDashboardFacts(forCarlos: boolean): Promise<QueryResult<GulianaDashboardFacts>> {
   const businessNow = await getBusinessNow();
   const { operatingMonth, upcomingObligationMonth } = deriveGulianaDashboardMonths(businessNow);
@@ -600,8 +640,14 @@ async function loadDashboardFacts(forCarlos: boolean): Promise<QueryResult<Gulia
     return { data: null as never, error: progressionResult.error ?? "Giuliana package progression unavailable." };
   }
 
-  const activeObligationMonth = forCarlos && progressionResult.data.mostRecentHandoff
-    ? progressionResult.data.mostRecentHandoff.obligationMonth
+  const activeObligationMonth = forCarlos
+    ? selectCarlosTargetObligationMonth({
+        operatingMonth,
+        upcomingObligationMonth,
+        context,
+        activePackage: progressionResult.data.activePackage,
+        mostRecentHandoff: progressionResult.data.mostRecentHandoff,
+      })
     : progressionResult.data.activePackage.obligationMonth;
   const activeUpcomingObligationMonth = nextMonthKey(activeObligationMonth) ?? activeObligationMonth;
   const factsResult = await loadBuildingMonthFinancialFacts({

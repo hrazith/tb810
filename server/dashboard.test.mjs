@@ -15,7 +15,7 @@ const buildingModule = jiti("@/server/building");
 const ownerFactsModule = jiti("@/server/obligations/owner-facts");
 const progressionModule = jiti("@/server/obligations/progression");
 
-const { projectCarlosDashboard, projectGulianaDashboard, deriveUnitChargeWorthNoting, deriveGulianaDashboardMonths, deriveDashboardContext, getGulianaDashboardFacts } = dashboard;
+const { projectCarlosDashboard, projectGulianaDashboard, deriveUnitChargeWorthNoting, deriveGulianaDashboardMonths, deriveDashboardContext, selectCarlosTargetObligationMonth, getGulianaDashboardFacts } = dashboard;
 
 function buildProjectionFacts(overrides = {}) {
   const businessDate = overrides.businessDate ?? "2026-08-05";
@@ -1023,6 +1023,121 @@ test("Carlos does not expose a future persisted snapshot before its obligation m
   }));
 
   assert.equal(projection.approvalState, "not_ready");
+});
+
+test("Carlos separates Aug 31 financial readiness from approval eligibility", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-08-31",
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-09", total: "29369.79", eligibleUnitCount: 64 },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+  }));
+
+  assert.equal(projection.financialReadiness, "ready");
+  assert.equal(projection.approvalState, "not_ready");
+  assert.equal(projection.total, "29369.79");
+});
+
+test("Carlos exposes concise financial blockers before handoff", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-08-31",
+    current: {
+      ...base,
+      obligations: {
+        ...base.obligations,
+        obligationMonth: "2026-09",
+        components: {
+          ...base.obligations.components,
+          common_water: { state: "blocked", amount: null, reason: "Sedapal water bill has not been entered yet." },
+          gas: { state: "blocked", amount: null, reason: "Required gas readings are missing." },
+        },
+      },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+  }));
+
+  assert.equal(projection.financialReadiness, "blocked");
+  assert.deepEqual(projection.financialBlockers, [
+    "Sedapal water bill has not been entered yet.",
+    "Required gas readings are missing.",
+  ]);
+  assert.equal(projection.approvalState, "not_ready");
+});
+
+test("Carlos has approval readiness only after a calendar-eligible handoff", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-09-01",
+    operatingMonth: "2026-09",
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-09", total: "29369.79", eligibleUnitCount: 64 },
+      obligationLifecycle: { mode: "snapshotted", billingPeriodId: "period-1", billingPeriodStatus: "ready_for_review" },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+  }));
+
+  assert.equal(projection.financialReadiness, "ready");
+  assert.equal(projection.approvalState, "ready");
+  assert.equal(projection.billingPeriodId, "period-1");
+});
+
+test("Carlos keeps Unit and Owner-direct charge amounts and counts separate", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-08-31",
+    current: {
+      ...base,
+      obligations: {
+        ...base.obligations,
+        obligationMonth: "2026-09",
+        total: "150.00",
+        components: {
+          ...base.obligations.components,
+          other_charge: { state: "available", amount: "25.00", count: 1 },
+          owner_direct_charge: { state: "available", amount: "125.00", count: 2 },
+        },
+      },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+  }));
+
+  assert.deepEqual({ amount: projection.components.other_charge.amount, count: projection.components.other_charge.count }, { amount: "25.00", count: 1 });
+  assert.deepEqual({ amount: projection.components.owner_direct_charge.amount, count: projection.components.owner_direct_charge.count }, { amount: "125.00", count: 2 });
+});
+
+test("Carlos targets the upcoming obligation month before an Aug 31 handoff", () => {
+  assert.equal(selectCarlosTargetObligationMonth({
+    operatingMonth: "2026-08",
+    upcomingObligationMonth: "2026-09",
+    context: "close",
+    activePackage: { obligationMonth: "2026-08" },
+    mostRecentHandoff: null,
+  }), "2026-09");
+});
+
+test("Carlos keeps September selected on Sep 1 before Pulse", () => {
+  assert.equal(selectCarlosTargetObligationMonth({
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    context: "open",
+    activePackage: { obligationMonth: "2026-09" },
+    mostRecentHandoff: null,
+  }), "2026-09");
+});
+
+test("Carlos prefers the handed-off package over calendar-derived targets", () => {
+  assert.equal(selectCarlosTargetObligationMonth({
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    context: "open",
+    activePackage: { obligationMonth: "2026-09" },
+    mostRecentHandoff: { obligationMonth: "2026-09" },
+  }), "2026-09");
 });
 
 test("K dashboard facts read uses exactly one bounded month read", async () => {

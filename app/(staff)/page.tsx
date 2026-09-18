@@ -107,10 +107,11 @@ function componentLabel(key: string) {
   if (key === "metered_water") return "Metered water";
   if (key === "common_water") return "Common water";
   if (key === "gas") return "Gas";
+  if (key === "owner_direct_charge") return "Owner-direct charges";
   return "Other charges";
 }
 
-const reviewComponentKeys = ["fixed_assessment", "metered_water", "common_water", "gas", "other_charge"] as const;
+const reviewComponentKeys = ["fixed_assessment", "metered_water", "common_water", "gas", "other_charge", "owner_direct_charge"] as const;
 
 async function CarlosDashboardPage({ firstName }: { firstName: string }) {
   const result = await getCarlosDashboardFacts();
@@ -119,7 +120,15 @@ async function CarlosDashboardPage({ firstName }: { firstName: string }) {
 
   const projection = projectCarlosDashboard(result.data);
   const hasApprovalItem = projection.approvalState === "ready" || projection.approvalState === "overdue";
+  const isApproved = projection.approvalState === "approved";
   const statusLabel = projection.approvalState === "overdue" ? "Approval overdue" : "Ready for your approval";
+  const financialStatusLabel = projection.financialReadiness === "ready" ? "Ready" : "Blocked";
+
+  function chargeLabel(key: "other_charge" | "owner_direct_charge") {
+    const component = projection.components[key];
+    const count = component.count ?? 0;
+    return `${componentText(component)} · ${count} ${count === 1 ? "charge" : "charges"}`;
+  }
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col space-y-6 px-6 py-6 sm:py-8">
@@ -135,14 +144,13 @@ async function CarlosDashboardPage({ firstName }: { firstName: string }) {
             <div className="space-y-3">
               <p className="text-2xl font-semibold tracking-tight text-zinc-950">{formatMonthLabel(projection.obligationMonth)} obligations</p>
               <p className="text-xl font-semibold text-zinc-950">{statusLabel}</p>
-              <p className="max-w-2xl text-lg text-zinc-600">Invoices and owner statements have not been dispatched because your approval is still required.</p>
+              <p className="max-w-2xl text-lg text-zinc-600">Review the {formatMonthLabel(projection.obligationMonth)} obligations below before approving.</p>
             </div>
             <p className="text-2xl font-semibold tracking-tight text-zinc-950">{amountText(projection.total)}</p>
           </div>
 
-          <details className="max-w-3xl border-t border-zinc-200 pt-5 ">
-            <summary className="cursor-pointer list-none text-lg font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950 [&::-webkit-details-marker]:hidden">Review and approve →</summary>
-            <div className="mt-6 space-y-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+          <div className="max-w-3xl border-t border-zinc-200 pt-5">
+            <div className="space-y-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Ready for approval</p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950">{formatMonthLabel(projection.obligationMonth)} obligations</h2>
@@ -155,7 +163,7 @@ async function CarlosDashboardPage({ firstName }: { firstName: string }) {
                 {reviewComponentKeys.map((key) => (
                   <div key={key} className="flex items-center justify-between gap-6">
                     <span className="text-zinc-600">{componentLabel(key)}</span>
-                    <span className="font-medium text-zinc-950">{componentText(projection.components[key])}</span>
+                    <span className="font-medium text-zinc-950">{key === "other_charge" || key === "owner_direct_charge" ? chargeLabel(key) : componentText(projection.components[key])}</span>
                   </div>
                 ))}
               </div>
@@ -166,12 +174,30 @@ async function CarlosDashboardPage({ firstName }: { firstName: string }) {
                 <button type="submit" className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-zinc-950 bg-zinc-950 px-6 py-3 text-base font-medium text-white transition hover:bg-zinc-800">Approve {formatMonthLabel(projection.obligationMonth)} obligations</button>
               </form>
             </div>
-          </details>
+          </div>
+        </div>
+      ) : isApproved ? (
+        <div className="mt-8 space-y-3 border-t border-zinc-200 pt-8">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">{formatMonthLabel(projection.obligationMonth)} obligations</p>
+          <p className="text-xl font-semibold text-zinc-950">✓ Approved</p>
+          <p className="text-lg text-zinc-600">{amountText(projection.total)} · {projection.eligibleUnitCount} units</p>
         </div>
       ) : (
         <div className="mt-8 border-t border-zinc-200 pt-8">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Needs your attention</p>
-          <p className="mt-3 text-xl font-semibold text-zinc-950">No monthly obligations require approval.</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">{formatMonthLabel(projection.obligationMonth)} obligations</p>
+          <p className="mt-3 text-xl font-semibold text-zinc-950">{financialStatusLabel}</p>
+          {projection.financialReadiness === "ready" ? (
+            <p className="mt-2 text-lg text-zinc-600">{amountText(projection.total)} · Expected monthly obligations</p>
+          ) : (
+            <ul className="mt-3 space-y-1 text-lg text-zinc-600">
+              {projection.financialBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+            </ul>
+          )}
+          <div className="mt-6 space-y-2 border-t border-zinc-200 pt-4 text-sm">
+            <p className="font-semibold uppercase tracking-[0.18em] text-zinc-500">Financial watch</p>
+            <p className="flex justify-between gap-6"><span className="text-zinc-600">Unit charges</span><span className="font-medium text-zinc-950">{chargeLabel("other_charge")}</span></p>
+            <p className="flex justify-between gap-6"><span className="text-zinc-600">Owner-direct charges</span><span className="font-medium text-zinc-950">{chargeLabel("owner_direct_charge")}</span></p>
+          </div>
         </div>
       )}
     </section>
