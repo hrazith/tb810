@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { Suspense } from "react";
 
 import { brandConfig, gothamSans } from "@/brand";
 import { DevToolsProvider, DevToolsToolbar } from "@/components/dev-tools";
@@ -52,7 +53,9 @@ export default async function RootLayout({
       >
         <DevToolsProvider>
           {children}
-          <DevToolsToolbar dashboardFacts={devDashboardFacts} />
+          <Suspense fallback={null}>
+            <DevToolsToolbar dashboardFacts={devDashboardFacts} />
+          </Suspense>
         </DevToolsProvider>
       </body>
     </html>
