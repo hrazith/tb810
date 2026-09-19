@@ -69,14 +69,15 @@ export function ObligationsNavigationShell({
         : null;
 
   return (
-    <section className="space-y-6 xl:w-[calc(100vw-3rem)] xl:max-w-none xl:-ml-[calc(50vw-50%-1.5rem)]">
-      <div className="space-y-2 ">
-        
+    <section className="space-y-6 xl:w-[calc(100vw-8rem)] xl:max-w-none xl:-ml-[calc(50vw-50%-4rem)]">
+      <div className="mt-12  ">
         <h1 className="whitespace-nowrap text-3xl text-center font-semibold tracking-tight text-zinc-950 mb-6">
           Obligations
         </h1>
-        <div className=" p-12  ">
-            <div className="grid grid-cols-2 gap-1  mx-auto w-lg bg-gray-200 rounded-xl">
+        <div className="  ">
+
+{/* Toggle  */}
+            <div className="inline-flex gap-1 rounded-full bg-gray-100 p-1">
               <Link
                 href={buildQuery({ mode: "owners", ownerId: selectedOwnerId ?? undefined })}
                 onClick={(event) => {
@@ -84,11 +85,11 @@ export function ObligationsNavigationShell({
                   router.replace(buildQuery({ mode: "owners", ownerId: selectedOwnerId ?? undefined }));
                 }}
                 className={[
-                  "rounded-2xl px-6 py-4 text-center text-xl font-semibold transition",
-                  mode === "owners" ? "bg-zinc-950 text-white shadow-sm ring-2 ring-sky-500" : "text-zinc-500",
+                  "rounded-full w-40 py-4 text-center text-base font-medium  transition",
+                  mode === "owners" ? "bg-zinc-950 text-white " : "text-zinc-500",
                 ].join(" ")}
               >
-                Owners
+                Owners  
               </Link>
               <Link
                 href={buildQuery({ mode: "units", unitId: selectedUnitId ?? undefined })}
@@ -97,14 +98,14 @@ export function ObligationsNavigationShell({
                   router.replace(buildQuery({ mode: "units", unitId: selectedUnitId ?? undefined }));
                 }}
                 className={[
-                  "rounded-2xl px-6 py-4 text-center text-xl font-semibold transition",
-                  mode === "units" ? "bg-zinc-950 text-white shadow-sm ring-2 ring-sky-500" : "text-zinc-500",
+                  "rounded-full w-40 py-4 text-center text-base font-medium transition",
+                  mode === "units" ? "bg-zinc-950 text-white " : "text-zinc-500",
                 ].join(" ")}
               >
                 Units
               </Link>
             </div>
-          </div>
+        </div>
       </div>
 
       {error ? (
@@ -114,10 +115,8 @@ export function ObligationsNavigationShell({
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(320px,1fr)]  ">
-        <div className="space-y-6">
-          
-
-          <div className="max-h-[calc(100vh-18rem)] overflow-y-auto pr-1">
+        
+          <div className=" pr-1">
             {mode === "owners" ? (
               <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4 ">
                 {(owners ?? []).map((owner) => {
@@ -207,9 +206,11 @@ export function ObligationsNavigationShell({
               </div>
             )}
           </div>
-        </div>
+       
 
-        <div className="self-start space-y-8 rounded-2xl border border-zinc-200 bg-white p-5  ">
+{/* Obligation Panel */}
+
+        <div className="self-start space-y-8  border border-zinc-200 bg-white  py-6">
           {showPendingDetail ? (
             <div className="flex items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 px-6 py-10 test">
               <div className="flex flex-col items-center gap-4 text-center">
