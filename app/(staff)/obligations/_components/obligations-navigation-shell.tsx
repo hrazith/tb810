@@ -209,9 +209,9 @@ export function ObligationsNavigationShell({
           </div>
         </div>
 
-        <div className="space-y-8 rounded-2xl border border-zinc-200 bg-white p-5  ">
+        <div className="self-start space-y-8 rounded-2xl border border-zinc-200 bg-white p-5  ">
           {showPendingDetail ? (
-            <div className="flex min-h-[28rem] items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 px-6 py-10 test">
+            <div className="flex items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 px-6 py-10 test">
               <div className="flex flex-col items-center gap-4 text-center">
                 <div
                   aria-hidden="true"

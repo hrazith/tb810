@@ -297,7 +297,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
+              <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-10">
                   <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Invoices</div>
                   <div className="text-sm text-zinc-600">Coming soon</div>
                   <div className="mt-4">
@@ -307,7 +307,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                   </div>
               </div>
 
-              <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
+              <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-10">
                   <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Other charges</div>
                   {monthlySummary?.data?.components.other_charge.amount ? (
                     <div className="flex items-center justify-between gap-4 text-sm text-zinc-600">
