@@ -15,7 +15,7 @@ const buildingModule = jiti("@/server/building");
 const ownerFactsModule = jiti("@/server/obligations/owner-facts");
 const progressionModule = jiti("@/server/obligations/progression");
 
-const { projectCarlosDashboard, projectGulianaDashboard, deriveUnitChargeWorthNoting, deriveGulianaDashboardMonths, deriveDashboardContext, selectCarlosTargetObligationMonth, getGulianaDashboardFacts } = dashboard;
+const { projectCarlosDashboard, projectGulianaDashboard, deriveUnitChargeWorthNoting, deriveGulianaDashboardMonths, deriveDashboardContext, selectCarlosTargetObligationMonth, financialReadinessDeadline, getGulianaDashboardFacts } = dashboard;
 
 function buildProjectionFacts(overrides = {}) {
   const businessDate = overrides.businessDate ?? "2026-08-05";
@@ -971,6 +971,7 @@ test("Carlos approval is not overdue through the fifth day", () => {
     }));
 
     assert.equal(projection.approvalState, "ready");
+    assert.equal(projection.journeyState, "ready_for_approval");
   }
 });
 
@@ -989,6 +990,7 @@ test("Carlos approval is overdue from the sixth day", () => {
   }));
 
   assert.equal(projection.approvalState, "overdue");
+  assert.equal(projection.journeyState, "approval_overdue");
 });
 
 test("Carlos approved package has no unresolved approval item", () => {
@@ -1006,6 +1008,7 @@ test("Carlos approved package has no unresolved approval item", () => {
   }));
 
   assert.equal(projection.approvalState, "approved");
+  assert.equal(projection.journeyState, "approved");
 });
 
 test("Carlos does not expose a future persisted snapshot before its obligation month", () => {
@@ -1038,6 +1041,7 @@ test("Carlos separates Aug 31 financial readiness from approval eligibility", ()
 
   assert.equal(projection.financialReadiness, "ready");
   assert.equal(projection.approvalState, "not_ready");
+  assert.equal(projection.journeyState, "ready");
   assert.equal(projection.total, "29369.79");
 });
 
@@ -1066,6 +1070,7 @@ test("Carlos exposes concise financial blockers before handoff", () => {
     "Required gas readings are missing.",
   ]);
   assert.equal(projection.approvalState, "not_ready");
+  assert.equal(projection.journeyState, "blocked");
 });
 
 test("Carlos has approval readiness only after a calendar-eligible handoff", () => {
@@ -1130,14 +1135,161 @@ test("Carlos keeps September selected on Sep 1 before Pulse", () => {
   }), "2026-09");
 });
 
-test("Carlos prefers the handed-off package over calendar-derived targets", () => {
+test("Carlos keeps a complete September package non-actionable before Pulse", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-09-01",
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-09", total: "29369.79", eligibleUnitCount: 64 },
+      obligationLifecycle: { mode: "live", billingPeriodId: null, billingPeriodStatus: null },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+  }));
+
+  assert.equal(projection.obligationMonth, "2026-09");
+  assert.equal(projection.approvalState, "not_ready");
+  assert.equal(projection.journeyState, "ready");
+  assert.notEqual(projection.journeyState, "ready_for_approval");
+  assert.notEqual(projection.journeyState, "approval_overdue");
+});
+
+test("Carlos prefers an unresolved handed-off package over calendar-derived targets", () => {
   assert.equal(selectCarlosTargetObligationMonth({
     operatingMonth: "2026-09",
     upcomingObligationMonth: "2026-10",
     context: "open",
     activePackage: { obligationMonth: "2026-09" },
-    mostRecentHandoff: { obligationMonth: "2026-09" },
+    mostRecentHandoff: { obligationMonth: "2026-09", status: "ready_for_review" },
   }), "2026-09");
+});
+
+test("Carlos advances to the next active package after approval", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-09-08",
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    mostRecentHandoff: { obligationMonth: "2026-09", status: "approved" },
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-10", total: null },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-11" } },
+  }));
+
+  assert.equal(projection.obligationMonth, "2026-10");
+  assert.equal(projection.approvalState, "not_ready");
+  assert.equal(projection.journeyState, "building");
+});
+
+test("Carlos keeps completed handoff statuses from anchoring the active target", () => {
+  for (const status of ["approved", "invoices_generated", "closed"]) {
+    assert.equal(selectCarlosTargetObligationMonth({
+      operatingMonth: "2026-09",
+      upcomingObligationMonth: "2026-10",
+      context: "open",
+      activePackage: { obligationMonth: "2026-10" },
+      mostRecentHandoff: { obligationMonth: "2026-09", status },
+    }), "2026-10");
+  }
+});
+
+test("Carlos builds the next active package charge count from both charge components", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-09-08",
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    mostRecentHandoff: { obligationMonth: "2026-09", status: "approved" },
+    current: {
+      ...base,
+      obligations: {
+        ...base.obligations,
+        obligationMonth: "2026-10",
+        total: null,
+        components: {
+          ...base.obligations.components,
+          other_charge: { state: "available", amount: "25.00", count: 1 },
+          owner_direct_charge: { state: "available", amount: "125.00", count: 2 },
+        },
+      },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-11" } },
+  }));
+
+  assert.equal(projection.journeyState, "building");
+  assert.equal((projection.components.other_charge.count ?? 0) + (projection.components.owner_direct_charge.count ?? 0), 3);
+});
+
+test("financial readiness deadlines use the final day of the preceding month", () => {
+  assert.equal(financialReadinessDeadline("2026-10"), "2026-09-30");
+  assert.equal(financialReadinessDeadline("2026-11"), "2026-10-31");
+  assert.equal(financialReadinessDeadline("2027-02"), "2027-01-31");
+  assert.equal(financialReadinessDeadline("2028-03"), "2028-02-29");
+  assert.equal(financialReadinessDeadline("2027-03"), "2027-02-28");
+});
+
+test("Carlos keeps an incomplete October package building before its deadline", () => {
+  const base = buildProjectionFacts().upcoming;
+  for (const businessDate of ["2026-09-08", "2026-09-15", "2026-09-29"]) {
+    const projection = projectCarlosDashboard(buildProjectionFacts({
+      businessDate,
+      operatingMonth: "2026-09",
+      upcomingObligationMonth: "2026-10",
+      mostRecentHandoff: { obligationMonth: "2026-09", status: "approved" },
+      current: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10", total: null } },
+      upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-11" } },
+    }));
+
+    assert.equal(projection.journeyState, "building");
+  }
+});
+
+test("Carlos blocks an incomplete October package on its readiness deadline", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-09-30",
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    mostRecentHandoff: { obligationMonth: "2026-09", status: "approved" },
+    current: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10", total: null } },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-11" } },
+  }));
+
+  assert.equal(projection.journeyState, "blocked");
+});
+
+test("Carlos is ready immediately when October becomes financially complete", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-09-20",
+    operatingMonth: "2026-09",
+    upcomingObligationMonth: "2026-10",
+    mostRecentHandoff: { obligationMonth: "2026-09", status: "approved" },
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth: "2026-10", total: "29369.79" },
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-11" } },
+  }));
+
+  assert.equal(projection.journeyState, "ready");
+});
+
+test("September incomplete obligations are blocked by the Aug 31 deadline", () => {
+  const base = buildProjectionFacts().upcoming;
+  const projection = projectCarlosDashboard(buildProjectionFacts({
+    businessDate: "2026-08-31",
+    operatingMonth: "2026-08",
+    upcomingObligationMonth: "2026-09",
+    current: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-09", total: null } },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-10" } },
+  }));
+
+  assert.equal(projection.journeyState, "blocked");
 });
 
 test("K dashboard facts read uses exactly one bounded month read", async () => {

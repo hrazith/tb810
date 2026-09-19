@@ -120,9 +120,19 @@ async function CarlosDashboardPage({ firstName }: { firstName: string }) {
 
   const projection = projectCarlosDashboard(result.data);
   const hasApprovalItem = projection.approvalState === "ready" || projection.approvalState === "overdue";
-  const isApproved = projection.approvalState === "approved";
-  const statusLabel = projection.approvalState === "overdue" ? "Approval overdue" : "Ready for your approval";
-  const financialStatusLabel = projection.financialReadiness === "ready" ? "Ready" : "Blocked";
+  const chargeCount = (projection.components.other_charge.count ?? 0) + (projection.components.owner_direct_charge.count ?? 0);
+  const journeyStatus = projection.journeyState === "approval_overdue"
+    ? "Approval overdue"
+    : projection.journeyState === "ready_for_approval"
+      ? "Ready for your approval"
+      : projection.journeyState === "approved"
+        ? `✓ Approved · ${amountText(projection.total)}`
+        : projection.journeyState === "building"
+          ? `Building${chargeCount > 0 ? ` · ${chargeCount} charges` : ""}`
+          : projection.journeyState === "ready"
+            ? `Ready · ${amountText(projection.total)}`
+            : `Blocked · ${projection.financialBlockers.length} ${projection.financialBlockers.length === 1 ? "issue" : "issues"}`;
+  const noteworthy = result.data.current.worthNoting;
 
   function chargeLabel(key: "other_charge" | "owner_direct_charge") {
     const component = projection.components[key];
@@ -137,69 +147,93 @@ async function CarlosDashboardPage({ firstName }: { firstName: string }) {
         <DashboardGreeting firstName={firstName} />
       </div>
 
-      {hasApprovalItem ? (
-        <div className="mt-8 space-y-6 border-t border-zinc-200 pt-8">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Needs your attention</p>
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="space-y-3">
-              <p className="text-2xl font-semibold tracking-tight text-zinc-950">{formatMonthLabel(projection.obligationMonth)} obligations</p>
-              <p className="text-xl font-semibold text-zinc-950">{statusLabel}</p>
-              <p className="max-w-2xl text-lg text-zinc-600">Review the {formatMonthLabel(projection.obligationMonth)} obligations below before approving.</p>
-            </div>
-            <p className="text-2xl font-semibold tracking-tight text-zinc-950">{amountText(projection.total)}</p>
-          </div>
+      <div className="mt-8 flex flex-wrap items-start justify-between gap-6 border-t border-zinc-200 pt-8">
+        <div className="space-y-2">
+          <p className="text-2xl font-semibold tracking-tight text-zinc-950">{formatMonthLabel(projection.obligationMonth)} obligations</p>
+          <p className="text-xl font-semibold text-zinc-950">{journeyStatus}</p>
+          {hasApprovalItem ? <p className="max-w-2xl text-lg text-zinc-600">Review the {formatMonthLabel(projection.obligationMonth)} obligations below before approving.</p> : null}
+        </div>
+        {projection.journeyState === "blocked" ? (
+          <ul className="max-w-2xl space-y-1 text-lg text-zinc-600">
+            {projection.financialBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+          </ul>
+        ) : null}
+      </div>
 
-          <div className="max-w-3xl border-t border-zinc-200 pt-5">
-            <div className="space-y-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Ready for approval</p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950">{formatMonthLabel(projection.obligationMonth)} obligations</h2>
-              </div>
-              <div className="flex items-center justify-between gap-6 border-y border-zinc-200 py-4">
-                <span className="font-medium text-zinc-600">Total</span>
-                <span className="text-xl font-semibold text-zinc-950">{amountText(projection.total)}</span>
-              </div>
-              <div className="space-y-3 text-sm">
-                {reviewComponentKeys.map((key) => (
-                  <div key={key} className="flex items-center justify-between gap-6">
-                    <span className="text-zinc-600">{componentLabel(key)}</span>
-                    <span className="font-medium text-zinc-950">{key === "other_charge" || key === "owner_direct_charge" ? chargeLabel(key) : componentText(projection.components[key])}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-sm text-zinc-600">All required source inputs complete.</p>
-              <form action={approveMonthlyObligationAction}>
-                <input type="hidden" name="billingPeriodId" value={projection.billingPeriodId ?? ""} />
-                <input type="hidden" name="reviewFingerprint" value={result.data.current.reviewFingerprint} />
-                <button type="submit" className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-zinc-950 bg-zinc-950 px-6 py-3 text-base font-medium text-white transition hover:bg-zinc-800">Approve {formatMonthLabel(projection.obligationMonth)} obligations</button>
-              </form>
+      {noteworthy.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-700">
+          <FileText size={20} weight="regular" aria-hidden="true" />
+          <span className="font-medium text-zinc-950">Unit charges</span>
+          <span>{noteworthy.length} noteworthy {noteworthy.length === 1 ? "charge" : "charges"}</span>
+        </div>
+      ) : null}
+
+      <div className="mt-4 space-y-4">
+        <p className="text-lg font-medium text-zinc-950">Financial watch</p>
+        <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-3">
+          {[
+            ["Delinquency", "Coming soon"],
+            ["Expenses", "Coming soon"],
+            ["TBD", "Coming soon"],
+          ].map(([title, status]) => (
+            <div key={title} className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">{title}</p>
+              <p className="mt-8 text-lg text-zinc-600">{status}</p>
             </div>
+          ))}
+        </div>
+      </div>
+
+      {hasApprovalItem ? (
+        <div className="mt-4 max-w-3xl space-y-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Ready for approval</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950">{formatMonthLabel(projection.obligationMonth)} obligations</h2>
+          </div>
+          <div className="flex items-center justify-between gap-6 border-y border-zinc-200 py-4">
+            <span className="font-medium text-zinc-600">Total</span>
+            <span className="text-xl font-semibold text-zinc-950">{amountText(projection.total)}</span>
+          </div>
+          <div className="space-y-3 text-sm">
+            {reviewComponentKeys.map((key) => (
+              <div key={key} className="flex items-center justify-between gap-6">
+                <span className="text-zinc-600">{componentLabel(key)}</span>
+                <span className="font-medium text-zinc-950">{key === "other_charge" || key === "owner_direct_charge" ? chargeLabel(key) : componentText(projection.components[key])}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-zinc-600">All required source inputs complete.</p>
+          <form action={approveMonthlyObligationAction}>
+            <input type="hidden" name="billingPeriodId" value={projection.billingPeriodId ?? ""} />
+            <input type="hidden" name="reviewFingerprint" value={result.data.current.reviewFingerprint} />
+            <button type="submit" className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-zinc-950 bg-zinc-950 px-6 py-3 text-base font-medium text-white transition hover:bg-zinc-800">Approve {formatMonthLabel(projection.obligationMonth)} obligations</button>
+          </form>
+        </div>
+      ) : null}
+
+      <details className="fixed bottom-6 right-6 z-40 max-sm:bottom-4 max-sm:right-4">
+        <summary className="flex cursor-pointer list-none items-center gap-4 rounded-full border border-zinc-200 bg-white px-5 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:border-zinc-950 [&::-webkit-details-marker]:hidden">
+          <span className="text-sm font-semibold text-zinc-950">Obligations</span>
+          <span className="text-sm text-zinc-600">{shortMonthLabel(projection.obligationMonth)}</span>
+          <span className="text-xs font-semibold tracking-[0.12em] text-zinc-500">{journeyStatus}</span>
+          <CaretDown size={16} aria-hidden="true" />
+        </summary>
+        <div className="absolute bottom-full right-0 z-20 mb-3 w-[min(32rem,calc(100vw-3rem))] rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_18px_40px_rgba(0,0,0,0.1)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{formatMonthLabel(projection.obligationMonth)} obligations</p>
+              <p className="mt-1 text-lg font-semibold text-zinc-950">{journeyStatus}</p>
+            </div>
+            <Link href="/obligations" className="text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">Open obligations →</Link>
+          </div>
+          <div className="mt-6 space-y-3 text-sm">
+            {reviewComponentKeys.map((key) => (
+              <div key={key} className="flex items-center justify-between gap-6"><span className="text-zinc-600">{componentLabel(key)}</span><span className="font-medium text-zinc-950">{key === "other_charge" || key === "owner_direct_charge" ? chargeLabel(key) : componentText(projection.components[key])}</span></div>
+            ))}
+            <div className="flex items-center justify-between gap-6 border-t border-zinc-200 pt-4 text-base"><span className="font-semibold text-zinc-950">Total</span><span className="font-semibold text-zinc-950">{amountText(projection.total)}</span></div>
           </div>
         </div>
-      ) : isApproved ? (
-        <div className="mt-8 space-y-3 border-t border-zinc-200 pt-8">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">{formatMonthLabel(projection.obligationMonth)} obligations</p>
-          <p className="text-xl font-semibold text-zinc-950">✓ Approved</p>
-          <p className="text-lg text-zinc-600">{amountText(projection.total)} · {projection.eligibleUnitCount} units</p>
-        </div>
-      ) : (
-        <div className="mt-8 border-t border-zinc-200 pt-8">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">{formatMonthLabel(projection.obligationMonth)} obligations</p>
-          <p className="mt-3 text-xl font-semibold text-zinc-950">{financialStatusLabel}</p>
-          {projection.financialReadiness === "ready" ? (
-            <p className="mt-2 text-lg text-zinc-600">{amountText(projection.total)} · Expected monthly obligations</p>
-          ) : (
-            <ul className="mt-3 space-y-1 text-lg text-zinc-600">
-              {projection.financialBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
-            </ul>
-          )}
-          <div className="mt-6 space-y-2 border-t border-zinc-200 pt-4 text-sm">
-            <p className="font-semibold uppercase tracking-[0.18em] text-zinc-500">Financial watch</p>
-            <p className="flex justify-between gap-6"><span className="text-zinc-600">Unit charges</span><span className="font-medium text-zinc-950">{chargeLabel("other_charge")}</span></p>
-            <p className="flex justify-between gap-6"><span className="text-zinc-600">Owner-direct charges</span><span className="font-medium text-zinc-950">{chargeLabel("owner_direct_charge")}</span></p>
-          </div>
-        </div>
-      )}
+      </details>
     </section>
   );
 }

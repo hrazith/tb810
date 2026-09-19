@@ -2,7 +2,7 @@ import { cache } from "react";
 
 import { getBusinessNow } from "@/server/business-date";
 import { getFixedBuildingIdentity } from "@/server/building";
-import { isChargeEligibleForMonth, nextMonthKey } from "@/server/charges/month";
+import { isChargeEligibleForMonth, nextMonthKey, previousMonthKey } from "@/server/charges/month";
 import { buildMonthlyObligationSummaryFromFacts, buildMonthlyObligationSummaryFromSnapshot } from "@/server/obligations/summary-facts";
 import { loadBuildingMonthFinancialFacts, type BuildingMonthFinancialFacts } from "@/server/obligations/owner-facts";
 import { isApprovedPackage, isHandedOffPackage, selectFinancialFocus } from "@/server/obligations/package-selection";
@@ -55,6 +55,7 @@ type UpcomingFacts = {
 export type DashboardContext = "close" | "open";
 export type DashboardFinancialFocus = "current" | "upcoming";
 export type CarlosApprovalState = "ready" | "overdue" | "approved" | "not_ready";
+export type CarlosJourneyState = "building" | "ready" | "blocked" | "ready_for_approval" | "approval_overdue" | "approved";
 
 export const MONTHLY_OBLIGATION_APPROVAL_CUTOFF_DAY = 5;
 
@@ -149,6 +150,7 @@ export type CarlosDashboardProjection = {
   billingPeriodId: string | null;
   billingPeriodStatus: string | null;
   approvalState: CarlosApprovalState;
+  journeyState: CarlosJourneyState;
 };
 
 function countCompletedWaterReadings(financialFacts: BuildingMonthFinancialFacts) {
@@ -265,6 +267,15 @@ function isReadyToApprove(facts: UpcomingFacts) {
   return facts.obligations.total !== null && !hasBlockedObligationComponent(facts.obligations);
 }
 
+export function financialReadinessDeadline(obligationMonth: string) {
+  const previousMonth = previousMonthKey(obligationMonth);
+  if (!previousMonth) return null;
+  const year = Number(previousMonth.slice(0, 4));
+  const month = Number(previousMonth.slice(5, 7));
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${previousMonth}-${String(lastDay).padStart(2, "0")}`;
+}
+
 function getFinancialBlockers(facts: UpcomingFacts) {
   const reasons = [
     facts.obligations.components.fixed_assessment.reason,
@@ -295,6 +306,18 @@ export function projectCarlosDashboard(monthFacts: GulianaDashboardFacts): Carlo
   const approvalState = readyForApproval
     ? currentMonth && Number(monthFacts.businessDate.slice(8, 10)) > MONTHLY_OBLIGATION_APPROVAL_CUTOFF_DAY ? "overdue" : "ready"
     : currentMonth && lifecycle.mode === "snapshotted" && isApprovedLifecycleStatus(lifecycle.billingPeriodStatus) ? "approved" : "not_ready";
+  const readinessDeadline = financialReadinessDeadline(financialFacts.obligations.obligationMonth);
+  const journeyState = approvalState === "overdue"
+    ? "approval_overdue"
+    : approvalState === "ready"
+      ? "ready_for_approval"
+      : approvalState === "approved"
+        ? "approved"
+        : financiallyReady
+          ? "ready"
+          : lifecycle.mode === "live" && readinessDeadline !== null && monthFacts.businessDate < readinessDeadline
+            ? "building"
+            : "blocked";
 
   return {
     businessDate: monthFacts.businessDate,
@@ -308,6 +331,7 @@ export function projectCarlosDashboard(monthFacts: GulianaDashboardFacts): Carlo
     billingPeriodId: lifecycle.billingPeriodId,
     billingPeriodStatus: lifecycle.billingPeriodStatus,
     approvalState,
+    journeyState,
   };
 }
 
@@ -620,9 +644,9 @@ export function selectCarlosTargetObligationMonth({
   upcomingObligationMonth: string;
   context: DashboardContext;
   activePackage: { obligationMonth: string };
-  mostRecentHandoff: { obligationMonth: string } | null;
+  mostRecentHandoff: { obligationMonth: string; status: string } | null;
 }) {
-  if (mostRecentHandoff) return mostRecentHandoff.obligationMonth;
+  if (mostRecentHandoff?.status === "ready_for_review") return mostRecentHandoff.obligationMonth;
   if (context === "close" && activePackage.obligationMonth === operatingMonth) return upcomingObligationMonth;
   return activePackage.obligationMonth;
 }
