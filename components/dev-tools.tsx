@@ -48,7 +48,7 @@ type DevToolsStore = DevToolsSnapshot & {
   setActiveTab: (next: "time" | "data" | "style") => void;
 };
 
-let snapshot: DevToolsSnapshot = {
+const DEFAULT_SNAPSHOT = Object.freeze<DevToolsSnapshot>({
   outline: false,
   historicalEditingEnabled: false,
   historicalEditingAvailable: false,
@@ -58,7 +58,9 @@ let snapshot: DevToolsSnapshot = {
   testSessionId: "",
   testSessionMutations: 0,
   activeTab: "time",
-};
+});
+
+let snapshot: DevToolsSnapshot = DEFAULT_SNAPSHOT;
 
 const listeners = new Set<() => void>();
 let initialized = false;
@@ -184,6 +186,10 @@ function readSnapshot() {
   return snapshot;
 }
 
+function readServerSnapshot() {
+  return DEFAULT_SNAPSHOT;
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -278,7 +284,7 @@ export function DevToolsProvider({ children }: { children: ReactNode }) {
 }
 
 export function useDevTools() {
-  const current = useSyncExternalStore(subscribe, readSnapshot, readSnapshot);
+  const current = useSyncExternalStore(subscribe, readSnapshot, readServerSnapshot);
 
   const setOutline = (next: boolean | ((current: boolean) => boolean)) => {
     const resolved = typeof next === "function" ? next(snapshot.outline) : next;
