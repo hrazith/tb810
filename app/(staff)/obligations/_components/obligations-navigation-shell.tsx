@@ -113,7 +113,7 @@ export function ObligationsNavigationShell({
         </div>
       ) : null}
 
-      <div className=" grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(320px,1fr)]  ">
+      <div className=" grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(460px,1fr)]  ">
 
 
 {/* Items  */}
