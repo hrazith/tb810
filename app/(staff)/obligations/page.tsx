@@ -1,8 +1,8 @@
 import Link from "next/link";
+import { CaretDown, CaretRight, X } from "@phosphor-icons/react/dist/ssr";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Panel } from "@/components/ui/panel";
 import { TB810_BUILDING_ID, TB810_BUILDING_NAME } from "@/server/building";
 import {
   createOwnerDirectChargeAction,
@@ -10,7 +10,7 @@ import {
   deleteFutureChargeAction,
   editFutureChargeAction,
 } from "@/server/charges/actions";
-import { getUpcomingOwnerDirectChargesForObligationMonth, getUpcomingUnitChargesForObligationMonth } from "@/server/charges";
+import { getUpcomingUnitChargesForObligationMonth } from "@/server/charges";
 import { currentMonthKey, monthLabel, nextMonthKey } from "@/server/charges/month";
 import {
   getMonthlyObligationSummary,
@@ -50,6 +50,11 @@ function formatComponentValue(status: string, amount: string | null) {
   return status === "available" ? formatMoney(amount) : status === "not_applicable" ? "—" : status;
 }
 
+function formatStatusLabel(status: string) {
+  const label = status.replaceAll("_", " ");
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 function componentLabel(key: string) {
   switch (key) {
     case "fixed_assessment":
@@ -73,7 +78,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
   const monthKey = await currentMonthKey();
   const mode = params.mode ?? "owners";
 
-  const unitsMeasurement = mode === "units" ? await measure(listUnitDirectory()) : null;
+  const unitsMeasurement = await measure(listUnitDirectory());
   const unitsResult = unitsMeasurement?.result ?? null;
   if (unitsResult?.error) throw new Error(unitsResult.error);
   const eligibleUnits = unitsResult?.data.filter((unit) => unit.unit_type_code === "condo") ?? [];
@@ -122,12 +127,6 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
     ? measure(getOwnerMonthlyObligation({ ownerId: selectedOwner.id, obligationMonth: monthKey }))
     : Promise.resolve(null);
 
-  const selectedOwnerUpcomingChargesMeasurementPromise: Promise<
-    TimedResult<Awaited<ReturnType<typeof getUpcomingOwnerDirectChargesForObligationMonth>>> | null
-  > = selectedOwner
-    ? measure(getUpcomingOwnerDirectChargesForObligationMonth(selectedOwner.id, monthKey))
-    : Promise.resolve(null);
-
   const selectedUnitUpcomingChargesMeasurementPromise: Promise<
     TimedResult<Awaited<ReturnType<typeof getUpcomingUnitChargesForObligationMonth>>> | null
   > = selectedUnit
@@ -154,14 +153,12 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
   const [
     selectedObligationMeasurement,
     selectedOwnerObligationMeasurement,
-    selectedOwnerUpcomingChargesMeasurement,
     selectedUnitUpcomingChargesMeasurement,
     selectedSnapshotMeasurement,
     transactionsMeasurement,
   ] = await Promise.all([
     selectedObligationMeasurementPromise,
     selectedOwnerObligationMeasurementPromise,
-    selectedOwnerUpcomingChargesMeasurementPromise,
     selectedUnitUpcomingChargesMeasurementPromise,
     selectedSnapshotMeasurementPromise,
     selectedTransactionsMeasurementPromise,
@@ -169,14 +166,12 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
 
   const selectedObligation = selectedObligationMeasurement?.result ?? null;
   const selectedOwnerObligation = selectedOwnerObligationMeasurement?.result ?? null;
-  const selectedOwnerUpcomingCharges = selectedOwnerUpcomingChargesMeasurement?.result ?? null;
   const selectedUnitUpcomingCharges = selectedUnitUpcomingChargesMeasurement?.result ?? null;
   const selectedSnapshot = selectedSnapshotMeasurement?.result ?? null;
   const transactions = transactionsMeasurement?.result ?? [];
 
   if (selectedObligation?.error) throw new Error(selectedObligation.error);
   if (selectedOwnerObligation?.error) throw new Error(selectedOwnerObligation.error);
-  if (selectedOwnerUpcomingCharges?.error) throw new Error(selectedOwnerUpcomingCharges.error);
   if (selectedUnitUpcomingCharges?.error) throw new Error(selectedUnitUpcomingCharges.error);
   if (selectedSnapshot?.error) throw new Error(selectedSnapshot.error);
 
@@ -207,7 +202,6 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
         `monthly_summary_ms=${monthlySummaryMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
         `selected_obligation_ms=${selectedObligationMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
         `selected_owner_obligation_ms=${selectedOwnerObligationMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
-        `selected_owner_upcoming_charges_ms=${selectedOwnerUpcomingChargesMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
         `selected_unit_upcoming_charges_ms=${selectedUnitUpcomingChargesMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
         `selected_snapshot_ms=${selectedSnapshotMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
         `selected_transactions_ms=${transactionsMeasurement?.elapsedMs.toFixed(1) ?? "0.0"}`,
@@ -257,14 +251,14 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
       selectedUnitId={selectedUnit?.id ?? null}
       error={params.error}
     >
-      <Panel className="space-y-8">
+      <div className="space-y-8 p-6 md:p-8 ">
         {!selectedOwner && !selectedUnit ? (
           <div className="space-y-8">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="text-3xl font-semibold tracking-tight text-zinc-950">{monthLabel(monthKey)}</div>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-6 ">
               <h3 className="mb-4 text-sm font-semibold uppercase text-zinc-500">Obligations</h3>
               <div className="space-y-3 text-sm text-zinc-600">
                     <div className="flex items-center justify-between gap-4">
@@ -297,7 +291,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-10">
+              <div className="p-10">
                   <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Invoices</div>
                   <div className="text-sm text-zinc-600">Coming soon</div>
                   <div className="mt-4">
@@ -307,186 +301,91 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                   </div>
               </div>
 
-              <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-10">
-                  <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Other charges</div>
-                  {monthlySummary?.data?.components.other_charge.amount ? (
-                    <div className="flex items-center justify-between gap-4 text-sm text-zinc-600">
-                      <span>{monthlySummary.data.components.other_charge.count} charges</span>
-                      <span>S/ {monthlySummary.data.components.other_charge.amount}</span>
-                    </div>
-                  ) : (
-                    <div className="text-sm text-zinc-600">—</div>
-                  )}
-                  <div className="mt-4 flex items-center justify-between gap-4 text-sm text-zinc-600">
-                    <span>Owner-direct charges</span>
-                    <span>
-                      {monthlySummary?.data?.components.owner_direct_charge.count
-                        ? `S/ ${monthlySummary.data.components.owner_direct_charge.amount}`
-                        : "—"}
-                    </span>
-                  </div>
-              </div>
             </div>
 
-            <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-600">
+            <div className="p-5 text-sm text-zinc-600">
                 Select an Owner or Unit to inspect its Monthly Obligation.
               </div>
             </div>
           ) : selectedOwner && selectedOwnerObligation?.data ? (
-            <div className="space-y-8">
+  /* Owner Obligation */
+            <div className="space-y-8  ">
               <div className="flex flex-wrap items-start justify-between gap-4">
+                <Button variant="icon" size="sm" className="ml-auto shrink-0" aria-label="Close owner obligations" data-obligations-close>
+                  <X aria-hidden size={16} />
+                </Button>
                 <div>
-                  <div className="text-4xl font-semibold tracking-tight text-zinc-950">{selectedOwner.full_name}</div>
-                  <div className="mt-2 text-sm text-zinc-600">
-                    {selectedOwner.owner_reference} · {monthLabel(monthKey)} · {selectedOwnerObligation.data.ownedUnitCount} responsible Units
+                  <div className="text-2xl font-semibold tracking-tight text-zinc-950">{selectedOwner.full_name}</div>
+                  <div className="mt-2 text-sm text-zinc-600 ">
+                    {selectedOwner.owner_reference} · {selectedOwnerObligation.data.ownedUnitCount}  Units
                   </div>
                 </div>
+                
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                {ownerComponentRows.map((component) => (
-                  <div key={component.key} className="rounded-[24px] border border-zinc-200 bg-white p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-sm font-medium uppercase tracking-wide text-zinc-500">{componentLabel(component.key)}</div>
-                        <div className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">
-                          {component.state === "available" ? formatMoney(component.amount) : component.state}
-                        </div>
+              <div>
+            
+                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500"> Obligations {monthLabel(monthKey)} </h3>
+                {ownerComponentRows.map((component) => {
+                  const value = component.state === "available" ? formatMoney(component.amount) : formatStatusLabel(component.state);
+                  if (component.key !== "fixed_assessment") {
+                    return (
+                      <div key={component.key} className="flex items-baseline justify-between gap-4 py-3 text-base text-zinc-600">
+                        <span className="min-w-0 break-words">{componentLabel(component.key)}</span>
+                        <span className="min-w-0 wrap-anywhere text-right font-medium">{value}</span>
                       </div>
-                        <div className="text-right text-xs text-zinc-500">
-                        <div>{component.state === "not_applicable" ? "—" : component.state}</div>
-                        <div>{component.reason ? component.reason : ""}</div>
-                      </div>
-                    </div>
-                    {component.reason ? <div className="mt-3 text-sm text-zinc-500">{component.reason}</div> : null}
-                  </div>
-                ))}
+                    );
+                  }
 
-                <div className="rounded-[24px] border border-zinc-200 bg-white p-5">
-                  <div className="text-sm font-medium uppercase tracking-wide text-zinc-500">Owner-direct charges</div>
-                  <div className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">
+                  return (
+                    <details key={component.key} className="group">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-3 text-left text-base text-zinc-600">
+                        <span className="min-w-0 break-words">{componentLabel(component.key)}</span>
+                        <span className="flex min-w-0 items-center gap-2 text-right font-medium">
+                          <span className="wrap-anywhere">{value}</span>
+                          <CaretRight className="shrink-0 group-open:hidden" size={16} aria-hidden="true" />
+                          <CaretDown className="hidden shrink-0 group-open:block" size={16} aria-hidden="true" />
+                        </span>
+                      </summary>
+                      <div className="space-y-1 pl-6 pb-2">
+                        {selectedOwnerObligation.data!.obligation.units.map((unit) => {
+                          const unitFixedAssessment = unit.components.find((item) => item.key === "fixed_assessment");
+                          const unitValue = unitFixedAssessment?.status === "available"
+                            ? formatMoney(unitFixedAssessment.amount)
+                            : formatStatusLabel(unitFixedAssessment?.status ?? "not_applicable");
+                          return (
+                            <div key={unit.unitId} className="flex items-baseline justify-between gap-4 py-2 text-sm text-zinc-600">
+                              <Link href={`/units/${unit.unitNumber}`} className="font-medium text-zinc-950 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950">
+                                {unit.unitNumber}
+                              </Link>
+                              <span className="min-w-0 wrap-anywhere text-right">{unitValue}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  );
+                })}
+                <div className="flex items-baseline justify-between gap-4 py-3 text-base text-zinc-600">
+                  <span className="min-w-0 break-words">Owner-direct charges</span>
+                  <span className="min-w-0 wrap-anywhere text-right font-medium">
                     {selectedOwnerObligation.data.ownerDirectCharges.state === "available"
                       ? formatMoney(selectedOwnerObligation.data.ownerDirectCharges.amount)
-                      : selectedOwnerObligation.data.ownerDirectCharges.state}
-                  </div>
-                  <div className="mt-2 text-sm text-zinc-500">
-                    {selectedOwnerObligation.data.ownerDirectCharges.count}
-                  </div>
-                  {selectedOwnerObligation.data.ownerDirectCharges.reason ? (
-                    <div className="mt-3 text-sm text-zinc-500">{selectedOwnerObligation.data.ownerDirectCharges.reason}</div>
-                  ) : null}
+                      : formatStatusLabel(selectedOwnerObligation.data.ownerDirectCharges.state)}
+                  </span>
                 </div>
-
-                <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5 md:col-span-2">
-                  <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-                    Upcoming owner-direct charges
-                  </div>
-                  {selectedOwnerUpcomingCharges?.data && selectedOwnerUpcomingCharges.data.length > 0 ? (
-                    <div className="space-y-3">
-                      {selectedOwnerUpcomingCharges.data.map((charge) => (
-                        <div key={charge.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
-                          <div className="flex flex-wrap items-start justify-between gap-4">
-                            <div>
-                              <div className="text-base font-semibold text-zinc-950">{charge.description}</div>
-                              <div className="mt-1 text-sm text-zinc-600">
-                                {charge.schedule === "one_off" ? "One-off" : "Recurring"}
-                              </div>
-                              <div className="mt-1 text-sm text-zinc-600">
-                                Starts {monthLabel(charge.effective_from_month.slice(0, 7))}
-                              </div>
-                              {charge.effective_to_month ? (
-                                <div className="mt-1 text-sm text-zinc-600">
-                                  Ends {monthLabel(charge.effective_to_month.slice(0, 7))}
-                                </div>
-                              ) : null}
-                              {charge.stop_note ? (
-                                <div className="mt-1 text-sm text-zinc-500">{charge.stop_note}</div>
-                              ) : null}
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                <details className="group">
-                                  <summary className="cursor-pointer rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 hover:border-zinc-400">
-                                    Edit
-                                  </summary>
-                                  <div className="mt-3 w-[min(32rem,80vw)] rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                                    <form action={editFutureChargeAction} className="space-y-3">
-                                      <input type="hidden" name="return_to" value={`/obligations?mode=owners&ownerId=${selectedOwner.id}`} />
-                                      <input type="hidden" name="charge_id" value={charge.id} />
-                                      <label className="block space-y-2">
-                                        <span className="text-sm font-medium text-zinc-700">Description</span>
-                                        <Input name="description" defaultValue={charge.description} />
-                                      </label>
-                                      <label className="block space-y-2">
-                                        <span className="text-sm font-medium text-zinc-700">Amount</span>
-                                        <Input name="amount" type="number" step="0.01" defaultValue={charge.amount} />
-                                      </label>
-                                      <label className="block space-y-2">
-                                        <span className="text-sm font-medium text-zinc-700">Schedule</span>
-                                        <select
-                                          name="schedule"
-                                          defaultValue={charge.schedule}
-                                          className="h-12 w-full rounded-xl border border-zinc-300 bg-white px-4 text-sm"
-                                        >
-                                          <option value="one_off">One-off</option>
-                                          <option value="recurring">Recurring</option>
-                                        </select>
-                                      </label>
-                                      <label className="block space-y-2">
-                                        <span className="text-sm font-medium text-zinc-700">Starts</span>
-                                        <Input
-                                          name="starts_month"
-                                          type="month"
-                                          min={nextMonthKey(monthKey) ?? monthKey}
-                                          defaultValue={charge.effective_from_month.slice(0, 7)}
-                                        />
-                                      </label>
-                                      <label className="block space-y-2">
-                                        <span className="text-sm font-medium text-zinc-700">Ends</span>
-                                        <Input
-                                          name="ends_month"
-                                          type="month"
-                                          min={nextMonthKey(monthKey) ?? monthKey}
-                                          defaultValue={charge.effective_to_month?.slice(0, 7) ?? ""}
-                                        />
-                                      </label>
-                                      <Button type="submit" variant="primary" className="w-full">
-                                        Save Changes
-                                      </Button>
-                                    </form>
-                                  </div>
-                                </details>
-                                <details className="group">
-                                  <summary className="cursor-pointer rounded-full border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 hover:border-red-400">
-                                    Delete
-                                  </summary>
-                                  <div className="mt-3 w-[min(24rem,80vw)] rounded-2xl border border-red-200 bg-red-50 p-4">
-                                    <div className="text-sm text-red-900">
-                                      This will permanently delete this future charge series before it takes effect.
-                                    </div>
-                                    <form action={deleteFutureChargeAction} className="mt-3 space-y-3">
-                                      <input type="hidden" name="return_to" value={`/obligations?mode=owners&ownerId=${selectedOwner.id}`} />
-                                      <input type="hidden" name="charge_id" value={charge.id} />
-                                      <Button type="submit" variant="destructive" className="w-full">
-                                        Confirm Delete
-                                      </Button>
-                                    </form>
-                                  </div>
-                                </details>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-lg font-semibold text-zinc-950">{formatMoney(charge.amount)}</div>
-                              <div className="text-sm text-zinc-500">Owner-direct</div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-zinc-600">No upcoming owner-direct charges.</div>
-                  )}
+                <div className="mt-2 flex items-baseline justify-between gap-4 border-t border-zinc-200 pt-4 font-semibold text-zinc-950">
+                  <span>Total</span>
+                  <span className="min-w-0 wrap-anywhere text-right">
+                    {selectedOwnerObligation.data.total.state === "available"
+                      ? formatMoney(selectedOwnerObligation.data.total.amount)
+                      : formatStatusLabel(selectedOwnerObligation.data.total.state)}
+                  </span>
                 </div>
+                <div className="mt-2 text-sm text-zinc-500">{formatStatusLabel(selectedOwnerObligation.data.readiness)}</div>
+              </div>
 
-                <details className="group rounded-[24px] border border-zinc-200 bg-white px-5 py-4 md:col-span-2">
+                <details className="group rounded-[24px] border border-zinc-200 bg-white px-5 py-4">
                   <summary className="cursor-pointer list-none text-sm font-medium text-zinc-950">
                     + Add owner-direct charge
                   </summary>
@@ -539,58 +438,6 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                   </div>
                 </details>
 
-                <div className="rounded-[24px] border border-zinc-200 bg-white p-5">
-                  <div className="text-sm font-medium uppercase tracking-wide text-zinc-500">Consolidated owner</div>
-                  <div className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">
-                    {selectedOwnerObligation.data.total.state === "available"
-                      ? formatMoney(selectedOwnerObligation.data.total.amount)
-                      : selectedOwnerObligation.data.total.state}
-                  </div>
-                  <div className="mt-2 text-sm text-zinc-500">{selectedOwnerObligation.data.readiness}</div>
-                </div>
-              </div>
-
-              <div className="space-y-4 rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
-                {selectedOwnerObligation.data.obligation.units.map((unit) => {
-                  return (
-                    <div key={unit.unitId} className="rounded-2xl border border-zinc-200 bg-white p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="text-lg font-semibold text-zinc-950">{unit.unitNumber}</div>
-                          <div className="text-sm text-zinc-500">
-                            {unit.unitTypeCode === "parking"
-                              ? "Parking"
-                              : unit.unitTypeCode === "storage"
-                                ? "Storage"
-                                : "Residential"}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-semibold text-zinc-950">
-                            {unit.readiness === "ready" || unit.readiness === "in_progress" ? formatMoney(unit.knownTotal) : unit.readiness}
-                          </div>
-                          <div className="text-sm text-zinc-500">{unit.readiness}</div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-2 text-sm text-zinc-600 sm:grid-cols-2">
-                        {unit.components.map((component) => (
-                          <div key={component.key} className="flex items-center justify-between gap-4 rounded-xl bg-zinc-50 px-3 py-2">
-                            <span>{componentLabel(component.key)}</span>
-                            <span>
-                              {component.status === "available" ? formatMoney(component.amount) : component.status}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {unit.blockers.length > 0 ? (
-                        <div className="mt-3 text-sm text-zinc-500">{unit.blockers.join(" · ")}</div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
             </div>
           ) : selectedUnit && selectedUnitPanel ? (
             <div className="space-y-8">
@@ -602,39 +449,29 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                 <Button asChild variant="secondary" size="sm">
                   <Link href={`/units/${selectedUnitPanel.unit.unit_number}`}>View account →</Link>
                 </Button>
+                <Button variant="icon" size="sm" className="ml-auto shrink-0" aria-label="Close unit obligations" data-obligations-close>
+                  <X aria-hidden size={16} />
+                </Button>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <div className="mb-8 text-4xl font-semibold tracking-tight text-zinc-950">{monthLabel(monthKey)}</div>
+                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Obligations</h3>
                 {selectedUnitPanel.obligation.components.map((component) => (
-                  <div key={component.key} className="rounded-[24px] border border-zinc-200 bg-white p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-sm font-medium uppercase tracking-wide text-zinc-500">{component.label}</div>
-                        <div className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">
-                          {component.status === "available" ? formatMoney(component.amount) : component.status}
-                        </div>
-                      </div>
-                      <div className="text-right text-xs text-zinc-500">
-                        <div>{component.status}</div>
-                        {component.sourceMonth ? <div>{component.sourceMonth}</div> : null}
-                      </div>
-                    </div>
-                    {component.blocker ? <div className="mt-3 text-sm text-zinc-500">{component.blocker}</div> : null}
+                  <div key={component.key} className="flex items-baseline justify-between gap-4 py-3 text-base text-zinc-600">
+                    <span className="min-w-0 break-words">{component.label}</span>
+                    <span className="min-w-0 wrap-anywhere text-right font-medium">
+                      {component.status === "available" ? formatMoney(component.amount) : formatStatusLabel(component.status)}
+                    </span>
                   </div>
                 ))}
-              </div>
-
-              <div className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-5">
-                <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Monthly charges</div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm text-zinc-600">
-                    <span>Current obligation</span>
-                    <span>{formatMoney(selectedUnitPanel.obligation.knownTotal)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-zinc-600">
-                    <span>Ready state</span>
-                    <span>{selectedUnitPanel.obligation.readiness}</span>
-                  </div>
+                <div className="mt-2 flex items-baseline justify-between gap-4 border-t border-zinc-200 pt-4 font-semibold text-zinc-950">
+                  <span>Total</span>
+                  <span className="min-w-0 wrap-anywhere text-right">{formatMoney(selectedUnitPanel.obligation.knownTotal)}</span>
+                </div>
+                <div className="mt-2 flex items-baseline justify-between gap-4 text-sm text-zinc-500">
+                  <span>Ready state</span>
+                  <span className="min-w-0 wrap-anywhere text-right">{formatStatusLabel(selectedUnitPanel.obligation.readiness)}</span>
                 </div>
               </div>
 
@@ -833,7 +670,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
               </div>
             </div>
           )}
-      </Panel>
+      </div>
     </ObligationsNavigationShell>
   );
 }

@@ -243,7 +243,7 @@ export async function listUnitDirectory(): Promise<QueryResult<UnitDirectoryItem
   const { data, error } = await supabase
     .from("tb810_units")
     .select(
-      "id, unit_number, participation_percentage, tb810_unit_types!tb810_units_unit_type_id_fkey(code), tb810_ownerships!tb810_ownerships_unit_id_fkey(end_date, tb810_owners!tb810_ownerships_owner_id_fkey(full_name, owner_reference))",
+      "id, unit_number, floor, participation_percentage, tb810_unit_types!tb810_units_unit_type_id_fkey(code), tb810_ownerships!tb810_ownerships_unit_id_fkey(end_date, owner_id, tb810_owners!tb810_ownerships_owner_id_fkey(full_name, owner_reference))",
     )
     .eq("building_id", buildingResult.data.id)
     .order("display_order", { ascending: true })
@@ -267,7 +267,8 @@ export async function listUnitDirectory(): Promise<QueryResult<UnitDirectoryItem
   const directory = (data ?? []).map((row) => {
       const ownerships = (row as unknown as {
         tb810_ownerships?: Array<{
-          end_date: string | null;
+        end_date: string | null;
+          owner_id: string;
           tb810_owners?: { full_name: string; owner_reference: string } | null;
         }>;
         tb810_unit_types?: { code: UnitTypeRecord["code"] } | null;
@@ -279,7 +280,9 @@ export async function listUnitDirectory(): Promise<QueryResult<UnitDirectoryItem
       return {
         id: row.id,
         unit_number: row.unit_number,
+        floor: row.floor ?? null,
         unit_type_code: unitType?.code ?? "condo",
+        current_owner_id: currentOwnership?.owner_id ?? null,
         current_owner_name: currentOwner?.full_name ?? null,
         current_owner_reference: currentOwner?.owner_reference ?? null,
         participation_percentage: row.participation_percentage ?? null,

@@ -3,7 +3,9 @@ type CachedUnitDirectory = {
   data: Array<{
     id: string;
     unit_number: string;
+    floor: string | null;
     unit_type_code: string;
+    current_owner_id: string | null;
     current_owner_name: string | null;
     current_owner_reference: string | null;
     participation_percentage: number | null;
