@@ -85,7 +85,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
 
   return (
     <section className="space-y-6 ">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4 my-12 px-6">
         <div className="space-y-1">
           <MonthLedgerSelector activeMonthKey={month} searchQuery={query ?? ""} monthOptions={monthOptions} />
         </div>
@@ -108,7 +108,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
       {deleted ? <Panel className="border-emerald-200 bg-emerald-50 text-sm text-emerald-700">{deleted}</Panel> : null}
       <HistoricalEditingBanner historicalEditingAvailable={historicalEditingAvailable} isHistoricalMonth={!isActiveMonth} />
 
-      <Panel className="space-y-4">
+      <Panel className="space-y-4 ">
         <h2 className="text-lg font-semibold text-zinc-950">Operational Ledger</h2>
         <div className="overflow-x-auto">
           <div className="min-w-[980px]">

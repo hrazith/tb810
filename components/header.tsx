@@ -201,13 +201,13 @@ export function Header({ userEmail, primaryRoleKey, signOutAction }: HeaderProps
         </div>
 
         {primaryRoleKey === "super_admin" ? (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 ">
             <button
               type="button"
               aria-label="Open menu"
               aria-haspopup="dialog"
               aria-expanded={openMenu === "menu"}
-              className="inline-flex items-center justify-center rounded-md border border-zinc-300 p-2 text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
+              className="inline-flex items-center justify-center cursor-pointer rounded-full bg-zinc-100  border border-zinc-300 p-3 text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
               onClick={() => setOpenMenu((current) => (current === "menu" ? null : "menu"))}
             >
               <List size={20} weight="bold" />

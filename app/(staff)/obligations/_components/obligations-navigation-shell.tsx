@@ -118,21 +118,23 @@ export function ObligationsNavigationShell({
 
 {/* Items  */}
 
-          <div className="mt-12 pr-1">
-            <div className="mb-6 flex items-center justify-between gap-4">
-          <h1 className="whitespace-nowrap text-2xl text-center font-semibold tracking-tight text-zinc-950">
-          Obligations
-         </h1>
-{/* Toggle  */}
+          <div className=" pr-1">
+  {/* Obligation Title + Controls  */}
+            <div className="py-12   flex items-center justify-between gap-4 bg-zinc-50 xl:sticky xl:top-0 xl:z-10">
+              <h1 className="whitespace-nowrap text-2xl text-center     font-semibold tracking-tight text-zinc-950">
+              Obligations
+              </h1>
+{/* Controls  */}
             <div className="flex items-center gap-3">
-          <Input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search"
-            className="w-64 rounded-xl border-0 bg-zinc-200 text-zinc-950"
-          />
-            <div className="inline-flex gap-1 rounded-full bg-zinc-200 p-1">
+              <Input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search"
+                className="w-64 rounded-xl border-0 bg-zinc-200 text-zinc-950"
+              />
+{/* Toggle  */}
+            <div className="inline-flex gap-1  rounded-full bg-zinc-200 p-1">
               <Link
                 href={buildQuery({ mode: "owners", ownerId: mode === "owners" ? selectedOwnerId ?? undefined : undefined })}
                 onClick={(event) => {
@@ -162,18 +164,19 @@ export function ObligationsNavigationShell({
                 Units
               </Link>
             </div>
-          <SelectMenu
-            ariaLabel={mode === "owners" ? "Filter owners by floor" : "Filter units by floor"}
-            icon={<FunnelSimple />}
-            items={floorItems}
-            selectedId={floor}
-            onSelect={setFloor}
-            align="start"
-          />
+            <SelectMenu
+              ariaLabel={mode === "owners" ? "Filter owners by floor" : "Filter units by floor"}
+              icon={<FunnelSimple />}
+              items={floorItems}
+              selectedId={floor}
+              onSelect={setFloor}
+              align="start"
+            />
             </div>
+
         </div>
             {mode === "owners" ? (
-              <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4 mt-12">
+              <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4 ">
                 {visibleOwners.map((owner) => {
                   const active = owner.id === visualSelectionId;
                   return (
@@ -218,7 +221,7 @@ export function ObligationsNavigationShell({
                 })}
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mt-12 ">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4  ">
                 {visibleUnits.map((unit) => {
                   const active = unit.id === visualSelectionId;
                   return (
@@ -273,7 +276,7 @@ export function ObligationsNavigationShell({
 
 {/* Obligation Panel */}
 
-        <div className="self-start space-y-8 border-l border-zinc-200">
+        <div className="self-start space-y-8 border-l border-zinc-200 xl:sticky xl:top-0">
           {showPendingDetail ? (
             <div className="flex items-center justify-center px-6 py-10">
               <div className="flex flex-col items-center gap-4 text-center">

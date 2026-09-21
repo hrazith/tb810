@@ -20,7 +20,7 @@ export default async function OwnersPage({ searchParams }: PageProps) {
 
   return (
     <section className="space-y-6">
-      <div className="grid gap-4 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center">
+      <div className="grid gap-4 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center  my-12 px-6">
         <h1 className="whitespace-nowrap text-2xl font-semibold tracking-tight text-zinc-950">
           Owners
         </h1>

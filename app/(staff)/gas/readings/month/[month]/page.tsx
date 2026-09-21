@@ -93,12 +93,12 @@ export default async function GasReadingMonthPage({ params }: PageProps) {
   });
 
   return (
-    <section className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-2">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-500">Gas</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Gas Readings</h1>
-        </div>
+    <section className="space-y-6 ">
+      <div className="flex flex-wrap items-start justify-between gap-3 my-12 px-6">
+        
+          
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">Gas Readings</h1>
+        
         <div className="flex items-center gap-3">
           <GasImportDialog action={importGasWorkbookAction} />
           <Button asChild variant="secondary" shape="pill">

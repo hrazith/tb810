@@ -42,10 +42,10 @@ export function GasBillsMonthWorkspace({ monthKey, monthLabel, previousMonthKey,
   const draftTotal = draftBills.reduce((sum, bill) => sum + bill.amount, 0);
 
   return (
-    <section className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Gas Supplier Bills</h1>
+    <section className="space-y-6 ">
+      <div className="flex flex-wrap items-start justify-between gap-3  my-12 px-6">
+        <div className="space-y-2 ">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">Gas Supplier Bills</h1>
           <div className="flex items-center gap-3 text-zinc-500">
             {previousMonthKey ? (
               <Button asChild variant="ghost" shape="pill" size="sm" className="px-2 text-lg">

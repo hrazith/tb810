@@ -50,26 +50,14 @@ export default async function BudgetPlanPage({ params }: PageProps) {
 
   return (
     <section className="space-y-6">
-      <Panel as="div" className="space-y-3">
-        <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-          Finance Foundation
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">
-          {planYear} Budget Plan
-        </h1>
-        <p className="max-w-2xl text-sm text-zinc-600">
-          {building.name} · Monthly Operating Budget for the selected calendar
-          year.
-        </p>
-        <Button asChild variant="secondary" size="sm">
-          <Link href="/dashboard">Back to dashboard</Link>
-        </Button>
-      </Panel>
+    
 
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-zinc-950">
+        <div className=" my-12 px-6">
+        <h2 className="text-xl font-semibold text-zinc-950">
           Monthly Operating Budget
         </h2>
+        </div>
         <BudgetPlanForm
           budgetPlan={budgetPlan}
           action={upsertBudgetPlanAction.bind(null, planYear)}

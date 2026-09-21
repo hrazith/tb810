@@ -36,7 +36,7 @@ export default async function UnitsPage({ searchParams }: PageProps) {
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between my-12 px-6">
         <h1 className="whitespace-nowrap text-2xl font-semibold tracking-tight text-zinc-950">
           Units
         </h1>

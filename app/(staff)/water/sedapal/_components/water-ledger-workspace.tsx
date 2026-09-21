@@ -58,25 +58,25 @@ function WaterLedgerTable({ bills }: { bills: WaterBillSummary[] }) {
     <table className="relative min-w-full divide-y divide-zinc-300">
       <thead>
         <tr>
-          <th className="py-3.5 pr-3 pl-4 text-left text-sm font-semibold text-zinc-900 sm:pl-0">
+          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400 sm:pl-0">
             Service Month
           </th>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900">
+          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400">
             Reading Date
           </th>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900">
+          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400">
             Previous Reading
           </th>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900">
+          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400">
             Current Reading
           </th>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900">
+          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400">
             Consumption
           </th>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900">
+          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400">
             Unit Cost
           </th>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900">
+          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400">
             Invoice Amount
           </th>
         </tr>
@@ -99,25 +99,25 @@ function WaterLedgerTable({ bills }: { bills: WaterBillSummary[] }) {
             }}
             className="cursor-pointer hover:bg-zinc-50 focus-visible:bg-zinc-50 focus-visible:outline-none"
           >
-            <td className="py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap text-zinc-900 sm:pl-0">
+            <td className="px-3 py-6 text-sm font-medium whitespace-nowrap text-zinc-900 sm:pl-0">
               {formatServiceMonth(bill.bill_date)}
             </td>
-            <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
+            <td className="px-3 py-6 text-sm whitespace-nowrap text-zinc-600">
               {formatPeruvianDate(bill.bill_date)}
             </td>
-            <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
+            <td className="px-3 py-6 text-sm whitespace-nowrap text-zinc-600">
               {formatReading(bill.previous_reading)}
             </td>
-            <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
+            <td className="px-3 py-6 text-sm whitespace-nowrap text-zinc-600">
               {formatReading(bill.current_reading)}
             </td>
-            <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
+            <td className="px-3 py-6 text-sm whitespace-nowrap text-zinc-600">
               {formatReading(bill.total_consumption)}
             </td>
-            <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
+            <td className="px-3 py-6 text-sm whitespace-nowrap text-zinc-600">
               {formatMoney(bill.unit_cost)}
             </td>
-            <td className="px-3 py-4 text-sm font-semibold whitespace-nowrap text-zinc-900">
+            <td className="px-3 py-6 text-sm font-semibold whitespace-nowrap text-zinc-900">
               {formatMoney(bill.amount)}
             </td>
           </tr>
@@ -183,11 +183,11 @@ export function WaterLedgerWorkspace({ bills, previousReading }: Props) {
 
   return (
     <section className="space-y-6">
-      <div className="grid gap-4 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center">
+      <div className="grid gap-4 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center my-12 px-6">
         <h1 className="whitespace-nowrap text-2xl font-semibold tracking-tight text-zinc-950">
           Sedapal Water Ledger
         </h1>
-        <div className="flex w-full flex-col gap-3 xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end xl:ml-auto">
+        <div className=" flex w-full flex-col gap-3 xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end xl:ml-auto">
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -216,7 +216,7 @@ export function WaterLedgerWorkspace({ bills, previousReading }: Props) {
             className="cursor-pointer"
             onClick={openModal}
           >
-            <PlusCircleIcon size={20} />
+            <PlusCircleIcon size={28} />
             Monthly Reading
           </Button>
         </div>
@@ -228,8 +228,8 @@ export function WaterLedgerWorkspace({ bills, previousReading }: Props) {
         </Panel>
       ) : (
         <div className="flow-root">
-          <div className="-mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-            <div className="inline-block min-w-full align-middle sm:px-6 lg:px-8">
+          <div className=" overflow-x-auto ">
+            <div className="inline-block min-w-full align-middle sm:px-6 lg:px-6 ">
               <WaterLedgerTable bills={filteredBills} />
             </div>
           </div>
