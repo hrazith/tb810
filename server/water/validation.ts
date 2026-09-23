@@ -27,12 +27,23 @@ const optionalText = z
   .optional()
   .or(z.literal(""));
 
+const sourcePdfSchema = z.custom<File>(
+  (value) =>
+    typeof value === "object" &&
+    value !== null &&
+    "arrayBuffer" in value &&
+    "type" in value &&
+    "size" in value,
+  "A Sedapal PDF is required.",
+);
+
 export const commonWaterBillInputSchema = z
   .object({
     bill_date: z.string().trim().min(1, "Bill date is required"),
     previous_reading: decimalReadingSchema,
     current_reading: decimalReadingSchema,
     amount: moneySchema,
+    source_pdf: sourcePdfSchema,
     description: optionalText,
     notes: optionalText,
   })

@@ -7,6 +7,7 @@ import {
   commonWaterBillInputSchema,
   createCommonWaterBill,
   updateCommonWaterBill,
+  getCommonWaterBillDocumentUrl,
 } from "@/server/water";
 import type { WaterBillFormState } from "@/server/water";
 import { commonWaterBillUpdateInputSchema } from "@/server/water/validation";
@@ -17,9 +18,16 @@ function toInput(formData: FormData) {
     previous_reading: String(formData.get("previous_reading") ?? ""),
     current_reading: String(formData.get("current_reading") ?? ""),
     amount: String(formData.get("amount") ?? ""),
+    source_pdf: formData.get("source_pdf"),
     description: String(formData.get("description") ?? ""),
     notes: String(formData.get("notes") ?? ""),
   };
+}
+
+function displayValues(values: ReturnType<typeof toInput>) {
+  const safeValues = { ...values };
+  delete (safeValues as { source_pdf?: unknown }).source_pdf;
+  return safeValues;
 }
 
 function toUpdateInput(formData: FormData) {
@@ -57,13 +65,13 @@ export async function createCommonWaterBillAction(
     return {
       error: "Please fix the highlighted fields.",
       fieldErrors: mapFieldErrors(validation.error.issues),
-      values,
+      values: displayValues(values),
     };
   }
 
   const result = await createCommonWaterBill(validation.data);
   if (result.error) {
-    return { error: result.error, values };
+    return { error: result.error, values: displayValues(values) };
   }
 
   revalidatePath("/");
@@ -73,6 +81,15 @@ export async function createCommonWaterBillAction(
     success: "Reading saved.",
     values: {},
   };
+}
+
+export async function viewCommonWaterBillAction(formData: FormData) {
+  const billId = String(formData.get("utility_bill_id") ?? "");
+  const result = await getCommonWaterBillDocumentUrl(billId);
+  if (result.error || !result.data) {
+    throw new Error(result.error ?? "Source PDF is unavailable.");
+  }
+  redirect(result.data);
 }
 
 export async function updateCommonWaterBillAction(

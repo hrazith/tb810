@@ -8,7 +8,8 @@ import {
   formatPeruvianDate,
   getServiceMonthFromReadingDate,
 } from "@/lib/water-dates";
-import { getWaterBillById } from "@/server/water";
+import { getCommonWaterBillDocument, getWaterBillById } from "@/server/water";
+import { viewCommonWaterBillAction } from "../actions";
 
 type PageProps = {
   params: Promise<{
@@ -31,7 +32,10 @@ function formatReading(value: number) {
 
 export default async function WaterBillDetailPage({ params }: PageProps) {
   const { utilityBillId } = await params;
-  const result = await getWaterBillById(utilityBillId);
+  const [result, documentResult] = await Promise.all([
+    getWaterBillById(utilityBillId),
+    getCommonWaterBillDocument(utilityBillId),
+  ]);
 
   if (result.error) {
     throw new Error(result.error);
@@ -39,6 +43,9 @@ export default async function WaterBillDetailPage({ params }: PageProps) {
 
   if (!result.data) {
     notFound();
+  }
+  if (documentResult.error) {
+    throw new Error(documentResult.error);
   }
 
   const bill = result.data;
@@ -74,6 +81,14 @@ export default async function WaterBillDetailPage({ params }: PageProps) {
                 <Button asChild variant="primary" size="sm">
                   <Link href={`/water/sedapal/${bill.id}/edit`}>Edit</Link>
                 </Button>
+              ) : null}
+              {documentResult.data ? (
+                <form action={viewCommonWaterBillAction}>
+                  <input type="hidden" name="utility_bill_id" value={bill.id} />
+                  <Button type="submit" variant="secondary" size="sm">
+                    View bill
+                  </Button>
+                </form>
               ) : null}
             </div>
           </div>

@@ -29,6 +29,16 @@ export type WaterBillSummary = WaterBillRecord & {
   is_editable: boolean;
 };
 
+export type CommonWaterBillDocument = {
+  id: string;
+  utility_bill_id: string | null;
+  storage_bucket: string | null;
+  storage_path: string | null;
+  original_name: string | null;
+  mime_type: string | null;
+  size_bytes: number | null;
+};
+
 export type WaterBillFormState = {
   success?: string;
   error?: string;
@@ -38,6 +48,7 @@ export type WaterBillFormState = {
       | "previous_reading"
       | "current_reading"
       | "amount"
+      | "source_pdf"
       | "description"
       | "notes",
       string

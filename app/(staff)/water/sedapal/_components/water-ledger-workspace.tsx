@@ -239,7 +239,8 @@ export function WaterLedgerWorkspace({ bills, previousReading }: Props) {
       <Dialog
         open={composeOpen}
         title="Add Monthly Reading"
-        description="Record the current master-meter reading and supplier invoice amount."
+        description="Current master-meter reading & supplier invoice amount."
+        className="mt-2 w-sm rounded-2xl mx-auto"
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {
             closeModal();

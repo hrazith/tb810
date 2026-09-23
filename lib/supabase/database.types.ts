@@ -2250,6 +2250,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      tb810_create_common_water_bill_with_document: {
+        Args: {
+          p_amount: number
+          p_bill_date: string
+          p_bill_id: string
+          p_billing_period_id: string
+          p_building_id: string
+          p_current_reading: number
+          p_description: string | null
+          p_metadata?: Json
+          p_mime_type: string
+          p_notes: string | null
+          p_original_name: string
+          p_previous_reading: number
+          p_size_bytes: number
+          p_storage_bucket: string
+          p_storage_path: string
+          p_total_consumption: number
+          p_unit_cost: number
+          p_utility_type_id: string
+        }
+        Returns: Json
+      }
       has_tb810_permission: {
         Args: { permission_key: string }
         Returns: boolean

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { createClient } from "@/lib/supabase/server";
 import { isPerfLoggingEnabled } from "@/server/perf";
 import { listUnits } from "@/server/units";
@@ -11,6 +13,7 @@ import type {
 } from "./validation";
 import { commonWaterBillInputSchema, commonWaterBillUpdateInputSchema } from "./validation";
 import type {
+  CommonWaterBillDocument,
   WaterBillRecord,
   WaterBillSummary,
 } from "./types";
@@ -142,6 +145,9 @@ const UNIT_SELECT = "id, building_id, unit_type_id, has_meter" as const;
 const UNIT_TYPE_SELECT = "id, code, name" as const;
 
 const BILLING_PERIOD_SELECT = "id, status, period_year, period_month" as const;
+
+export const SEDAPAL_SOURCE_PDF_BUCKET = "tb810-sedapal-source-pdfs";
+export const MAX_SEDAPAL_SOURCE_PDF_BYTES = 10 * 1024 * 1024;
 
 function toBillRecord(row: WaterBillRecord): WaterBillRecord {
   return row;
@@ -1053,6 +1059,21 @@ export async function createCommonWaterBill(
   }
 
   const payload = parsed.data;
+  const sourcePdf = payload.source_pdf;
+  if (sourcePdf.type !== "application/pdf") {
+    return { data: null as never, error: "The source document must be a PDF." };
+  }
+  if (sourcePdf.size <= 0 || sourcePdf.size > MAX_SEDAPAL_SOURCE_PDF_BYTES) {
+    return {
+      data: null as never,
+      error: "The source PDF must be 10 MB or smaller.",
+    };
+  }
+  const sourcePdfBytes = new Uint8Array(await sourcePdf.arrayBuffer());
+  const pdfSignature = new TextDecoder().decode(sourcePdfBytes.slice(0, 5));
+  if (pdfSignature !== "%PDF-") {
+    return { data: null as never, error: "The source document is not a valid PDF." };
+  }
   const currentReading = parseReading(payload.current_reading);
   const amount = parseMoney(payload.amount);
   const readingContext = await getCommonWaterReadingContext(
@@ -1080,6 +1101,9 @@ export async function createCommonWaterBill(
   if (billingPeriod.error) {
     return { data: null as never, error: billingPeriod.error };
   }
+  if (!billingPeriod.data) {
+    return { data: null as never, error: "The billing period for this reading date is unavailable." };
+  }
 
   if (!readingContext.data?.hasPriorBill && previousReading < 0) {
     return { data: null as never, error: "Opening reading must be zero or greater." };
@@ -1092,37 +1116,113 @@ export async function createCommonWaterBill(
     };
   }
 
-  const { data, error } = await supabase
+  const { data: existingNativeBill, error: existingNativeBillError } = await supabase
     .from("tb810_utility_bills")
-    .insert({
-      building_id: buildingResult.data.id,
-      utility_type_id: utilityType.id,
-      billing_period_id: billingPeriod.data?.id ?? null,
-      bill_date: payload.bill_date,
-      amount,
-      description: payload.description || "Sedapal common water invoice",
-      notes: payload.notes || null,
-      previous_reading: previousReading,
-      current_reading: currentReading,
-      total_consumption: totalConsumption,
-      unit_cost: unitCost,
-      status: "received",
-      legacy_table: "tb810_common_water_ledger",
-      legacy_id: `${buildingResult.data.id}:${payload.bill_date}`,
-      legacy_metadata: {
-        slice: "common_water_ledger",
-        utility_type_code: "common_water",
-        source: "giuiana_monthly_workflow",
-      },
-    })
-    .select(WATER_BILL_SELECT)
-    .single();
-
-  if (error) {
-    return { data: null as never, error: error.message };
+    .select("id")
+    .eq("building_id", buildingResult.data.id)
+    .eq("utility_type_id", utilityType.id)
+    .eq("billing_period_id", billingPeriod.data.id)
+    .or("legacy_table.is.null,legacy_table.neq.utilities")
+    .maybeSingle();
+  if (existingNativeBillError) {
+    return { data: null as never, error: existingNativeBillError.message };
+  }
+  if (existingNativeBill) {
+    return { data: null as never, error: "A native Sedapal bill already exists for this billing period." };
   }
 
-  return { data, error: null };
+  const billId = randomUUID();
+  const originalName = sourcePdf.name || "sedapal-invoice.pdf";
+  const storagePath = `${buildingResult.data.id}/${billingPeriod.data.id}/${billId}.pdf`;
+  const { error: uploadError } = await supabase.storage
+    .from(SEDAPAL_SOURCE_PDF_BUCKET)
+    .upload(storagePath, sourcePdfBytes, {
+      contentType: "application/pdf",
+      upsert: false,
+    });
+  if (uploadError) {
+    return { data: null as never, error: `Source PDF upload failed: ${uploadError.message}` };
+  }
+
+  const { data: created, error } = await supabase.rpc(
+    "tb810_create_common_water_bill_with_document",
+    {
+      p_bill_id: billId,
+      p_building_id: buildingResult.data.id,
+      p_utility_type_id: utilityType.id,
+      p_billing_period_id: billingPeriod.data.id,
+      p_bill_date: payload.bill_date,
+      p_amount: amount,
+      p_description: payload.description || "Sedapal common water invoice",
+      p_notes: payload.notes || null,
+      p_previous_reading: previousReading,
+      p_current_reading: currentReading,
+      p_total_consumption: totalConsumption,
+      p_unit_cost: unitCost,
+      p_storage_bucket: SEDAPAL_SOURCE_PDF_BUCKET,
+      p_storage_path: storagePath,
+      p_original_name: originalName,
+      p_mime_type: sourcePdf.type,
+      p_size_bytes: sourcePdf.size,
+      p_metadata: { source: "sedapal_live_intake", original_name: originalName },
+    },
+  );
+  if (error || !created) {
+    const { error: cleanupError } = await supabase.storage
+      .from(SEDAPAL_SOURCE_PDF_BUCKET)
+      .remove([storagePath]);
+    const cleanupMessage = cleanupError
+      ? ` Storage cleanup also failed: ${cleanupError.message}`
+      : "";
+    if (error?.code === "23505") {
+      return { data: null as never, error: `A native Sedapal bill already exists for this billing period.${cleanupMessage}` };
+    }
+    return {
+      data: null as never,
+      error: `${error?.message ?? "Common Water bill creation failed."}${cleanupMessage}`,
+    };
+  }
+
+  const result = created as unknown as { bill?: WaterBillRecord };
+  return { data: result.bill as WaterBillRecord, error: null };
+}
+
+export async function getCommonWaterBillDocumentUrl(billId: string) {
+  const bill = await getWaterBillById(billId);
+  if (bill.error) return { data: null, error: bill.error };
+  if (!bill.data) return { data: null, error: "Common water bill not found." };
+
+  const supabase = await createClient();
+  const { data: document, error: documentError } = await getCommonWaterBillDocument(billId, supabase);
+  if (documentError) return { data: null, error: documentError };
+  if (!document?.storage_bucket || !document.storage_path) {
+    return { data: null, error: "This historical bill has no source PDF." };
+  }
+
+  const { data: signed, error: signedError } = await supabase.storage
+    .from(document.storage_bucket)
+    .createSignedUrl(document.storage_path, 60);
+  if (signedError || !signed?.signedUrl) {
+    return { data: null, error: signedError?.message ?? "Could not create a document link." };
+  }
+  return { data: signed.signedUrl, error: null };
+}
+
+export async function getCommonWaterBillDocument(
+  billId: string,
+  client?: Awaited<ReturnType<typeof createClient>>,
+) {
+  const supabase = client ?? await createClient();
+  const { data: document, error: documentError } = await supabase
+    .from("tb810_documents")
+    .select("id, utility_bill_id, storage_bucket, storage_path, original_name, mime_type, size_bytes")
+    .eq("utility_bill_id", billId)
+    .eq("document_type", "sedapal_source_invoice")
+    .maybeSingle();
+  return {
+    data: document as CommonWaterBillDocument | null,
+    error: documentError?.message ?? null,
+  };
 }
 
 export async function getLatestPreviousCommonWaterReading() {
