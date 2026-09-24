@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  FilePdf,
   FunnelSimple,
+  PencilSimple,
   PlusCircleIcon,
   SortAscending,
 } from "@phosphor-icons/react/dist/ssr";
@@ -17,14 +20,19 @@ import {
   formatPeruvianDate,
   getServiceMonthFromReadingDate,
 } from "@/lib/water-dates";
+import { getAppliedObligationMonthFromReadingDate } from "@/server/water/month";
 import type { WaterBillSummary } from "@/server/water";
 
-import { createCommonWaterBillAction } from "../actions";
+import {
+  createCommonWaterBillAction,
+  viewCommonWaterBillAction,
+} from "../actions";
 import { CommonWaterBillForm } from "./common-water-bill-form";
 
 type Props = {
   bills: WaterBillSummary[];
   previousReading: string;
+  devTestContext?: boolean;
 };
 
 function formatMoney(value: number) {
@@ -40,6 +48,12 @@ function formatReading(value: number) {
 
 function formatServiceMonth(value: string) {
   return formatMonthYear(getServiceMonthFromReadingDate(value));
+}
+
+function formatAppliedMonth(bill: WaterBillSummary) {
+  const monthKey = getAppliedObligationMonthFromReadingDate(bill.bill_date);
+  if (!monthKey) return "—";
+  return formatMonthYear(new Date(`${monthKey}-01T00:00:00Z`));
 }
 
 const filterItems: SelectMenuItem[] = [
@@ -58,48 +72,55 @@ function WaterLedgerTable({ bills }: { bills: WaterBillSummary[] }) {
     <table className="relative min-w-full divide-y divide-zinc-300">
       <thead>
         <tr>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400 sm:pl-0">
+          <th aria-label="PDF action" className="px-3 py-3.5" />
+          <th className="px-3 py-3.5 text-left text-sm font-medium text-zinc-400 sm:pl-0">
             Service Month
           </th>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400">
+          <th className="px-3 py-3.5 text-left text-sm font-medium text-zinc-400">
             Reading Date
           </th>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400">
+          <th className="px-3 py-3.5 text-left text-sm font-medium text-zinc-400">
             Previous Reading
           </th>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400">
+          <th className="px-3 py-3.5 text-left text-sm font-medium text-zinc-400">
             Current Reading
           </th>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400">
+          <th className="px-3 py-3.5 text-left text-sm font-medium text-zinc-400">
             Consumption
           </th>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400">
+          <th className="px-3 py-3.5 text-left text-sm font-medium text-zinc-400">
             Unit Cost
           </th>
-          <th className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-400">
+          <th className="px-3 py-3.5 text-left text-sm font-medium text-zinc-400">
+            Applied to
+          </th>
+          <th className="px-3 py-3.5 text-left text-sm font-medium text-zinc-400">
             Invoice Amount
           </th>
+          <th aria-label="Edit action" className="px-3 py-3.5" />
         </tr>
       </thead>
       <tbody className="divide-y divide-zinc-200 bg-white">
         {bills.map((bill) => (
           <tr
             key={bill.id}
-            role="link"
-            tabIndex={0}
-            aria-label={`View ${formatServiceMonth(bill.bill_date)}`}
-            onClick={() => {
-              window.location.href = `/water/sedapal/${bill.id}`;
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                window.location.href = `/water/sedapal/${bill.id}`;
-              }
-            }}
-            className="cursor-pointer hover:bg-zinc-50 focus-visible:bg-zinc-50 focus-visible:outline-none"
+            className={bill.is_editable ? "group cursor-pointer hover:bg-zinc-50" : "group hover:bg-zinc-50"}
           >
-            <td className="px-3 py-6 text-sm font-medium whitespace-nowrap text-zinc-900 sm:pl-0">
+            <td className="px-3 py-6 text-sm whitespace-nowrap text-zinc-600">
+              {bill.document ? (
+                <form action={viewCommonWaterBillAction}>
+                  <input type="hidden" name="utility_bill_id" value={bill.id} />
+                  <button
+                    type="submit"
+                    className="inline-flex rounded-md p-1 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950"
+                    aria-label={`Open PDF for ${formatServiceMonth(bill.bill_date)}`}
+                  >
+                    <FilePdf size={20} aria-hidden="true" />
+                  </button>
+                </form>
+              ) : null}
+            </td>
+            <td className="px-3 py-6 text-sm font-normal whitespace-nowrap text-zinc-900 sm:pl-0">
               {formatServiceMonth(bill.bill_date)}
             </td>
             <td className="px-3 py-6 text-sm whitespace-nowrap text-zinc-600">
@@ -117,8 +138,22 @@ function WaterLedgerTable({ bills }: { bills: WaterBillSummary[] }) {
             <td className="px-3 py-6 text-sm whitespace-nowrap text-zinc-600">
               {formatMoney(bill.unit_cost)}
             </td>
+            <td className="px-3 py-6 text-sm whitespace-nowrap text-zinc-600">
+              <span className="font-medium text-zinc-900">{formatAppliedMonth(bill)}</span>
+            </td>
             <td className="px-3 py-6 text-sm font-semibold whitespace-nowrap text-zinc-900">
               {formatMoney(bill.amount)}
+            </td>
+            <td className="px-3 py-6 text-sm whitespace-nowrap text-zinc-600">
+              {bill.is_editable ? (
+                <Link
+                  href={`/water/sedapal/${bill.id}/edit`}
+                  className="inline-flex items-center gap-1 rounded-md text-zinc-700 opacity-0 underline decoration-zinc-300 underline-offset-4 transition group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950"
+                >
+                  <PencilSimple size={16} aria-hidden="true" />
+                  Edit
+                </Link>
+              ) : null}
             </td>
           </tr>
         ))}
@@ -127,7 +162,7 @@ function WaterLedgerTable({ bills }: { bills: WaterBillSummary[] }) {
   );
 }
 
-export function WaterLedgerWorkspace({ bills, previousReading }: Props) {
+export function WaterLedgerWorkspace({ bills, previousReading, devTestContext = false }: Props) {
   const router = useRouter();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const previousComposeOpenRef = useRef(false);
@@ -183,16 +218,16 @@ export function WaterLedgerWorkspace({ bills, previousReading }: Props) {
 
   return (
     <section className="space-y-6">
-      <div className="grid gap-4 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center my-12 px-6">
+      <div className="grid  gap-4 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center my-12 px-6">
         <h1 className="whitespace-nowrap text-2xl font-semibold tracking-tight text-zinc-950">
           Sedapal Water Ledger
         </h1>
         <div className=" flex w-full flex-col gap-3 xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end xl:ml-auto">
-          <input
+            <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search"
-            className="h-11 w-full min-w-0 max-w-xs rounded-md border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 xl:w-[22rem]"
+            className="h-11 w-full min-w-0 max-w-xs rounded-full border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 xl:w-[22rem]"
           />
           <SelectMenu
             ariaLabel="Filter water bills"
@@ -208,17 +243,6 @@ export function WaterLedgerWorkspace({ bills, previousReading }: Props) {
             selectedId={sortKey}
             onSelect={(id) => setSortKey(id as typeof sortKey)}
           />
-          <Button
-            ref={triggerRef}
-            type="button"
-            variant="primary"
-            shape="pill"
-            className="cursor-pointer"
-            onClick={openModal}
-          >
-            <PlusCircleIcon size={28} />
-            Monthly Reading
-          </Button>
         </div>
       </div>
 
@@ -239,8 +263,7 @@ export function WaterLedgerWorkspace({ bills, previousReading }: Props) {
       <Dialog
         open={composeOpen}
         title="Add Monthly Reading"
-        description="Current master-meter reading & supplier invoice amount."
-        className="mt-2 w-sm rounded-2xl mx-auto"
+        className="m-auto w-full max-w-sm rounded-2xl"
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {
             closeModal();
@@ -265,8 +288,21 @@ export function WaterLedgerWorkspace({ bills, previousReading }: Props) {
           hideCancel={false}
           onCancel={closeModal}
           onSuccess={handleSuccess}
+          devTestContext={devTestContext}
         />
       </Dialog>
+
+      <Button
+        ref={triggerRef}
+        type="button"
+        variant="primary"
+        shape="pill"
+        className="fixed bottom-4 right-4 z-40 shadow-lg sm:bottom-6 sm:right-6"
+        onClick={openModal}
+      >
+        <PlusCircleIcon size={28} />
+        Monthly Reading
+      </Button>
     </section>
   );
 }

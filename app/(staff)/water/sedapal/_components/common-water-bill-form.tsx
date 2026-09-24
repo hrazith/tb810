@@ -1,8 +1,15 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useActionState,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
-import { Panel } from "@/components/ui/panel";
+import { CaretLeft, FilePdf } from "@phosphor-icons/react/dist/ssr";
 import {
   formatMonthYear,
   getChargeMonthFromServiceMonth,
@@ -20,6 +27,7 @@ type Props = {
   previousReadingLabel: string;
   previousReadingReadOnly?: boolean;
   utilityBillId?: string;
+  devTestContext?: boolean;
   initialValues?: Partial<{
     bill_date: string;
     previous_reading: string;
@@ -50,6 +58,31 @@ function toNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+const MAX_SOURCE_PDF_BYTES = 10 * 1024 * 1024;
+
+function isValidSourcePdf(file: File | null) {
+  return Boolean(
+    file &&
+      file.type === "application/pdf" &&
+      file.size > 0 &&
+      file.size <= MAX_SOURCE_PDF_BYTES,
+  );
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function formatReading(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed)
+    ? parsed.toLocaleString("en-US", { maximumFractionDigits: 3 })
+    : value || "—";
+}
+
 export function CommonWaterBillForm({
   action,
   submitLabel,
@@ -57,6 +90,7 @@ export function CommonWaterBillForm({
   previousReadingLabel,
   previousReadingReadOnly = true,
   utilityBillId,
+  devTestContext = false,
   initialValues,
   showDescription = true,
   showNotes = true,
@@ -69,7 +103,11 @@ export function CommonWaterBillForm({
   const [state, formAction, pending] = useActionState(action, initialState);
   const lastSuccessRef = useRef<string | undefined>(undefined);
   const sourcePdfInputRef = useRef<HTMLInputElement | null>(null);
+  const sourcePdfInputId = useId();
   const [step, setStep] = useState(utilityBillId ? 2 : 1);
+  const [selectedSourcePdf, setSelectedSourcePdf] = useState<File | null>(null);
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [billDate, setBillDate] = useState(
     state.values?.bill_date ?? initialValues?.bill_date ?? "",
   );
@@ -104,6 +142,8 @@ export function CommonWaterBillForm({
     return totalAmount / total;
   }, [amount, totalConsumption]);
 
+  const validSourcePdf = isValidSourcePdf(selectedSourcePdf);
+
   const serviceMonth = useMemo(() => {
     return formatMonthYear(getServiceMonthFromReadingDate(billDate));
   }, [billDate]);
@@ -122,11 +162,12 @@ export function CommonWaterBillForm({
   ];
 
   function continueToBillDetails() {
-    if (!sourcePdfInputRef.current?.files?.length) {
-      sourcePdfInputRef.current?.reportValidity();
-      return;
-    }
+    if (!isValidSourcePdf(selectedSourcePdf)) return;
     setStep(2);
+  }
+
+  function displayedFieldError(field: string) {
+    return touchedFields[field] || submitAttempted ? fieldError(field, state) : null;
   }
 
   useEffect(() => {
@@ -136,42 +177,96 @@ export function CommonWaterBillForm({
   }, [onSuccess, state.success]);
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form
+      action={formAction}
+      className="space-y-6"
+      onSubmit={() => setSubmitAttempted(true)}
+    >
       {utilityBillId ? (
         <input type="hidden" name="utility_bill_id" value={utilityBillId} />
       ) : null}
+      {devTestContext ? <input type="hidden" name="dev_test_context" value="1" /> : null}
       <input type="hidden" name="previous_reading" value={previousReading} />
-      {!utilityBillId ? (
-        <p className="text-sm text-zinc-500">Step {step} of 2</p>
-      ) : null}
+      {!utilityBillId
+        ? step === 2
+          ? (
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                aria-label="Return to PDF upload"
+                className="inline-flex cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 text-sm text-zinc-500 transition hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950"
+              >
+                <CaretLeft size={18} aria-hidden="true" />
+                <span>Step 2 of 2</span>
+              </button>
+            )
+          : (
+              <p className="text-sm text-zinc-500">Step 1 of 2</p>
+            )
+        : null}
 
       <div className={!utilityBillId && step === 1 ? "space-y-6" : "hidden"}>
         <label className="block space-y-2">
           <span className="block text-lg font-medium text-zinc-900">
-            Original Sedapal invoice (PDF)
+            Upload Sedapal invoice
           </span>
           <input
             ref={sourcePdfInputRef}
+            id={sourcePdfInputId}
             name="source_pdf"
             type="file"
             accept="application/pdf,.pdf"
             required={!utilityBillId}
-            className="block w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm text-zinc-700 file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-medium"
+            className="sr-only"
+            onChange={(event) =>
+              setSelectedSourcePdf(event.target.files?.[0] ?? null)
+            }
           />
-          {fieldError("source_pdf", state) ? (
+          {validSourcePdf && selectedSourcePdf ? (
+            <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+              <FilePdf size={22} className="shrink-0 text-zinc-700" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-zinc-900">
+                  {selectedSourcePdf.name}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  {formatFileSize(selectedSourcePdf.size)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => sourcePdfInputRef.current?.click()}
+                className="shrink-0 cursor-pointer text-sm font-medium text-zinc-700 underline underline-offset-4 hover:text-zinc-950"
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <label
+                htmlFor={sourcePdfInputId}
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950"
+              >
+                Choose PDF
+              </label>
+              <span className="text-sm text-zinc-500">PDF · up to 10 MB</span>
+            </div>
+          )}
+          {selectedSourcePdf && !isValidSourcePdf(selectedSourcePdf) ? (
             <p className="text-sm text-red-600">
-              {fieldError("source_pdf", state)}
+              Choose a PDF up to 10 MB.
             </p>
           ) : null}
-          <p className="text-xs text-zinc-500">
-            Upload the original Sedapal invoice as a PDF, up to 10 MB.
-          </p>
+          {displayedFieldError("source_pdf") ? (
+            <p className="text-sm text-red-600">{displayedFieldError("source_pdf")}</p>
+          ) : null}
         </label>
         <div className="flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
             onClick={continueToBillDetails}
-            className="inline-flex h-12 cursor-pointer items-center justify-center rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white transition hover:bg-zinc-800"
+            disabled={!validSourcePdf}
+            className="inline-flex h-12 cursor-pointer items-center justify-center rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Continue
           </button>
@@ -198,11 +293,14 @@ export function CommonWaterBillForm({
               type="date"
               value={billDate}
               onChange={(event) => setBillDate(event.target.value)}
+              onBlur={() =>
+                setTouchedFields((fields) => ({ ...fields, bill_date: true }))
+              }
               className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none transition selection:bg-zinc-200 selection:text-zinc-950 focus:border-zinc-950"
             />
-            {fieldError("bill_date", state) ? (
+            {displayedFieldError("bill_date") ? (
               <p className="text-sm text-red-600">
-                {fieldError("bill_date", state)}
+                {displayedFieldError("bill_date")}
               </p>
             ) : null}
           </label>
@@ -219,41 +317,53 @@ export function CommonWaterBillForm({
               inputMode="decimal"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
+              onBlur={() =>
+                setTouchedFields((fields) => ({ ...fields, amount: true }))
+              }
               className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none transition focus:border-zinc-950"
             />
-            {fieldError("amount", state) ? (
+            {displayedFieldError("amount") ? (
               <p className="text-sm text-red-600">
-                {fieldError("amount", state)}
+                {displayedFieldError("amount")}
               </p>
             ) : null}
           </label>
 
-          <label className="space-y-2">
-            <span className="block text-lg font-medium text-zinc-900">
-              {previousReadingLabel}
-            </span>
-            <input
-              name="previous_reading"
-              type="number"
-              step="0.001"
-              min="0"
-              inputMode="decimal"
-              value={previousReading}
-              readOnly={previousReadingReadOnly}
-              onChange={
-                previousReadingReadOnly
-                  ? undefined
-                  : (event) => setPreviousReading(event.target.value)
-              }
-              className="h-12 w-full rounded-xl border border-zinc-300 bg-zinc-50 px-4 text-sm outline-none transition read-only:cursor-not-allowed focus:border-zinc-950"
-            />
-            <p className="text-xs text-zinc-500">{previousReadingHelpText}</p>
-            {fieldError("previous_reading", state) ? (
-              <p className="text-sm text-red-600">
-                {fieldError("previous_reading", state)}
-              </p>
-            ) : null}
-          </label>
+          {utilityBillId ? (
+            <label className="space-y-2">
+              <span className="block text-lg font-medium text-zinc-900">
+                {previousReadingLabel}
+              </span>
+              <input
+                name="previous_reading"
+                type="number"
+                step="0.001"
+                min="0"
+                inputMode="decimal"
+                value={previousReading}
+                readOnly={previousReadingReadOnly}
+                onChange={
+                  previousReadingReadOnly
+                    ? undefined
+                    : (event) => setPreviousReading(event.target.value)
+                }
+                className="h-12 w-full rounded-xl border border-zinc-300 bg-zinc-50 px-4 text-sm outline-none transition read-only:cursor-not-allowed focus:border-zinc-950"
+              />
+              <p className="text-xs text-zinc-500">{previousReadingHelpText}</p>
+              {displayedFieldError("previous_reading") ? (
+                <p className="text-sm text-red-600">
+                  {displayedFieldError("previous_reading")}
+                </p>
+              ) : null}
+            </label>
+          ) : (
+            <div className="flex items-baseline justify-between gap-4 text-sm">
+              <span className="text-zinc-500">Previous reading</span>
+              <span className="font-medium text-zinc-900">
+                {formatReading(previousReading)}
+              </span>
+            </div>
+          )}
 
           <label className="space-y-2">
             <span className="block text-lg font-medium text-zinc-900">
@@ -267,11 +377,14 @@ export function CommonWaterBillForm({
               inputMode="decimal"
               value={currentReading}
               onChange={(event) => setCurrentReading(event.target.value)}
+              onBlur={() =>
+                setTouchedFields((fields) => ({ ...fields, current_reading: true }))
+              }
               className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none transition focus:border-zinc-950"
             />
-            {fieldError("current_reading", state) ? (
+            {displayedFieldError("current_reading") ? (
               <p className="text-sm text-red-600">
-                {fieldError("current_reading", state)}
+                {displayedFieldError("current_reading")}
               </p>
             ) : null}
           </label>
@@ -313,9 +426,9 @@ export function CommonWaterBillForm({
               className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none transition focus:border-zinc-950"
               placeholder="Sedapal invoice reference"
             />
-            {fieldError("description", state) ? (
+            {displayedFieldError("description") ? (
               <p className="text-sm text-red-600">
-                {fieldError("description", state)}
+                {displayedFieldError("description")}
               </p>
             ) : null}
           </label>
@@ -333,30 +446,21 @@ export function CommonWaterBillForm({
               onChange={(event) => setNotes(event.target.value)}
               className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
             />
-            {fieldError("notes", state) ? (
+            {displayedFieldError("notes") ? (
               <p className="text-sm text-red-600">
-                {fieldError("notes", state)}
+                {displayedFieldError("notes")}
               </p>
             ) : null}
           </label>
         ) : null}
 
-        {state.error ? (
+        {state.error && !state.fieldErrors ? (
           <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {state.error}
           </p>
         ) : null}
 
         <div className="flex flex-col gap-3 sm:flex-row">
-          {!utilityBillId ? (
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              className="inline-flex h-12 cursor-pointer items-center justify-center rounded-xl border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950"
-            >
-              Back
-            </button>
-          ) : null}
           <button
             type="submit"
             disabled={pending}
