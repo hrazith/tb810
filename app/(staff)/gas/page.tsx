@@ -18,7 +18,7 @@ export default function GasHomePage() {
           <h2 className="text-xl font-semibold text-zinc-950">Supplier Bills</h2>
           <p className="text-sm text-zinc-600">Create, edit, delete, and review draft or processed bills.</p>
         </Panel>
-        <Panel as={Link} href="/gas/readings" className="space-y-2 transition hover:border-zinc-950 hover:bg-zinc-50">
+        <Panel as={Link} href="/gas/unit-gas-readings" className="space-y-2 transition hover:border-zinc-950 hover:bg-zinc-50">
           <h2 className="text-xl font-semibold text-zinc-950">Gas Readings</h2>
           <p className="text-sm text-zinc-600">Capture monthly readings for gas-enabled condo units.</p>
         </Panel>

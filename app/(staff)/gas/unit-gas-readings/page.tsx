@@ -5,6 +5,6 @@ function currentMonthKey() {
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-export default function NewGasReadingPage() {
-  redirect(`/gas/readings/month/${currentMonthKey()}`);
+export default function GasUnitReadingsPage() {
+  redirect(`/gas/unit-gas-readings/${currentMonthKey()}`);
 }

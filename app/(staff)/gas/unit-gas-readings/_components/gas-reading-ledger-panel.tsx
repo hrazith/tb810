@@ -137,7 +137,7 @@ export function GasReadingLedgerPanel({ action, selectedMonthKey, monthOptions, 
               value={selectedMonthKey}
               onChange={(event) => {
                 const nextMonth = event.target.value;
-                router.replace(`/gas/readings/month/${nextMonth}`);
+                router.replace(`/gas/unit-gas-readings/${nextMonth}`);
               }}
               className="h-12 rounded-xl border border-zinc-300 bg-white px-4 text-sm"
             >

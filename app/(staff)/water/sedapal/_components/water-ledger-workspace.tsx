@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Panel } from "@/components/ui/panel";
+import { SearchInput } from "@/components/ui/search-input";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/select-menu";
 import {
   formatMonthYear,
@@ -223,12 +224,12 @@ export function WaterLedgerWorkspace({ bills, previousReading, devTestContext = 
           Sedapal Water Ledger
         </h1>
         <div className=" flex w-full flex-col gap-3 xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end xl:ml-auto">
-            <input
+            <SearchInput
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search"
-            className="h-11 w-full min-w-0 max-w-xs rounded-full border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 xl:w-[22rem]"
-          />
+            className="h-12 w-full min-w-0  rounded-full border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 xl:w-lg"
+            />
           <SelectMenu
             ariaLabel="Filter water bills"
             icon={<FunnelSimple />}

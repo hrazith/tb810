@@ -177,10 +177,10 @@ export function Header({ userEmail, primaryRoleKey, signOutAction }: HeaderProps
                     Supplier bills
                   </Link>
                   <Link
-                    href="/gas/readings"
+                    href="/gas/unit-gas-readings"
                     className={[
                       "flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-medium transition hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950",
-                      pathname === "/gas/readings" ? "underline decoration-2 underline-offset-4 text-zinc-950" : "text-zinc-700",
+                      pathname.startsWith("/gas/unit-gas-readings") ? "underline decoration-2 underline-offset-4 text-zinc-950" : "text-zinc-700",
                     ].join(" ")}
                   >
                     Gas readings

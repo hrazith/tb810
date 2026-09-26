@@ -8,7 +8,7 @@ import { listGasReadings } from "@/server/gas";
 import { createGasReadingAction, importGasWorkbookAction } from "@/server/gas/actions";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 
-import { GasReadingLedgerPanel, type GasMonthOption, type GasReadingLedgerRow } from "../../_components/gas-reading-ledger-panel";
+import { GasReadingLedgerPanel, type GasMonthOption, type GasReadingLedgerRow } from "../_components/gas-reading-ledger-panel";
 
 type PageProps = {
   params: Promise<{
@@ -39,7 +39,7 @@ export default async function GasReadingMonthPage({ params }: PageProps) {
   const { month } = await params;
   const selectedMonthKey = isMonthKey(month) ? month : currentMonthKey();
   if (!isMonthKey(month)) {
-    redirect(`/gas/readings/month/${selectedMonthKey}`);
+    redirect(`/gas/unit-gas-readings/${selectedMonthKey}`);
   }
 
   const [buildingResult, unitsResult] = await Promise.all([
@@ -102,7 +102,7 @@ export default async function GasReadingMonthPage({ params }: PageProps) {
         <div className="flex items-center gap-3">
           <GasImportDialog action={importGasWorkbookAction} />
           <Button asChild variant="secondary" shape="pill">
-            <Link href="/gas/readings">All Readings</Link>
+            <Link href="/gas/unit-gas-readings">All Readings</Link>
           </Button>
         </div>
       </div>

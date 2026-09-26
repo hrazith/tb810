@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
+import { SearchInput } from "@/components/ui/search-input";
 import type { UnitMeterReadingRow, UnitOption } from "@/server/water/unit-meter-readings";
 
 import {
@@ -48,21 +48,25 @@ export function CurrentUnitMeterReadingsWorkspace({
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4 my-12 px-6">
+      <div className=" flex flex-wrap items-start justify-between gap-4 my-12 px-6">
         <div className="space-y-1">
           <MonthLedgerSelector activeMonthKey={month} searchQuery="" monthOptions={monthOptions} />
         </div>
-        <div className="flex items-center gap-3">
-          <Input
+        <div className="flex items-center  gap-3">
+          <SearchInput
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search"
-            className="h-11 w-full min-w-0 max-w-xs rounded-full border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 xl:w-[22rem]"
+            className="h-12 w-full min-w-0  rounded-full border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 xl:w-lg"
             aria-label="Search Unit Water readings"
           />
+
+
           <DownloadTemplateLink />
         </div>
       </div>
+
+
 
       {deleted ? <Panel className="border-emerald-200 bg-emerald-50 text-sm text-emerald-700">{deleted}</Panel> : null}
 

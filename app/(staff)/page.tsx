@@ -86,7 +86,7 @@ function MeterProgress({ complete, expected, label }: { complete: number; expect
 }
 
 function uploadHrefForAttention(source: string, happened: string) {
-  if (source === "gas") return "/gas/readings/new";
+  if (source === "gas") return "/gas/unit-gas-readings";
   if (source === "water" && happened.startsWith("Sedapal")) return "/water/sedapal/new";
   if (source === "water") return "/water/unit-meter-readings/new";
   return "/obligations";
@@ -305,7 +305,7 @@ export default async function DashboardPage() {
           <div className="absolute right-0 z-20 mt-2 w-64 rounded-2xl border border-zinc-200 bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.08)]">
             <Link href="/water/sedapal/new" className="block rounded-xl px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950">Sedapal bill</Link>
             <Link href="/water/unit-meter-readings/new" className="block rounded-xl px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950">Water readings</Link>
-            <Link href="/gas/readings/new" className="block rounded-xl px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950">Gas readings</Link>
+            <Link href="/gas/unit-gas-readings" className="block rounded-xl px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950">Gas readings</Link>
             <Link href="/gas/bills/new" className="block rounded-xl px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950">Gas supplier bill</Link>
           </div>
         </details>

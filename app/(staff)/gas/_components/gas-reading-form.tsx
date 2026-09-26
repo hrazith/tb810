@@ -163,7 +163,7 @@ export function GasReadingForm({ action, units, readings, submitLabel, initialMo
 
       <div className="flex gap-3">
         <Button asChild variant="secondary" size="sm">
-          <Link href="/gas/readings">Cancel</Link>
+          <Link href="/gas/unit-gas-readings">Cancel</Link>
         </Button>
         <button type="submit" disabled={pending} className="inline-flex h-12 items-center justify-center rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white">
           {pending ? "Saving..." : submitLabel}

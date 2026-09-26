@@ -38,7 +38,7 @@ export default async function GasReadingDetailPage({ params }: PageProps) {
           <p>Consumption: {result.data.consumption == null ? "—" : result.data.consumption.toFixed(3)}</p>
         </div>
         <Button asChild variant="secondary" size="sm">
-          <Link href="/gas/readings">Back to readings</Link>
+          <Link href="/gas/unit-gas-readings">Back to readings</Link>
         </Button>
       </Panel>
 
