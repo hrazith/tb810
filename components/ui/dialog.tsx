@@ -56,7 +56,7 @@ export function Dialog({
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
       className={joinClasses(
-        "m-0 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-[34rem] rounded-2xl border border-zinc-200 bg-white p-0 text-left text-zinc-950 shadow-2xl backdrop:bg-zinc-950/45",
+        "text-zinc-950 shadow-2xl backdrop:bg-zinc-950/45",
         "fixed inset-0 overflow-hidden",
         className,
       )}
@@ -73,7 +73,7 @@ export function Dialog({
     >
       <div
         className={joinClasses(
-          "flex max-h-[calc(100vh-2rem)] flex-col gap-6 overflow-y-auto p-6 sm:p-8",
+          "flex max-h-[calc(100vh-2rem)] flex-col gap-6 overflow-y-auto p-10 sm:p-12 ",
           contentClassName,
         )}
       >

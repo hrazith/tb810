@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { getActiveDevTestSessionSummary } from "@/server/dev-test-session";
 import {
   commonWaterBillInputSchema,
   createCommonWaterBill,
@@ -59,6 +60,15 @@ export async function createCommonWaterBillAction(
   formData: FormData,
 ): Promise<WaterBillFormState> {
   const values = toInput(formData);
+  const devTestContext = formData.get("dev_test_context") === "1";
+  let devSessionId: string | undefined;
+  if (devTestContext) {
+    const session = await getActiveDevTestSessionSummary();
+    if (!session) {
+      return { error: "Start an active DEV test session before using DEV Sedapal intake." };
+    }
+    devSessionId = session.id;
+  }
   const validation = commonWaterBillInputSchema.safeParse(values);
 
   if (!validation.success) {
@@ -69,7 +79,7 @@ export async function createCommonWaterBillAction(
     };
   }
 
-  const result = await createCommonWaterBill(validation.data);
+  const result = await createCommonWaterBill(validation.data, { devSessionId });
   if (result.error) {
     return { error: result.error, values: displayValues(values) };
   }
@@ -116,5 +126,5 @@ export async function updateCommonWaterBillAction(
   revalidatePath("/");
   revalidatePath("/units", "layout");
   revalidatePath("/water/sedapal");
-  redirect(`/water/sedapal/${result.data.id}`);
+  redirect("/water/sedapal");
 }

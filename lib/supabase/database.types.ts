@@ -2250,6 +2250,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      tb810_create_dev_common_water_bill_with_document: {
+        Args: {
+          p_amount: number
+          p_bill_date: string
+          p_bill_id: string
+          p_billing_period_id: string
+          p_building_id: string
+          p_current_reading: number
+          p_description: string | null
+          p_metadata?: Json
+          p_mime_type: string
+          p_notes: string | null
+          p_original_name: string
+          p_previous_reading: number
+          p_session_id: string
+          p_size_bytes: number
+          p_storage_bucket: string
+          p_storage_path: string
+          p_total_consumption: number
+          p_unit_cost: number
+          p_utility_type_id: string
+        }
+        Returns: Json
+      }
       tb810_create_common_water_bill_with_document: {
         Args: {
           p_amount: number
@@ -2282,6 +2306,10 @@ export type Database = {
       tb810_list_meter_reading_months: {
         Args: { p_building_id: string }
         Returns: { reading_month: string | null }[]
+      }
+      tb810_clear_current_unit_water_month: {
+        Args: { p_dev_session_id?: string | null; p_month_key: string }
+        Returns: number
       }
       tb810_reset_dev_test_session: {
         Args: { p_session_id: string }

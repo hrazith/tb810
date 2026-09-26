@@ -12,6 +12,8 @@ Historical periods are canonical monthly financial containers. They exist indepe
 
 The historical backfill is platform-level data, not a legacy import artifact. Future financial imports should simply resolve the relevant Billing Period instead of creating one.
 
+Billing Period records before September 2026 may exist as historical monthly containers without persisted Monthly Obligations. See the historical boundary in [`monthly-obligations.md`](../architecture/monthly-obligations.md).
+
 ## Purpose
 
 A Billing Period is the operational context for one calendar month.

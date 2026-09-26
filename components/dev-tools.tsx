@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   useEffect,
   useMemo,
@@ -520,6 +521,14 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                             + Add test bill
                           </button>
                         )}
+                        {state.testSessionActive ? (
+                          <Link
+                            href="/water/sedapal?dev_test=1"
+                            className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
+                          >
+                            Open real form
+                          </Link>
+                        ) : null}
                         {!waterReadiness ? <span className="mt-1 block text-white/45">Complete Water readings first</span> : null}
                       </div>
                     </div>

@@ -17,19 +17,31 @@ type RpcResult = {
 export async function persistMeterReadingImport(
   monthKey: string,
   acceptedRows: ValidatedMeterReadingImportRow[],
+  readingDate: string | null,
+  devSessionId?: string | null,
 ): Promise<{ data: MeterReadingImportWriteResult | null; error: string | null }> {
   if (!acceptedRows.length) {
     return { data: { insertedCount: 0, updatedCount: 0, processedCount: 0 }, error: null };
   }
 
   const supabase = await createClient();
-  const { data, error } = await (supabase as any).rpc("tb810_sync_meter_reading_import", {
-    p_month_key: monthKey,
-    p_rows: acceptedRows.map((row) => ({
-      unit_id: row.unitId,
-      reading_end: row.readingEnd,
-    })),
-  });
+  const rows = acceptedRows.map((row) => ({
+    unit_id: row.unitId,
+    reading_end: row.readingEnd,
+    reading_date: row.readingDate ?? readingDate,
+  }));
+  const client = supabase as unknown as {
+    rpc: (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
+  };
+  const { data, error } = await client.rpc(
+    devSessionId ? "tb810_sync_dev_meter_reading_import" : "tb810_sync_meter_reading_import",
+    devSessionId
+      ? { p_session_id: devSessionId, p_month_key: monthKey, p_rows: rows }
+      : { p_month_key: monthKey, p_rows: rows },
+  );
 
   if (error) {
     return { data: null, error: error.message };

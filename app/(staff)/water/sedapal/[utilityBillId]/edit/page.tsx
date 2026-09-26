@@ -92,9 +92,9 @@ export default async function EditWaterBillPage({ params }: PageProps) {
           previous_reading: formatReading(bill.previous_reading),
           current_reading: formatReading(bill.current_reading),
           amount: bill.amount.toFixed(2),
-          description: bill.description ?? "",
-          notes: bill.notes ?? "",
         }}
+        showDescription={false}
+        showNotes={false}
       />
     </section>
   );

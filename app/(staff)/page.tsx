@@ -335,14 +335,14 @@ export default async function DashboardPage() {
 
             <div>
               <Drop size={20} weight="regular" aria-hidden="true" />
-              <p className="text-md font-light text-zinc-950">Water meter reading</p>
+
 
             </div>
             <UtilityStatusIndicator emphasis={projection.water.meterReadingsEmphasis} complete={projection.water.meterReadingsComplete} />
           </div>
           <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
             <div className="flex flex-col items-center gap-3 sm:items-start">
-              
+              <p className="text-lg font-normal text-zinc-950">Water meter reading</p>
               <MeterProgress complete={waterComplete} expected={waterExpected} label="Water meter readings" />
             </div>
 
@@ -354,25 +354,19 @@ export default async function DashboardPage() {
 
             <div>
               <Drop size={20} weight="regular" aria-hidden="true" />
-             
-
             </div>
             <UtilityStatusIndicator emphasis={projection.water.billEmphasis} complete={projection.water.billPresent} />
           </div>
-          <div className="mt-10 h-36 rounded-3xl  bg-amber-100 w-36 ">
-
-<p className="text-lg font-normal text-zinc-950">Sedepal Bill</p>
+          <div className="mt-10 h-36 rounded-3xl   w-36 ">
+              <p className="text-lg font-normal text-zinc-950">Sedepal Bill</p>
               <p className="mt-2 text-lg font-medium text-zinc-950">{waterBill ? "Present" : isOpen ? "Not received yet" : "Missing"}</p>
-
-
-
           </div>
         </Link>
 
 {/*   Gas insights */}
         <Link href="/gas" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
 
-        <div className=" test lex items-start justify-between gap-4 ">
+        <div className="  flex items-start justify-between gap-4 ">
 
             <div>
               <Flame size={20} weight="regular" aria-hidden="true" />
@@ -390,7 +384,7 @@ export default async function DashboardPage() {
 
           <div className="mt-10 ">
             <div className="flex flex-col items-center gap-3 sm:items-start">
-              <p className="text-lg text-center font-normal text-zinc-950 test">Gas Meter Readings</p>
+              <p className="text-lg text-center font-normal text-zinc-950 ">Gas Meter Readings</p>
               <MeterProgress complete={gasComplete} expected={gasExpected} label="Gas meter readings" />
             </div>
            

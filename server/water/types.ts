@@ -23,9 +23,26 @@ export type WaterBillRecord = {
   updated_at: string;
 };
 
+export function isNativeCommonWaterBill(
+  bill: Pick<WaterBillRecord, "legacy_table">,
+) {
+  return bill.legacy_table === "tb810_common_water_ledger";
+}
+
+export function isCommonWaterBillEditable(
+  bill: Pick<WaterBillRecord, "legacy_table"> & {
+    has_persisted_obligation: boolean;
+  },
+) {
+  return isNativeCommonWaterBill(bill) && !bill.has_persisted_obligation;
+}
+
 export type WaterBillSummary = WaterBillRecord & {
   utility_type_name: string;
   billing_period_status: string | null;
+  target_obligation_month: string | null;
+  has_persisted_obligation: boolean;
+  document: CommonWaterBillDocument | null;
   is_editable: boolean;
 };
 

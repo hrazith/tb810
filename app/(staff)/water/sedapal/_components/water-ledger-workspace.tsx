@@ -80,10 +80,10 @@ function WaterLedgerTable({ bills }: { bills: WaterBillSummary[] }) {
             Reading Date
           </th>
           <th className="px-3 py-3.5 text-left text-sm font-medium text-zinc-400">
-            Previous Reading
+            Previous
           </th>
           <th className="px-3 py-3.5 text-left text-sm font-medium text-zinc-400">
-            Current Reading
+            Current
           </th>
           <th className="px-3 py-3.5 text-left text-sm font-medium text-zinc-400">
             Consumption
@@ -262,7 +262,7 @@ export function WaterLedgerWorkspace({ bills, previousReading, devTestContext = 
 
       <Dialog
         open={composeOpen}
-        title="Add Monthly Reading"
+        title="Add Sedapal Bill"
         className="m-auto w-full max-w-sm rounded-2xl"
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {
@@ -274,7 +274,7 @@ export function WaterLedgerWorkspace({ bills, previousReading, devTestContext = 
       >
         <CommonWaterBillForm
           action={createCommonWaterBillAction}
-          submitLabel="Save Reading"
+          submitLabel="Save Sedapal Bill"
           previousReadingHelpText="Loaded automatically from the most recent prior Sedapal reading."
           previousReadingLabel="Previous Reading"
           previousReadingReadOnly

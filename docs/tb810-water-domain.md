@@ -82,8 +82,9 @@ Changing month immediately refreshes the ledger.
 
 ### Import
 
-Import is exposed through the in-page "Upload Completed Template" modal.
-Excel parsing has intentionally not been implemented yet.
+Import is exposed through the in-page "Upload Completed Template" modal. The accepted workflow parses semantic XLSX columns, previews and validates the complete batch before confirmation, and persists the confirmed batch atomically.
+
+The accepted Unit Water workflow also supports direct Current and Reading Date entry, workbook-provided dates, current-month editing and individual deletion, and a production Start over operation. Start over atomically removes all readings in the current editable month while preserving prior Water, the roster, Sedapal, Gas, Charges, lifecycle state, obligations, and snapshots. With an active DEV session, only matching Water ownership journal rows are reconciled in that transaction; unrelated DEV mutations remain untouched. Historical or locked readings remain protected.
 
 ### Canonical Data
 
@@ -438,6 +439,21 @@ Canonical rule:
 - Divide the remaining cost equally among the 64 residential condominiums.
 - Every residential condominium receives exactly the same AGUA COMUN amount for that billing cycle.
 
+Amounts are calculated in cents. Individual metered allocations are rounded to cents first; the remaining Common Water pool is then divided equally and each per-unit Common Water obligation is rounded to cents. Consequently, the aggregate of persisted/displayed per-unit obligations is not required to equal the Sedapal invoice exactly. The exact reconciliation invariant is the metered total plus the unrounded Common Water pool.
+
+Accepted October 2026 Water example:
+
+```text
+Sedapal invoice:              PEN 3,100.00
+Metered Water:                PEN 2,254.14
+Exact Common Water pool:      PEN   845.86
+Rounded Common Water total:   PEN   846.08
+Displayed combined total:     PEN 3,100.22
+Rounding variance:            +PEN 0.22
+```
+
+This is compatible with the legacy convention. Historical legacy examples show small positive and negative differences, with observed examples up to PEN 2.96. Do not introduce residual-cent redistribution unless the business rule is deliberately changed.
+
 Historical note:
 
 The legacy SQL suggested a participation-based allocation model, but Carlos has confirmed that TB810 vNext intentionally uses an equal allocation across all 64 residential condominiums. This supersedes the earlier implementation hypothesis.
@@ -481,6 +497,12 @@ The obligation is the final monthly financial result of the water cycle.
 - Calculations are system-generated.
 - Private consumption and shared water are both part of the monthly water obligation.
 - AGUA COMUN is computed by equal division of the remaining Sedapal water cost among the 64 residential condominiums.
+
+## Road to October Acceptance Boundary
+
+Legacy Unit Water is authoritative through August 2026. Native operational Unit Water begins with September 2026. Historical obligation packages must not be reconstructed solely from Water source history.
+
+For the accepted September 2026 cycle, September source facts build October obligations. The operating month is September, the Water source month is September, and Giuliana's working obligation month is October. Lifecycle/progression month may remain September independently.
 
 ## 9. Canonical Live URLs
 

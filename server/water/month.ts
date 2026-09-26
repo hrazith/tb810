@@ -21,3 +21,6 @@ export function getNextWaterMonthKey(monthKey: string) {
   return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+export function getAppliedObligationMonthFromReadingDate(readingDate: string) {
+  return getNextWaterMonthKey(readingDate.slice(0, 7));
+}

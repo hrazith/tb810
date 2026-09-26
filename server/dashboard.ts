@@ -672,7 +672,7 @@ async function loadDashboardFacts(forCarlos: boolean): Promise<QueryResult<Gulia
         activePackage: progressionResult.data.activePackage,
         mostRecentHandoff: progressionResult.data.mostRecentHandoff,
       })
-    : progressionResult.data.activePackage.obligationMonth;
+    : upcomingObligationMonth;
   const activeUpcomingObligationMonth = nextMonthKey(activeObligationMonth) ?? activeObligationMonth;
   const factsResult = await loadBuildingMonthFinancialFacts({
     buildingId: building.id,

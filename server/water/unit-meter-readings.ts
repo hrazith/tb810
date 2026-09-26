@@ -181,6 +181,22 @@ export async function canEditReadyForReviewSourceMonth(sourceMonth: string) {
   return isLatestReadyForReviewSourceMonth(await createClient(), buildingResult.data.id, sourceMonth);
 }
 
+export async function clearCurrentUnitWaterMonth(monthKey: string) {
+  const activeMonth = getActiveReadingMonth();
+  if (monthKey !== activeMonth.key) {
+    return { data: null as never, error: "Only the current editable Unit Water month can be started over." };
+  }
+
+  const supabase = await createClient();
+  const sessionId = await getActiveDevTestSessionId();
+  const { data, error } = await supabase.rpc("tb810_clear_current_unit_water_month", {
+    p_month_key: monthKey,
+    p_dev_session_id: sessionId,
+  });
+  if (error) return { data: null as never, error: error.message };
+  return { data: { deletedCount: Number(data ?? 0) }, error: null };
+}
+
 function monthStartFromKey(monthKey: string) {
   return `${monthKey}-01`;
 }
@@ -298,6 +314,40 @@ async function getCondoUnits(): Promise<QueryResult<UnitOption[]>> {
 
 export async function getWaterReadingUnits(): Promise<QueryResult<UnitOption[]>> {
   return getCondoUnits();
+}
+
+export async function getPreviousMeterReadingsForMonth(monthKey: string): Promise<
+  QueryResult<Record<string, { previous_reading: number | null; previous_reading_date: string | null }>>
+> {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: {}, error: buildingResult.error };
+  if (!buildingResult.data) return { data: {}, error: null };
+
+  const supabase = await createClient();
+  const utilityType = await getUtilityTypeId(supabase);
+  if (utilityType.error) return { data: {}, error: utilityType.error };
+  if (!utilityType.data) return { data: {}, error: "Common Water utility type is missing." };
+
+  const { data, error } = await supabase
+    .from("tb810_meter_readings")
+    .select("unit_id, reading_end, reading_date, created_at")
+    .eq("building_id", buildingResult.data.id)
+    .eq("utility_type_id", utilityType.data.id)
+    .lt("reading_date", monthStartFromKey(monthKey))
+    .order("reading_date", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) return { data: {}, error: error.message };
+
+  const previousByUnitId: Record<string, { previous_reading: number | null; previous_reading_date: string | null }> = {};
+  for (const row of data ?? []) {
+    if (!(row.unit_id in previousByUnitId)) {
+      previousByUnitId[row.unit_id] = {
+        previous_reading: row.reading_end,
+        previous_reading_date: row.reading_date,
+      };
+    }
+  }
+  return { data: previousByUnitId, error: null };
 }
 
 async function getCondoPopulationFacts(): Promise<QueryResult<PopulationUnit[]>> {

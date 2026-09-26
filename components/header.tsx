@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { List, X } from "@phosphor-icons/react/dist/ssr";
+import { BookOpen, List, X } from "@phosphor-icons/react/dist/ssr";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -200,8 +200,7 @@ export function Header({ userEmail, primaryRoleKey, signOutAction }: HeaderProps
           </nav>
         </div>
 
-        {primaryRoleKey === "super_admin" ? (
-          <div className="flex items-center gap-3 ">
+        <div className="flex items-center gap-3">
             <button
               type="button"
               aria-label="Open menu"
@@ -240,7 +239,7 @@ export function Header({ userEmail, primaryRoleKey, signOutAction }: HeaderProps
                   </div>
 
                   <div className="space-y-8 px-6 py-6">
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    {primaryRoleKey === "super_admin" ? <div className="grid gap-3 sm:grid-cols-3">
                       <Link
                         href="/finance/budget-plans/2027"
                         className={[
@@ -290,45 +289,45 @@ export function Header({ userEmail, primaryRoleKey, signOutAction }: HeaderProps
                           <p className="text-lg font-semibold text-zinc-950">Building units</p>
                         </div>
                       </Link>
-                    </div>
+                    </div> : null}
 
                     <div className="border-t border-zinc-200 pt-5">
                       <div className="space-y-1 text-sm font-medium text-zinc-700">
-                        <p className="rounded-xl px-1 py-2 text-zinc-500">Account settings</p>
-                        <p className="rounded-xl px-1 py-2 text-zinc-500">Staff &amp; permissions</p>
-                        <p className="rounded-xl px-1 py-2 text-zinc-500">Building settings</p>
-                        <p className="rounded-xl px-1 py-2 text-zinc-500">Help</p>
+                        {primaryRoleKey === "super_admin" ? (
+                          <>
+                            <p className="rounded-xl px-1 py-2 text-zinc-500">Account settings</p>
+                            <p className="rounded-xl px-1 py-2 text-zinc-500">Staff &amp; permissions</p>
+                            <p className="rounded-xl px-1 py-2 text-zinc-500">Building settings</p>
+                          </>
+                        ) : null}
+                        <Link
+                          href="/help"
+                          className="flex items-center gap-2 rounded-xl px-1 py-2 text-zinc-700 transition hover:text-zinc-950"
+                          onClick={closeMenu}
+                        >
+                          <BookOpen size={16} aria-hidden="true" />
+                          Help &amp; Documentation
+                        </Link>
                       </div>
 
-                      <form action={signOutAction} className="mt-3">
-                        <button
-                          type="submit"
-                          className="flex w-full items-center justify-start gap-2 rounded-xl px-1 py-2 text-left text-sm font-medium text-zinc-700 transition hover:text-zinc-950"
-                        >
-                          <SignOut aria-hidden size={16} />
-                          Sign out
-                        </button>
-                      </form>
+                      <div className="mt-3 border-t border-zinc-200 pt-4">
+                        <p className="px-1 py-2 text-sm text-zinc-500">Logged in as: {userEmail}</p>
+                        <form action={signOutAction}>
+                          <button
+                            type="submit"
+                            className="flex w-full items-center justify-start gap-2 rounded-xl px-1 py-2 text-left text-sm font-medium text-zinc-700 transition hover:text-zinc-950"
+                          >
+                            <SignOut aria-hidden size={16} />
+                            Sign out
+                          </button>
+                        </form>
+                      </div>
                     </div>
                   </div>
                 </aside>
               </div>
             ) : null}
           </div>
-        ) : (
-          <div className="flex items-center gap-6">
-            <form action={signOutAction} className="flex items-center gap-3">
-              <p className="text-sm text-zinc-600">{userEmail}</p>
-              <button
-                type="submit"
-                className="inline-flex items-center gap-2 rounded-md border border-zinc-300 px-6 py-2 text-sm font-medium text-zinc-700 transition hover:cursor-pointer hover:border-zinc-950 hover:text-zinc-950"
-              >
-                <SignOut aria-hidden size={16} />
-                Sign out
-              </button>
-            </form>
-          </div>
-        )}
       </div>
     </header>
   );

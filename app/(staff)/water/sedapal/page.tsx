@@ -3,7 +3,12 @@ import { getCommonWaterReadingDefaults, listCommonWaterBills } from "@/server/wa
 
 import { WaterLedgerWorkspace } from "./_components/water-ledger-workspace";
 
-export default async function WaterSedapalPage() {
+export default async function WaterSedapalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dev_test?: string }>;
+}) {
+  const params = await searchParams;
   const [buildingResult, billsResult, defaultsResult] = await Promise.all([
     getCurrentBuilding(),
     listCommonWaterBills(),
@@ -30,6 +35,7 @@ export default async function WaterSedapalPage() {
     <WaterLedgerWorkspace
       bills={billsResult.data}
       previousReading={String(defaultsResult.data?.previousReading ?? "")}
+      devTestContext={params.dev_test === "1"}
     />
   );
 }

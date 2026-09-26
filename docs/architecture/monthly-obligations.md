@@ -29,6 +29,23 @@ Canonical philosophy:
 - Truth in the middle.
 - Communication downstream.
 
+### Historical boundary
+
+September 2026 is the canonical beginning of native TB810 Monthly Obligation history.
+
+January-August 2026 Billing Period records are historical monthly containers, not incomplete native Obligation packages. Their absence of persisted Monthly Obligation rows is expected and must not be treated as lifecycle corruption or repaired through retroactive obligation generation.
+
+For MVP, TB810 does not reconstruct or persist Monthly Obligation packages for periods before September 2026. Historical source data remains authoritative for those periods.
+
+The implementation provenance is:
+
+- July 11, 2026 - Billing Period foundation (`20260711190000_create_tb810_schema.sql`)
+- August 2, 2026 - persisted Monthly Obligation model (`20260802120000_monthly_financial_obligations.sql`, commit `b10f713`)
+- August 5, 2026 - live Monthly Obligation composition (commit `c2f595f`)
+- September 9, 2026 - native package persistence (`20260909123000_create_monthly_obligation_snapshot_rpc.sql`)
+- September 14, 2026 - Pulse/handoff (commit `6d7f998`)
+- September 17, 2026 - approval-time snapshot/freeze (`20260917120000_snapshot_at_approval.sql`)
+
 ## 2. Definitions
 
 ### Monthly Obligation

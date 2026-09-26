@@ -3,8 +3,10 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useDevTools } from "@/components/dev-tools";
+import { formatPeruvianDate } from "@/lib/water-dates";
 import { LEDGER_GRID_CLASS } from "./ledger-layout";
 
 type FormState = {
@@ -51,15 +53,17 @@ export function CurrentMeterReadingRow({
   const { historicalEditingEnabled } = useDevTools();
   const [state, formAction, pending] = useActionState(action, initialState);
   const [deleteState, deleteFormAction, deletePending] = useActionState(deleteAction, initialState);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [currentReading, setCurrentReading] = useState(readingValue(row.reading_end));
   const [readingDate, setReadingDate] = useState(row.reading_date);
   const lastCommittedRef = useRef({ currentReading: readingValue(row.reading_end), readingDate: row.reading_date });
   const formRef = useRef<HTMLFormElement | null>(null);
   const formId = `unit-meter-reading-${row.id}`;
   const deleteFormId = `unit-meter-reading-delete-${row.id}`;
+  const deleteFormRef = useRef<HTMLFormElement | null>(null);
   const canEditHistoricalReadings =
     isHistoricalMonth && (packageCorrectionAvailable || (historicalEditingAvailable && historicalEditingEnabled));
-  const editable = !readOnly || canEditHistoricalReadings;
+  const editable = !isHistoricalMonth && !readOnly;
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -86,8 +90,9 @@ export function CurrentMeterReadingRow({
 
   return (
     <>
-      <div className={`${LEDGER_GRID_CLASS} border-b border-zinc-100 px-4 py-4`}>
+      <div className={`${LEDGER_GRID_CLASS} group border-b border-zinc-100 px-4 py-4`}>
         <div className="text-sm font-medium text-zinc-950">{row.unit_number}</div>
+        <div className="text-sm text-zinc-600">{previous == null ? "—" : readingValue(previous)}</div>
         <div>
           {editable ? (
             <>
@@ -118,6 +123,7 @@ export function CurrentMeterReadingRow({
                     formRef.current?.requestSubmit();
                   }
                 }}
+                className="rounded-xl border border-zinc-300 bg-zinc-50 px-3 text-sm"
               />
             </>
           ) : (
@@ -126,7 +132,6 @@ export function CurrentMeterReadingRow({
             </div>
           )}
         </div>
-        <div className="text-sm text-zinc-600">{previous == null ? "—" : readingValue(previous)}</div>
         <div className="text-sm text-zinc-600">{consumption == null ? "—" : readingValue(consumption)}</div>
         <div>
           {editable ? (
@@ -149,20 +154,13 @@ export function CurrentMeterReadingRow({
               {state.error ? <p className="mt-2 text-xs text-red-600">{state.error}</p> : null}
             </>
           ) : (
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-              {new Date(`${row.reading_date}T00:00:00Z`).toLocaleDateString("en-US", {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-                timeZone: "UTC",
-              })}
-            </div>
+            <div className="text-sm text-zinc-600">{formatPeruvianDate(row.reading_date)}</div>
           )}
         </div>
         <div className="flex items-start justify-end">
           {editable ? (
             <>
-              <form id={deleteFormId} action={deleteFormAction} className="hidden">
+              <form ref={deleteFormRef} id={deleteFormId} action={deleteFormAction} className="hidden">
                 <input type="hidden" name="reading_id" value={row.id} />
                 <input
                   type="hidden"
@@ -170,31 +168,14 @@ export function CurrentMeterReadingRow({
                   value={canEditHistoricalReadings ? "true" : "false"}
                 />
               </form>
-              <Button
-                type="submit"
-                form={deleteFormId}
-                variant="destructive"
-                size="sm"
-                onClick={(event) => {
-                  const confirmed = window.confirm(
-                    `Delete meter reading for Unit ${row.unit_number}?\n\nThis will permanently remove the reading dated ${new Date(`${row.reading_date}T00:00:00Z`).toLocaleDateString(
-                      "en-US",
-                      {
-                        month: "long",
-                        day: "numeric",
-                        year: "numeric",
-                        timeZone: "UTC",
-                      },
-                    )}.`,
-                  );
-                  if (!confirmed) {
-                    event.preventDefault();
-                  }
-                }}
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmOpen(true)}
                 disabled={pending || deletePending}
+                className="cursor-pointer text-sm text-red-700 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950 disabled:cursor-not-allowed"
               >
                 Delete
-              </Button>
+              </button>
             </>
           ) : null}
         </div>
@@ -202,6 +183,36 @@ export function CurrentMeterReadingRow({
       {editable && deleteState.error ? (
         <p className="px-4 py-2 text-sm text-red-600">{deleteState.error}</p>
       ) : null}
+      <Dialog
+        open={deleteConfirmOpen}
+        title={`Delete Unit ${row.unit_number} reading?`}
+        onOpenChange={setDeleteConfirmOpen}
+        className="m-auto w-full max-w-sm rounded-2xl"
+        contentClassName="w-full"
+      >
+        <div className="space-y-6">
+          <p className="text-sm text-zinc-600">
+            Deleting this reading will remove the {formatPeruvianDate(row.reading_date)} reading from the current operational month.
+          </p>
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button type="button" variant="secondary" shape="pill" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              shape="pill"
+              disabled={deletePending}
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                deleteFormRef.current?.requestSubmit();
+              }}
+            >
+              {deletePending ? "Deleting..." : "Delete reading"}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </>
   );
 }

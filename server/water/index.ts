@@ -5,6 +5,9 @@ import { isPerfLoggingEnabled } from "@/server/perf";
 import { listUnits } from "@/server/units";
 import { getCurrentBuilding } from "@/server/units";
 import { getCurrentReadingMonthCompleteness } from "@/server/water/unit-meter-readings";
+import {
+  getAppliedObligationMonthFromReadingDate,
+} from "./month";
 import { previousMonthKeyFromMonthKey } from "./month-utils";
 
 import type {
@@ -12,10 +15,11 @@ import type {
   CommonWaterBillUpdateInput,
 } from "./validation";
 import { commonWaterBillInputSchema, commonWaterBillUpdateInputSchema } from "./validation";
-import type {
-  CommonWaterBillDocument,
-  WaterBillRecord,
-  WaterBillSummary,
+import {
+  isCommonWaterBillEditable,
+  type CommonWaterBillDocument,
+  type WaterBillRecord,
+  type WaterBillSummary,
 } from "./types";
 
 type QueryResult<T> = {
@@ -139,6 +143,11 @@ type August2026UnitWaterCycleContext = {
 
 const WATER_BILL_SELECT =
   "id, building_id, utility_type_id, billing_period_id, supplier_id, bill_date, amount, description, attachment_document_id, status, notes, previous_reading, current_reading, total_consumption, unit_cost, legacy_table, legacy_id, legacy_metadata, created_by, updated_by, created_at, updated_at" as const;
+const WATER_BILL_CONTEXT_SELECT = [
+  WATER_BILL_SELECT,
+  "tb810_billing_periods!tb810_utility_bills_billing_period_id_fkey(id, status, period_year, period_month)",
+  "tb810_documents!tb810_documents_utility_bill_id_fkey(id, utility_bill_id, storage_bucket, storage_path, original_name, mime_type, size_bytes)",
+].join(", ");
 const METER_READING_SELECT =
   "id, building_id, unit_id, utility_type_id, reading_date, reading_start, reading_end, consumption, status, created_at" as const;
 const UNIT_SELECT = "id, building_id, unit_type_id, has_meter" as const;
@@ -348,27 +357,6 @@ async function getBillingPeriodForBillDate(
     .eq("building_id", buildingId)
     .eq("period_year", year)
     .eq("period_month", month)
-    .maybeSingle();
-
-  if (error) {
-    return { data: null, error: error.message };
-  }
-
-  return { data, error: null };
-}
-
-async function getBillingPeriodStatus(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  billingPeriodId: string | null,
-) {
-  if (!billingPeriodId) {
-    return { data: null, error: null };
-  }
-
-  const { data, error } = await supabase
-    .from("tb810_billing_periods")
-    .select(BILLING_PERIOD_SELECT)
-    .eq("id", billingPeriodId)
     .maybeSingle();
 
   if (error) {
@@ -848,8 +836,75 @@ async function getCommonWaterChargeForUnitPreview(
   };
 }
 
-function isBillEditable(billingPeriodStatus: string | null | undefined) {
-  return billingPeriodStatus !== "closed";
+function toWaterBillSummary(
+  row: WaterBillRecord & {
+    tb810_utility_types?: { code: string; name: string } | null;
+    tb810_billing_periods?: {
+      id: string;
+      status: string;
+      period_year: number;
+      period_month: number;
+      tb810_monthly_financial_obligations?: Array<{ id: string }>;
+    } | null;
+    tb810_documents?: CommonWaterBillDocument[] | null;
+  },
+  utilityTypeName: string,
+  targetObligationMonth: string | null,
+  hasPersistedObligation: boolean,
+): WaterBillSummary {
+  const billingPeriod = row.tb810_billing_periods;
+
+  return {
+    ...toBillRecord(row),
+    utility_type_name: utilityTypeName,
+    billing_period_status: billingPeriod?.status ?? null,
+    target_obligation_month: targetObligationMonth,
+    has_persisted_obligation: hasPersistedObligation,
+    document: row.tb810_documents?.[0] ?? null,
+    is_editable: isCommonWaterBillEditable({
+      legacy_table: row.legacy_table,
+      has_persisted_obligation: hasPersistedObligation,
+    }),
+  };
+}
+
+type ObligationEvidence = Map<string, boolean>;
+
+async function getObligationEvidenceForMonths(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  buildingId: string,
+  monthKeys: string[],
+): Promise<{ data: ObligationEvidence; error: string | null }> {
+  const uniqueMonths = [...new Set(monthKeys.filter(Boolean))];
+  if (uniqueMonths.length === 0) return { data: new Map(), error: null };
+
+  const periodFilters = uniqueMonths
+    .map((monthKey) => {
+      const [year, month] = monthKey.split("-");
+      return `and(period_year.eq.${year},period_month.eq.${Number(month)})`;
+    })
+    .join(",");
+
+  const { data, error } = await supabase
+    .from("tb810_billing_periods")
+    .select("period_year, period_month, tb810_monthly_financial_obligations!tb810_monthly_financial_obligations_billing_period_id_fkey(id)")
+    .eq("building_id", buildingId)
+    .or(periodFilters);
+
+  if (error) return { data: new Map(), error: error.message };
+
+  const requestedMonths = new Set(uniqueMonths);
+  const evidence = new Map<string, boolean>();
+  for (const row of data ?? []) {
+    const monthKey = `${row.period_year}-${String(row.period_month).padStart(2, "0")}`;
+    if (!requestedMonths.has(monthKey)) continue;
+    const obligations = (row as unknown as {
+      tb810_monthly_financial_obligations?: Array<{ id: string }>;
+    }).tb810_monthly_financial_obligations;
+    evidence.set(monthKey, Boolean(obligations?.length));
+  }
+
+  return { data: evidence, error: null };
 }
 
 async function getCommonWaterReadingContext(
@@ -906,9 +961,8 @@ export async function listCommonWaterBills(): Promise<
     .from("tb810_utility_bills")
     .select(
       [
-        WATER_BILL_SELECT,
+        WATER_BILL_CONTEXT_SELECT,
         "tb810_utility_types!tb810_utility_bills_utility_type_id_fkey(code, name)",
-        "tb810_billing_periods!tb810_utility_bills_billing_period_id_fkey(status)",
       ].join(", "),
     )
     .eq("building_id", buildingResult.data.id)
@@ -923,29 +977,37 @@ export async function listCommonWaterBills(): Promise<
   const rows = (data ?? []) as unknown as Array<
     WaterBillRecord & {
       tb810_utility_types?: { code: string; name: string } | null;
-      tb810_billing_periods?: { status: string } | null;
+      tb810_billing_periods?: {
+        id: string;
+        status: string;
+        period_year: number;
+        period_month: number;
+      } | null;
+      tb810_documents?: CommonWaterBillDocument[] | null;
     }
   >;
+  const targetMonths = rows.map((row) =>
+    getAppliedObligationMonthFromReadingDate(row.bill_date),
+  ).filter((month): month is string => month !== null);
+  const obligationEvidence = await getObligationEvidenceForMonths(
+    supabase,
+    buildingResult.data.id,
+    targetMonths,
+  );
+  if (obligationEvidence.error) {
+    return { data: [], error: obligationEvidence.error };
+  }
   const utilityType = rows[0]
     ? (rows[0] as unknown as {
         tb810_utility_types?: { code: string; name: string } | null;
       }).tb810_utility_types ?? null
     : null;
-  const billingPeriodById = new Map<string, { status: string }>();
-  for (const row of rows) {
-    if (row.billing_period_id && row.tb810_billing_periods) {
-      billingPeriodById.set(row.billing_period_id, {
-        status: row.tb810_billing_periods.status,
-      });
-    }
-  }
-
   if (isPerfLoggingEnabled()) {
     const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
     console.info(
       [
         "[SEDAPAL_LEDGER_PERF]",
-        `data_remote_requests=1`,
+        `data_remote_requests=2`,
         `elapsed_ms=${elapsedMs.toFixed(1)}`,
         `bills=${rows.length}`,
         `source=remote`,
@@ -954,15 +1016,16 @@ export async function listCommonWaterBills(): Promise<
   }
 
   return {
-    data: rows.map((row) => {
-      const billingPeriod = billingPeriodById.get(row.billing_period_id ?? "");
-      return {
-        ...toBillRecord(row),
-        utility_type_name: utilityType?.name ?? "Common Water",
-        billing_period_status: billingPeriod?.status ?? null,
-        is_editable: isBillEditable(billingPeriod?.status),
-      };
-    }),
+    data: rows.map((row) =>
+      toWaterBillSummary(
+        row,
+        utilityType?.name ?? "Common Water",
+        getAppliedObligationMonthFromReadingDate(row.bill_date),
+        obligationEvidence.data.get(
+          getAppliedObligationMonthFromReadingDate(row.bill_date) ?? "",
+        ) ?? false,
+      ),
+    ),
     error: null,
   };
 }
@@ -988,7 +1051,7 @@ export async function getWaterBillById(
 
   const { data, error } = await supabase
     .from("tb810_utility_bills")
-    .select(WATER_BILL_SELECT)
+    .select(WATER_BILL_CONTEXT_SELECT)
     .eq("building_id", buildingResult.data.id)
     .eq("utility_type_id", utilityType.id)
     .eq("id", billId)
@@ -1002,18 +1065,32 @@ export async function getWaterBillById(
     return { data: null, error: null };
   }
 
-  const billingPeriod = await getBillingPeriodStatus(supabase, data.billing_period_id);
-  if (billingPeriod.error) {
-    return { data: null, error: billingPeriod.error };
+  const billRow = data as unknown as WaterBillRecord & {
+    tb810_billing_periods?: {
+      id: string;
+      status: string;
+      period_year: number;
+      period_month: number;
+    } | null;
+    tb810_documents?: CommonWaterBillDocument[] | null;
+  };
+  const targetObligationMonth = getAppliedObligationMonthFromReadingDate(billRow.bill_date);
+  const obligationEvidence = await getObligationEvidenceForMonths(
+    supabase,
+    buildingResult.data.id,
+    targetObligationMonth ? [targetObligationMonth] : [],
+  );
+  if (obligationEvidence.error) {
+    return { data: null, error: obligationEvidence.error };
   }
 
   return {
-    data: {
-      ...toBillRecord(data),
-      utility_type_name: utilityType.name,
-      billing_period_status: billingPeriod.data?.status ?? null,
-      is_editable: isBillEditable(billingPeriod.data?.status),
-    },
+    data: toWaterBillSummary(
+      billRow,
+      utilityType.name,
+      targetObligationMonth,
+      obligationEvidence.data.get(targetObligationMonth ?? "") ?? false,
+    ),
     error: null,
   };
 }
@@ -1028,6 +1105,7 @@ function parseMoney(value: string) {
 
 export async function createCommonWaterBill(
   input: CommonWaterBillInput,
+  options: { devSessionId?: string } = {},
 ): Promise<QueryResult<WaterBillRecord>> {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) {
@@ -1144,29 +1222,31 @@ export async function createCommonWaterBill(
     return { data: null as never, error: `Source PDF upload failed: ${uploadError.message}` };
   }
 
-  const { data: created, error } = await supabase.rpc(
-    "tb810_create_common_water_bill_with_document",
-    {
-      p_bill_id: billId,
-      p_building_id: buildingResult.data.id,
-      p_utility_type_id: utilityType.id,
-      p_billing_period_id: billingPeriod.data.id,
-      p_bill_date: payload.bill_date,
-      p_amount: amount,
-      p_description: payload.description || "Sedapal common water invoice",
-      p_notes: payload.notes || null,
-      p_previous_reading: previousReading,
-      p_current_reading: currentReading,
-      p_total_consumption: totalConsumption,
-      p_unit_cost: unitCost,
-      p_storage_bucket: SEDAPAL_SOURCE_PDF_BUCKET,
-      p_storage_path: storagePath,
-      p_original_name: originalName,
-      p_mime_type: sourcePdf.type,
-      p_size_bytes: sourcePdf.size,
-      p_metadata: { source: "sedapal_live_intake", original_name: originalName },
-    },
-  );
+  const rpcName = options.devSessionId
+    ? "tb810_create_dev_common_water_bill_with_document"
+    : "tb810_create_common_water_bill_with_document";
+  const rpcArgs = {
+    p_bill_id: billId,
+    p_building_id: buildingResult.data.id,
+    p_utility_type_id: utilityType.id,
+    p_billing_period_id: billingPeriod.data.id,
+    p_bill_date: payload.bill_date,
+    p_amount: amount,
+    p_description: payload.description || "Sedapal common water invoice",
+    p_notes: payload.notes || null,
+    p_previous_reading: previousReading,
+    p_current_reading: currentReading,
+    p_total_consumption: totalConsumption,
+    p_unit_cost: unitCost,
+    p_storage_bucket: SEDAPAL_SOURCE_PDF_BUCKET,
+    p_storage_path: storagePath,
+    p_original_name: originalName,
+    p_mime_type: sourcePdf.type,
+    p_size_bytes: sourcePdf.size,
+    p_metadata: { source: "sedapal_live_intake", original_name: originalName },
+    ...(options.devSessionId ? { p_session_id: options.devSessionId } : {}),
+  };
+  const { data: created, error } = await supabase.rpc(rpcName, rpcArgs);
   if (error || !created) {
     const { error: cleanupError } = await supabase.storage
       .from(SEDAPAL_SOURCE_PDF_BUCKET)
@@ -1325,8 +1405,13 @@ export async function updateCommonWaterBill(
   const existing = await getWaterBillById(billId);
   if (existing.error) return { data: null as never, error: existing.error };
   if (!existing.data) return { data: null as never, error: "Common water bill not found." };
-  if (!existing.data.is_editable) {
-    return { data: null as never, error: "This common water bill is locked." };
+  if (!isCommonWaterBillEditable(existing.data)) {
+    return {
+      data: null as never,
+      error: existing.data.legacy_table === "utilities"
+        ? "Historical common water bills are read-only."
+        : "This common water bill is locked because its obligation has been created.",
+    };
   }
 
   const payload = parsed.data;

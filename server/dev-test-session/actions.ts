@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resetCurrentMonthlyObligationApprovalForDev } from "@/server/obligations/approval";
 import { runMonthlyObligationPulse } from "@/server/obligations/pulse";
 import type { HandoffPersistence } from "@/server/obligations/snapshot";
+import { SEDAPAL_SOURCE_PDF_BUCKET } from "@/server/water";
 
 import { getActiveDevTestSessionSummary, getDevTestSessionCookieName, startDevTestSession } from "../dev-test-session";
 
@@ -45,6 +46,34 @@ export async function resetDevTestSessionAction(formData: FormData) {
     cookieStore.set(getDevTestSessionCookieName(), "", { path: "/", expires: new Date(0) });
     revalidatePath("/", "layout");
     redirect(returnTo);
+  }
+
+  const { data: storageMutations, error: storageMutationError } = await supabase
+    .from("tb810_dev_test_mutations")
+    .select("before_state")
+    .eq("session_id", sessionId)
+    .eq("domain", "water")
+    .eq("record_type", "utility_bill")
+    .eq("operation", "create");
+  if (storageMutationError) {
+    redirect(`${returnTo}?error=${encodeURIComponent(storageMutationError.message)}`);
+  }
+
+  for (const mutation of storageMutations ?? []) {
+    const beforeState = mutation.before_state;
+    if (!beforeState || typeof beforeState !== "object" || Array.isArray(beforeState)) continue;
+    const storageBucket = typeof beforeState.storage_bucket === "string" ? beforeState.storage_bucket : "";
+    const storagePath = typeof beforeState.storage_path === "string" ? beforeState.storage_path : "";
+    if (!storageBucket && !storagePath) continue;
+    if (storageBucket !== SEDAPAL_SOURCE_PDF_BUCKET || !storagePath) {
+      redirect(`${returnTo}?error=${encodeURIComponent("DEV Sedapal Storage ownership is invalid.")}`);
+    }
+    const { error: storageError } = await supabase.storage
+      .from(storageBucket)
+      .remove([storagePath]);
+    if (storageError && !/not found|does not exist|no such/i.test(storageError.message)) {
+      redirect(`${returnTo}?error=${encodeURIComponent(`Storage cleanup failed: ${storageError.message}`)}`);
+    }
   }
 
   const { error: snapshotResetError } = await (supabase as unknown as {

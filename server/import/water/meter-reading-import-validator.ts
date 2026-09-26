@@ -19,6 +19,12 @@ export type ValidatedMeterReadingImportRow = {
   unitId: string;
   previousReading: number | null;
   existingReadingId: string | null;
+  readingDate: string | null;
+  readingDateText: string | null;
+  consumptionMonth: string | null;
+  consumptionMonthText: string | null;
+  readingDateColumnPresent: boolean;
+  consumptionMonthColumnPresent: boolean;
 };
 
 export type MeterReadingImportSyncResult = {
@@ -30,6 +36,7 @@ export type MeterReadingImportSyncResult = {
   newRowCount: number;
   updatedRowCount: number;
   rejectedRowCount: number;
+  existingRowCount: number;
   completedUnitCountBefore: number;
   completedUnitCountAfter: number;
   remainingUnitCount: number;
@@ -37,6 +44,7 @@ export type MeterReadingImportSyncResult = {
   acceptedRows: ValidatedMeterReadingImportRow[];
   rejectedRows: MeterReadingImportIssue[];
   canonicalColumns: string[];
+  rowDateMode: "none" | "row";
 };
 
 function monthStart(monthKey: string) {
@@ -136,8 +144,8 @@ export async function validateMeterReadingImport(
     }
   }
 
-  const suppliedRows = rows.filter((row) => !isBlank(row.readingText));
-  const ignoredBlankRowCount = rows.length - suppliedRows.length;
+  const suppliedRows = rows;
+  const ignoredBlankRowCount = 0;
 
   const groups = new Map<string, ParsedMeterReadingRow[]>();
   for (const row of suppliedRows) {
@@ -149,6 +157,49 @@ export async function validateMeterReadingImport(
   const rejectedRows: MeterReadingImportIssue[] = [];
   const acceptedRows: ValidatedMeterReadingImportRow[] = [];
   const rejectedUnitNumbers = new Set<string>();
+  const dateSuppliedRows = suppliedRows.filter((row) => row.readingDateText);
+  const rowDateMode = dateSuppliedRows.length === 0 ? "none" : "row";
+  if (dateSuppliedRows.length > 0 && dateSuppliedRows.length !== suppliedRows.length) {
+    rejectedRows.push({
+      code: "READING_DATE_MIXED",
+      message: "Reading dates must be populated for every row or omitted for the entire batch.",
+    });
+  }
+  for (const row of dateSuppliedRows) {
+    if (!row.readingDate) {
+      rejectedRows.push({
+        code: "READING_DATE_INVALID",
+        sourceRowNumber: row.sourceRowNumber,
+        unitNumber: row.unitNumber,
+        message: `Unit ${row.unitNumber} reading date is invalid.`,
+      });
+    } else if (!row.readingDate.startsWith(`${monthKey}-`)) {
+      rejectedRows.push({
+        code: "READING_DATE_WRONG_MONTH",
+        sourceRowNumber: row.sourceRowNumber,
+        unitNumber: row.unitNumber,
+        message: `Unit ${row.unitNumber} reading date must belong to ${monthLabel(monthKey)}.`,
+      });
+    }
+    if (row.consumptionMonthText && row.consumptionMonth !== monthKey) {
+      rejectedRows.push({
+        code: "CONSUMPTION_MONTH_WRONG",
+        sourceRowNumber: row.sourceRowNumber,
+        unitNumber: row.unitNumber,
+        message: `Unit ${row.unitNumber} consumption month must be ${monthLabel(monthKey)}.`,
+      });
+    }
+  }
+  for (const row of suppliedRows.filter((item) => item.consumptionMonthText && !dateSuppliedRows.includes(item))) {
+    if (row.consumptionMonth !== monthKey) {
+      rejectedRows.push({
+        code: "CONSUMPTION_MONTH_WRONG",
+        sourceRowNumber: row.sourceRowNumber,
+        unitNumber: row.unitNumber,
+        message: `Unit ${row.unitNumber} consumption month must be ${monthLabel(monthKey)}.`,
+      });
+    }
+  }
 
   for (const row of suppliedRows) {
     if (isBlank(row.unitNumber)) {
@@ -224,6 +275,12 @@ export async function validateMeterReadingImport(
       unitId: unit.id,
       previousReading: prior,
       existingReadingId: existingByUnitNumber.get(row.unitNumber)?.id ?? null,
+      readingDate: row.readingDate,
+      readingDateText: row.readingDateText,
+      consumptionMonth: row.consumptionMonth,
+      consumptionMonthText: row.consumptionMonthText,
+      readingDateColumnPresent: row.readingDateColumnPresent,
+      consumptionMonthColumnPresent: row.consumptionMonthColumnPresent,
     });
   }
 
@@ -236,6 +293,16 @@ export async function validateMeterReadingImport(
 
   const newRowCount = acceptedRows.filter((row) => !row.existingReadingId).length;
   const updatedRowCount = acceptedRows.length - newRowCount;
+  const suppliedUnitNumbers = new Set(suppliedRows.map((row) => row.unitNumber));
+  for (const unit of eligibleUnits) {
+    if (!suppliedUnitNumbers.has(unit.unit_number)) {
+      rejectedRows.push({
+        code: "UNIT_MISSING",
+        unitNumber: unit.unit_number,
+        message: `Unit ${unit.unit_number} is missing from the workbook.`,
+      });
+    }
+  }
 
   return {
     monthKey,
@@ -246,6 +313,7 @@ export async function validateMeterReadingImport(
     newRowCount,
     updatedRowCount,
     rejectedRowCount: rejectedRows.length,
+    existingRowCount: existingRows?.length ?? 0,
     completedUnitCountBefore: completedUnitIdsBefore.size,
     completedUnitCountAfter: completedUnitIdsAfter,
     remainingUnitCount,
@@ -253,5 +321,6 @@ export async function validateMeterReadingImport(
     acceptedRows,
     rejectedRows,
     canonicalColumns: ["Unit", "Reading"],
+    rowDateMode,
   };
 }

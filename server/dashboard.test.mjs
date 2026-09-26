@@ -1292,18 +1292,18 @@ test("September incomplete obligations are blocked by the Aug 31 deadline", () =
   assert.equal(projection.journeyState, "blocked");
 });
 
-test("K dashboard facts read uses exactly one bounded month read", async () => {
+test("K Giuliana dashboard targets the upcoming working obligation month with one bounded read", async () => {
   const originalGetBusinessNow = businessDateModule.getBusinessNow;
   const originalGetFixedBuildingIdentity = buildingModule.getFixedBuildingIdentity;
   const originalLoadBuildingMonthFinancialFacts = ownerFactsModule.loadBuildingMonthFinancialFacts;
   const originalLoadGiulianaPackageProgression = progressionModule.loadGiulianaPackageProgression;
   const obligationMonths = [];
 
-  businessDateModule.getBusinessNow = async () => new Date("2026-08-31T00:00:00Z");
+  businessDateModule.getBusinessNow = async () => new Date("2026-09-25T00:00:00Z");
   buildingModule.getFixedBuildingIdentity = () => ({ id: "building-1", name: "Building One" });
   progressionModule.loadGiulianaPackageProgression = async () => ({
     data: {
-      activePackage: { obligationMonth: "2026-08", mode: "live", status: null },
+      activePackage: { obligationMonth: "2026-09", mode: "live", status: "collecting_readings" },
       mostRecentHandoff: null,
     },
     error: null,
@@ -1370,15 +1370,15 @@ test("K dashboard facts read uses exactly one bounded month read", async () => {
       current: {
         ...shared,
         obligationMonth,
-        sourceReadingMonth: "2026-07",
+        sourceReadingMonth: "2026-09",
         commonWaterBill: null,
         waterReadings: [],
         gasReadings: [],
       },
       upcoming: {
         ...shared,
-        obligationMonth: "2026-09",
-        sourceReadingMonth: "2026-08",
+        obligationMonth: "2026-11",
+        sourceReadingMonth: "2026-10",
         commonWaterBill: null,
       },
     };
@@ -1392,15 +1392,17 @@ test("K dashboard facts read uses exactly one bounded month read", async () => {
     assert.equal(result.error, null);
     assert.ok(result.data);
     assert.equal(obligationMonths.length, 1);
-    assert.deepEqual(obligationMonths, ["2026-08"]);
-    assert.equal(result.data?.operatingMonth, "2026-08");
-    assert.equal(result.data?.upcomingObligationMonth, "2026-09");
+    assert.deepEqual(obligationMonths, ["2026-10"]);
+    assert.equal(result.data?.operatingMonth, "2026-09");
+    assert.equal(result.data?.upcomingObligationMonth, "2026-10");
+    assert.equal(result.data?.current.obligations.obligationMonth, "2026-10");
+    assert.equal(result.data?.current.sourceReadingMonth, "2026-09");
     assert.equal(result.data?.upcoming.commonWaterBill, null);
     assert.equal(result.data?.upcoming.obligations.components.common_water.state, "blocked");
     assert.equal(result.data?.upcoming.gas.supplierBillCount, 2);
     assert.equal(result.data?.upcoming.gas.supplierBillTotal, "100.00");
-    assert.equal(result.data?.upcoming.charges.unitChargeCount, 1);
-    assert.equal(result.data?.upcoming.obligations.obligationMonth, "2026-09");
+    assert.equal(result.data?.upcoming.charges.unitChargeCount, 0);
+    assert.equal(result.data?.upcoming.obligations.obligationMonth, "2026-11");
     assert.equal(result.data?.sourceWork.water.commonWaterBillPresent, false);
     assert.equal(result.data?.sourceWork.water.meterReadingCount, 0);
     assert.equal(result.data?.sourceWork.gas.gasReadingCount, 0);

@@ -87,7 +87,15 @@ export async function recordDevTestMutation(input: {
     record_identity: input.recordIdentity,
     before_state: input.beforeState ? (input.beforeState as Json) : null,
   });
-  if (error) return { error: error.message };
+  if (error) {
+    if (
+      error.code === "23505" &&
+      `${error.message} ${error.details ?? ""}`.includes("tb810_dev_test_mutations_unique_first_state")
+    ) {
+      return { error: null };
+    }
+    return { error: "Unable to record this DEV test change. Please try again." };
+  }
   return { error: null };
 }
 
