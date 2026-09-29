@@ -81,18 +81,25 @@ function xmlEscape(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function sheetXml(unitNumbers: string[]) {
-  const rows = [
-    '<row r="1"><c r="A1" t="inlineStr"><is><t>Unidad</t></is></c><c r="B1" t="inlineStr"><is><t>Lectura</t></is></c></row>',
-    ...unitNumbers.map(
-      (unitNumber, index) =>
-        `<row r="${index + 2}"><c r="A${index + 2}" t="inlineStr"><is><t>${xmlEscape(`DEP-${unitNumber}`)}</t></is></c></row>`,
-    ),
-  ];
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows.join("")}</sheetData></worksheet>`;
+function cellXml(column: string, rowNumber: number, value: string | number | null) {
+  if (value == null || value === "") return "";
+  if (typeof value === "number") return `<c r="${column}${rowNumber}"><v>${value}</v></c>`;
+  return `<c r="${column}${rowNumber}" t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`;
 }
 
-export function generateMeterReadingTemplate(unitNumbers: string[]) {
+function sheetXml(headers: string[], rows: Array<Array<string | number | null>>) {
+  const headerCells = headers.map((header, index) => cellXml(String.fromCharCode(65 + index), 1, header)).join("");
+  const sheetRows = [
+    `<row r="1">${headerCells}</row>`,
+    ...rows.map((row, rowIndex) => {
+      const rowNumber = rowIndex + 2;
+      return `<row r="${rowNumber}">${row.map((value, columnIndex) => cellXml(String.fromCharCode(65 + columnIndex), rowNumber, value)).join("")}</row>`;
+    }),
+  ];
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${sheetRows.join("")}</sheetData></worksheet>`;
+}
+
+export function generateSpreadsheetTemplate(headers: string[], rows: Array<Array<string | number | null>>) {
   const entries: ZipEntry[] = [
     {
       name: "[Content_Types].xml",
@@ -118,8 +125,20 @@ export function generateMeterReadingTemplate(unitNumbers: string[]) {
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
       ),
     },
-    { name: "xl/worksheets/sheet1.xml", data: Buffer.from(sheetXml(unitNumbers)) },
+    {
+      name: "xl/worksheets/sheet1.xml",
+      data: Buffer.from(
+        sheetXml(headers, rows),
+      ),
+    },
   ];
 
   return zip(entries);
+}
+
+export function generateMeterReadingTemplate(unitNumbers: string[]) {
+  return generateSpreadsheetTemplate(
+    ["Unidad", "Lectura"],
+    unitNumbers.map((unitNumber) => [`DEP-${unitNumber}`, null]),
+  );
 }

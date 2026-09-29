@@ -1,10 +1,8 @@
-import { redirect } from "next/navigation";
+import { GasBillsWorkspace } from "./_components/gas-bills-workspace";
+import { loadGasBillsWorkspace } from "@/server/gas";
 
-function currentMonthKey() {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-export default function GasBillsPage() {
-  redirect(`/gas/bills/month/${currentMonthKey()}`);
+export default async function GasBillsPage() {
+  const result = await loadGasBillsWorkspace();
+  if (result.error) throw new Error(result.error);
+  return <GasBillsWorkspace data={result.data} />;
 }

@@ -500,7 +500,7 @@ The obligation is the final monthly financial result of the water cycle.
 
 ## Road to October Acceptance Boundary
 
-Legacy Unit Water is authoritative through August 2026. Native operational Unit Water begins with September 2026. Historical obligation packages must not be reconstructed solely from Water source history.
+Legacy Unit Water is authoritative through August 2026. September 2026 is the final legacy-generated obligation month and the first native operational Unit Water source-input month. October 2026 is the first native TB810 obligation lifecycle month. Historical obligation packages must not be reconstructed solely from Water source history. The full cutover record is [`docs/migrations/october-2026-first-ride.md`](migrations/october-2026-first-ride.md).
 
 For the accepted September 2026 cycle, September source facts build October obligations. The operating month is September, the Water source month is September, and Giuliana's working obligation month is October. Lifecycle/progression month may remain September independently.
 

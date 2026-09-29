@@ -2,8 +2,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { GasImportDialog } from "@/app/(staff)/gas/_components/gas-import-dialog";
-import { importGasWorkbookAction, updateGasBillAction } from "@/server/gas/actions";
+import { updateGasBillAction } from "@/server/gas/actions";
 import { isEligibleGasBill } from "@/server/gas/month-utils";
 import type { GasBillSummary } from "@/server/gas/types";
 
@@ -69,7 +68,6 @@ export function GasBillsMonthWorkspace({ monthKey, monthLabel, previousMonthKey,
           </div>
         </div>
         <div className="flex gap-3">
-          <GasImportDialog action={importGasWorkbookAction} />
           <Button asChild variant="primary" shape="pill">
             <Link href="/gas/bills/new">Add Bill</Link>
           </Button>

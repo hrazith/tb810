@@ -1,12 +1,10 @@
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
 
 import { GasImportDialog } from "@/app/(staff)/gas/_components/gas-import-dialog";
-import { Button } from "@/components/ui/button";
-import { Panel } from "@/components/ui/panel";
 import { listGasReadings } from "@/server/gas";
-import { createGasReadingAction, importGasWorkbookAction } from "@/server/gas/actions";
+import { createGasReadingAction, importGasWorkbookAction, updateGasReadingAction } from "@/server/gas/actions";
 import { getCurrentBuilding, listUnits } from "@/server/units";
+import { canEditReadyForReviewSourceMonth, getActiveReadingMonth } from "@/server/water/unit-meter-readings";
 
 import { GasReadingLedgerPanel, type GasMonthOption, type GasReadingLedgerRow } from "../_components/gas-reading-ledger-panel";
 
@@ -41,6 +39,12 @@ export default async function GasReadingMonthPage({ params }: PageProps) {
   if (!isMonthKey(month)) {
     redirect(`/gas/unit-gas-readings/${selectedMonthKey}`);
   }
+  const activeMonthKey = getActiveReadingMonth().key;
+  const correctionResult = selectedMonthKey === activeMonthKey
+    ? { allowed: false, error: null }
+    : await canEditReadyForReviewSourceMonth(selectedMonthKey);
+  if (correctionResult.error) throw new Error(correctionResult.error);
+  const monthEditable = selectedMonthKey === activeMonthKey || correctionResult.allowed;
 
   const [buildingResult, unitsResult] = await Promise.all([
     getCurrentBuilding(),
@@ -53,7 +57,6 @@ export default async function GasReadingMonthPage({ params }: PageProps) {
   const readingsResult = await listGasReadings(unitsResult.data);
   if (readingsResult.error) throw new Error(readingsResult.error);
 
-  const activeMonthKey = currentMonthKey();
   const monthKeys = new Set<string>([activeMonthKey, selectedMonthKey]);
   for (const reading of readingsResult.data) {
     monthKeys.add(monthKeyFromDate(reading.reading_month));
@@ -86,35 +89,25 @@ export default async function GasReadingMonthPage({ params }: PageProps) {
       current_reading: currentReading,
       previous_reading: previous?.current_reading ?? null,
       consumption: currentConsumption,
-      reading_date: current?.reading_date ?? `${selectedMonthKey}-01`,
+      reading_date: current?.reading_date ?? null,
       reading_id: current?.id ?? null,
       has_reading: Boolean(current),
     };
   });
+  const currentMonthComplete = selectedMonthKey === activeMonthKey && monthEditable && rows.length > 0 && rows.every((row) => row.has_reading);
 
   return (
-    <section className="space-y-6 ">
-      <div className="flex flex-wrap items-start justify-between gap-3 my-12 px-6">
-        
-          
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">Gas Readings</h1>
-        
-        <div className="flex items-center gap-3">
-          <GasImportDialog action={importGasWorkbookAction} />
-          <Button asChild variant="secondary" shape="pill">
-            <Link href="/gas/unit-gas-readings">All Readings</Link>
-          </Button>
-        </div>
-      </div>
-
-      <Panel className="p-0">
-        <GasReadingLedgerPanel
-          action={createGasReadingAction}
-          selectedMonthKey={selectedMonthKey}
-          monthOptions={monthOptions}
-          rows={rows}
-        />
-      </Panel>
+    <section className="space-y-6">
+      <GasReadingLedgerPanel
+        createAction={createGasReadingAction}
+        updateAction={updateGasReadingAction}
+        selectedMonthKey={selectedMonthKey}
+        monthOptions={monthOptions}
+        rows={rows}
+        isCurrentMonth={selectedMonthKey === activeMonthKey}
+        monthEditable={monthEditable}
+      />
+      {monthEditable && !currentMonthComplete ? <GasImportDialog action={importGasWorkbookAction} targetMonth={selectedMonthKey} floating /> : null}
     </section>
   );
 }

@@ -38,9 +38,11 @@ function parseSharedStrings() {
 }
 
 const sharedStrings = parseSharedStrings();
+const workbookSheetXml = new Map();
 
 function readWorkbookRow(sheetPath, rowNumber) {
-  const xml = unzip(sheetPath);
+  const xml = workbookSheetXml.get(sheetPath) ?? unzip(sheetPath);
+  workbookSheetXml.set(sheetPath, xml);
   const rowMatch = xml.match(new RegExp(`<row[^>]*r="${rowNumber}"[^>]*>([\\s\\S]*?)</row>`));
   if (!rowMatch) return [];
 
@@ -99,6 +101,41 @@ function workbookJuly2026Fixture() {
       { billId: "gas-bill-112", amount: "460", status: "unprocessed" },
       { billId: "gas-bill-113", amount: "460", status: "unprocessed" },
     ],
+    units,
+  };
+}
+
+const historicalParityPeriods = [
+  { sourceReadingMonth: "2024-06", obligationMonth: "2024-07", consumptionColumn: "F", amountColumn: "G", supplierPool: "3143.00", aggregateConsumption: "140.715", blendedRate: "22.335927", roundedTotal: "3143.02", residual: "0.02" },
+  { sourceReadingMonth: "2024-07", obligationMonth: "2024-08", consumptionColumn: "H", amountColumn: "I", supplierPool: "2277.00", aggregateConsumption: "127.451", blendedRate: "17.865690", roundedTotal: "2277.00", residual: "0.00" },
+  { sourceReadingMonth: "2025-06", obligationMonth: "2025-07", consumptionColumn: "AD", amountColumn: "AE", supplierPool: "1840.00", aggregateConsumption: "146.285", blendedRate: "12.578186", roundedTotal: "1839.98", residual: "-0.02" },
+  { sourceReadingMonth: "2025-07", obligationMonth: "2025-08", consumptionColumn: "AF", amountColumn: "AG", supplierPool: "2250.00", aggregateConsumption: "157.918", blendedRate: "14.247901", roundedTotal: "2250.01", residual: "0.01" },
+  { sourceReadingMonth: "2026-06", obligationMonth: "2026-07", consumptionColumn: "BB", amountColumn: "BC", supplierPool: "2300.00", aggregateConsumption: "153.480", blendedRate: "14.985666", roundedTotal: "2300.01", residual: "0.01" },
+  { sourceReadingMonth: "2026-07", obligationMonth: "2026-08", consumptionColumn: "BD", amountColumn: "BE", supplierPool: "2760.00", aggregateConsumption: "127.689", blendedRate: "21.615018", roundedTotal: "2760.00", residual: "0.00" },
+];
+
+function workbookHistoricalParityFixture(period) {
+  const units = Array.from({ length: 60 }, (_, index) => index + 4)
+    .map((readingRow) => {
+      const calcRow = readingRow + 2;
+      const readingCells = readWorkbookRow("xl/worksheets/sheet2.xml", readingRow);
+      const calcCells = readWorkbookRow("xl/worksheets/sheet1.xml", calcRow);
+      const unitNumber = String(Number(cellValue(readingCells, `A${readingRow}`)));
+      const consumption = cellValue(calcCells, `${period.consumptionColumn}${calcRow}`);
+      return {
+        unitId: `wb-${unitNumber}-${readingRow}`,
+        unitNumber,
+        unitTypeCode: "condo",
+        hasGasService: unitNumber !== "301",
+        consumption: unitNumber === "301" ? null : consumption,
+        workbookAmount: cellValue(calcCells, `${period.amountColumn}${calcRow}`),
+      };
+    });
+
+  return {
+    sourceReadingMonth: period.sourceReadingMonth,
+    obligationMonth: period.obligationMonth,
+    supplierBills: [{ billId: `bill-${period.sourceReadingMonth}`, amount: period.supplierPool, status: "unprocessed" }],
     units,
   };
 }
@@ -231,4 +268,31 @@ test("historical workbook fixture comparison", () => {
 
   assert.equal(result.excludedUnits.filter((unit) => unit.unitNumber === "301").length, 2);
   assert.equal(result.blockers.length, 0);
+});
+
+test("historical workbook parity preserves independent cent rounding and residuals", () => {
+  for (const period of historicalParityPeriods) {
+    const fixture = workbookHistoricalParityFixture(period);
+    const result = calculateGasCharges(fixture);
+
+    assert.equal(result.gasCostPool, period.supplierPool, period.sourceReadingMonth);
+    assert.equal(result.totalConsumption, period.aggregateConsumption, period.sourceReadingMonth);
+    assert.equal(result.blendedRate, period.blendedRate, period.sourceReadingMonth);
+    assert.equal(result.blockers.length, 0, period.sourceReadingMonth);
+    assert.equal(result.unitCharges.length, 58, period.sourceReadingMonth);
+
+    const expectedCharges = fixture.units.filter((unit) => unit.hasGasService);
+    const actualCharges = new Map(result.unitCharges.map((charge) => [charge.unitNumber, charge]));
+    for (const expected of expectedCharges) {
+      const actual = actualCharges.get(expected.unitNumber);
+      assert.ok(actual, `${period.sourceReadingMonth}: missing Unit ${expected.unitNumber}`);
+      assert.equal(actual.consumption, Number(expected.consumption).toFixed(3), `${period.sourceReadingMonth}: Unit ${expected.unitNumber} consumption`);
+      assert.equal(actual.amount, Number(expected.workbookAmount).toFixed(2), `${period.sourceReadingMonth}: Unit ${expected.unitNumber} amount`);
+    }
+
+    const roundedTotal = result.unitCharges.reduce((total, charge) => total + Number(charge.amount), 0);
+    assert.equal(roundedTotal.toFixed(2), period.roundedTotal, `${period.sourceReadingMonth}: rounded total`);
+    const residual = roundedTotal - Number(period.supplierPool);
+    assert.equal(Number(residual.toFixed(2)).toFixed(2), period.residual, `${period.sourceReadingMonth}: residual`);
+  }
 });

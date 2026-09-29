@@ -2,6 +2,8 @@
 
 The authoritative finance architecture is frozen in [`docs/architecture/finance-architecture-freeze-v1.md`](/Users/roon/dev/tb810/docs/architecture/finance-architecture-freeze-v1.md). This document remains the domain-model companion for Unit Accounts.
 
+For the October 2026 cutover, the historical migration facts and open adjustment decisions are recorded in [`docs/migrations/october-2026-first-ride.md`](../migrations/october-2026-first-ride.md).
+
 ## Purpose
 
 A Unit Account is the permanent financial record for a Unit.
@@ -96,6 +98,10 @@ The Unit Account is the system's source of truth for:
 - whether the Unit has credit
 - whether the Unit is clear for NOC purposes
 - whether a payment or invoice belongs to the asset's financial history
+
+## TB810 Implementation
+
+The canonical entity is `tb810_unit_accounts`. Migration [`20260715190000_permanent_unit_accounts.sql`](../../supabase/migrations/20260715190000_permanent_unit_accounts.sql) ensures one account per `tb810_units` row and does not restrict account creation by condo, parking, or storage type. Unit Charges remain separate unit-linked records; an account is not itself a recurring assessment adjustment.
 
 ## Architectural Note
 

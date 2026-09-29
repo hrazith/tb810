@@ -3,9 +3,11 @@ import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import { formatPeruvianDate } from "@/lib/water-dates";
 import { getGasReadingById, listGasReadings } from "@/server/gas";
 import { deleteGasReadingAction } from "@/server/gas/actions";
 import { listUnits } from "@/server/units";
+import { canEditReadyForReviewSourceMonth, getActiveReadingMonth } from "@/server/water/unit-meter-readings";
 
 import { GasReadingForm } from "../../_components/gas-reading-form";
 import { updateGasReadingAction } from "@/server/gas/actions";
@@ -23,6 +25,14 @@ export default async function GasReadingDetailPage({ params }: PageProps) {
   if (unitsResult.error) throw new Error(unitsResult.error);
   if (!result.data) notFound();
 
+  const readingMonth = result.data.reading_month.slice(0, 7);
+  const activeMonth = getActiveReadingMonth().key;
+  const correctionResult = readingMonth === activeMonth
+    ? { allowed: false, error: null }
+    : await canEditReadyForReviewSourceMonth(readingMonth);
+  if (correctionResult.error) throw new Error(correctionResult.error);
+  const monthEditable = readingMonth === activeMonth || correctionResult.allowed;
+
   const readingsResult = await listGasReadings(unitsResult.data);
   if (readingsResult.error) throw new Error(readingsResult.error);
 
@@ -33,7 +43,7 @@ export default async function GasReadingDetailPage({ params }: PageProps) {
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">{result.data.unit_number}</h1>
         <div className="space-y-1 text-sm text-zinc-600">
           <p>Reading month: {result.data.reading_month.slice(0, 7)}</p>
-          <p>Reading date: {result.data.reading_date}</p>
+          <p>Reading date: {formatPeruvianDate(result.data.reading_date)}</p>
           <p>Current reading: {result.data.current_reading.toFixed(3)}</p>
           <p>Consumption: {result.data.consumption == null ? "—" : result.data.consumption.toFixed(3)}</p>
         </div>
@@ -42,19 +52,27 @@ export default async function GasReadingDetailPage({ params }: PageProps) {
         </Button>
       </Panel>
 
-      <GasReadingForm
-        action={updateGasReadingAction}
-        units={unitsResult.data}
-        readings={readingsResult.data}
-        submitLabel="Save Reading"
-        initialMonth={result.data.reading_month.slice(0, 7)}
-      />
-      <form action={deleteGasReadingAction}>
-        <input type="hidden" name="reading_id" value={result.data.id} />
-        <Button type="submit" variant="secondary" size="sm">
-          Delete Reading
-        </Button>
-      </form>
+      {monthEditable ? (
+        <>
+          <GasReadingForm
+            action={updateGasReadingAction}
+            units={unitsResult.data}
+            readings={readingsResult.data}
+            submitLabel="Save Reading"
+            initialMonth={readingMonth}
+          />
+          <form action={deleteGasReadingAction}>
+            <input type="hidden" name="reading_id" value={result.data.id} />
+            <Button type="submit" variant="secondary" size="sm">
+              Delete Reading
+            </Button>
+          </form>
+        </>
+      ) : (
+        <Panel>
+          <p className="text-sm text-zinc-600">This historical Gas reading is read-only.</p>
+        </Panel>
+      )}
     </section>
   );
 }

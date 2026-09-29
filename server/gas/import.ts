@@ -16,7 +16,7 @@ function extractText(xml: string) {
 }
 
 function parseSharedStrings(xml: string) {
-  return (xml.match(/<si[\s\S]*?<\/si>/g) ?? []).map((entry) => extractText(entry));
+  return (xml.match(/<(?:[\w.-]+:)?si\b[\s\S]*?<\/(?:[\w.-]+:)?si>/g) ?? []).map((entry) => extractText(entry));
 }
 
 function getAttribute(source: string, attribute: string) {
@@ -39,17 +39,17 @@ type ParsedCell = { ref: string; value: string | null };
 type ParsedRow = { rowNumber: number; cells: ParsedCell[] };
 
 function parseSheetXml(xml: string, sharedStrings: string[]) {
-  const rowMatches = xml.match(/<row\b[^>]*>[\s\S]*?<\/row>/g) ?? [];
+  const rowMatches = xml.match(/<(?:[\w.-]+:)?row\b[^>]*>[\s\S]*?<\/(?:[\w.-]+:)?row>/g) ?? [];
   const rows: ParsedRow[] = [];
   for (const rowXml of rowMatches) {
     const rowNumber = Number(getAttribute(rowXml, "r") ?? "0");
-    const cellMatches = rowXml.match(/<c\b[^>]*>[\s\S]*?<\/c>/g) ?? [];
+    const cellMatches = rowXml.match(/<(?:[\w.-]+:)?c\b[^>]*>[\s\S]*?<\/(?:[\w.-]+:)?c>/g) ?? [];
     const cells: ParsedCell[] = [];
     for (const cellXml of cellMatches) {
       const ref = getAttribute(cellXml, "r") ?? "";
       const type = getAttribute(cellXml, "t");
-      const inlineMatch = cellXml.match(/<is>([\s\S]*?)<\/is>/);
-      const valueMatch = cellXml.match(/<v>([\s\S]*?)<\/v>/);
+      const inlineMatch = cellXml.match(/<(?:[\w.-]+:)?is>([\s\S]*?)<\/(?:[\w.-]+:)?is>/);
+      const valueMatch = cellXml.match(/<(?:[\w.-]+:)?v>([\s\S]*?)<\/(?:[\w.-]+:)?v>/);
       let value: string | null = null;
       if (type === "s" && valueMatch) value = sharedStrings[Number(valueMatch[1])] ?? null;
       else if (type === "inlineStr" && inlineMatch) value = extractText(inlineMatch[1]) || null;
@@ -59,6 +59,15 @@ function parseSheetXml(xml: string, sharedStrings: string[]) {
     rows.push({ rowNumber, cells });
   }
   return rows;
+}
+
+function normalizeReadingDate(value: string | null) {
+  if (value == null || !value.trim()) return value;
+  const text = value.trim();
+  if (!/^\d+(?:\.\d+)?$/.test(text)) return text;
+  const serial = Number(text);
+  if (!Number.isFinite(serial) || serial <= 0) return text;
+  return new Date(Date.UTC(1899, 11, 30) + Math.round(serial) * 86_400_000).toISOString().slice(0, 10);
 }
 
 function normalizeHeader(value: string | null) {
@@ -86,9 +95,13 @@ export type GasImportPreflight = {
   invalidRows: GasImportIssue[];
   duplicateRows: GasImportIssue[];
   unresolvedUnitNumbers: GasImportIssue[];
+  expectedUnitCount?: number;
+  missingUnitNumbers?: string[];
+  readingSheetDetected?: boolean;
+  readyToImport?: boolean;
 };
 
-export async function parseGasWorkbook(file: File) {
+export async function parseGasWorkbook(file: File, fallbackReadingDate = "") {
   const buffer = Buffer.from(await file.arrayBuffer());
   const tmpDir = mkdtempSync(join(tmpdir(), "tb810-gas-import-"));
   const tmp = join(tmpDir, file.name);
@@ -98,13 +111,21 @@ export async function parseGasWorkbook(file: File) {
   const sharedStringsXml = getEntry(tmp, "xl/sharedStrings.xml");
   if (!workbookXml || !relsXml) throw new Error("Unable to read workbook.");
   const relMap = new Map<string, string>();
-  for (const match of relsXml.matchAll(/<Relationship\b[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"[^>]*\/>/g)) {
-    relMap.set(match[1], match[2]);
+  for (const match of relsXml.matchAll(/<(?:[\w.-]+:)?Relationship\b([^>]*)\/?\s*>/g)) {
+    const attributes = match[1];
+    const id = getAttribute(attributes, "Id");
+    const target = getAttribute(attributes, "Target");
+    if (id && target) relMap.set(id, target);
   }
   const sheets: Array<{ name: string; path: string }> = [];
-  for (const match of workbookXml.matchAll(/<sheet\b[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"[^>]*\/>/g)) {
-    const target = relMap.get(match[2]);
-    if (target) sheets.push({ name: match[1], path: `xl/${target}` });
+  for (const match of workbookXml.matchAll(/<(?:[\w.-]+:)?sheet\b([^>]*)\/?\s*>/g)) {
+    const attributes = match[1];
+    const name = getAttribute(attributes, "name");
+    const relationshipId = getAttribute(attributes, "id");
+    const target = relationshipId ? relMap.get(relationshipId) : null;
+    if (!name || !target) continue;
+    const path = target.startsWith("/") ? target.slice(1) : `xl/${target}`;
+    sheets.push({ name, path });
   }
   const sharedStrings = sharedStringsXml ? parseSharedStrings(sharedStringsXml) : [];
   const rows: GasImportRow[] = [];
@@ -113,6 +134,7 @@ export async function parseGasWorkbook(file: File) {
   const unmatchedRows: GasImportIssue[] = [];
   const invalidRows: GasImportIssue[] = [];
   const unresolvedUnitNumbers: GasImportIssue[] = [];
+  let readingSheetDetected = false;
   for (const sheet of sheets) {
     const xml = getEntry(tmp, sheet.path);
     if (!xml) continue;
@@ -131,16 +153,28 @@ export async function parseGasWorkbook(file: File) {
         const header = headers.get(columnNameToIndex(getColumnName(cell.ref)));
         if (header) data[header] = cell.value ?? null;
       }
+      for (const dateHeader of ["Reading Date", "Fecha", "Date"]) {
+        if (dateHeader in data) data[dateHeader] = normalizeReadingDate(data[dateHeader]);
+      }
       const values = Object.values(data).filter(Boolean).join(" ").toLowerCase();
+      const headersInSheet = Array.from(headers.values()).map(normalizeHeader);
+      const isReadingSheet = headersInSheet.some((header) => ["unit", "unidad", "unit number"].includes(header)) &&
+        headersInSheet.some((header) => ["current reading", "lectura", "reading"].includes(header));
+      if (isReadingSheet) readingSheetDetected = true;
+      const isBillSheet = headersInSheet.some((header) => ["supplier", "supplier name", "proveedor"].includes(header)) &&
+        headersInSheet.some((header) => ["invoice number", "invoice", "nro factura"].includes(header));
+      const readingDate = data["Reading Date"] ?? data["Fecha"] ?? data["Date"];
+      const currentReading = data["Current Reading"] ?? data["Lectura"] ?? data["Reading"];
+      if (isReadingSheet && !hasText(readingDate) && !hasText(currentReading) && !hasText(fallbackReadingDate)) continue;
       const signature = `${sheet.name}:${row.rowNumber}:${values}`;
       if (seenRows.has(signature)) {
         duplicateRows.push({ sourceRowNumber: row.rowNumber, reason: `Duplicate workbook row on ${sheet.name}.` });
         continue;
       }
       seenRows.add(signature);
-      if (values.includes("invoice") || values.includes("supplier")) {
+      if (isBillSheet || values.includes("invoice") || values.includes("supplier")) {
         rows.push({ sourceRowNumber: row.rowNumber, kind: "bill", data });
-      } else if (values.includes("reading") || values.includes("unidad") || values.includes("unit")) {
+      } else if (isReadingSheet || values.includes("reading") || values.includes("unidad") || values.includes("unit")) {
         rows.push({ sourceRowNumber: row.rowNumber, kind: "reading", data });
       } else {
         unmatchedRows.push({ sourceRowNumber: row.rowNumber, reason: "Row did not match bill or reading import patterns." });
@@ -157,15 +191,13 @@ export async function parseGasWorkbook(file: File) {
         }
       } else {
         const unitNumber = data["Unit"] ?? data["Unidad"] ?? data["Unit Number"];
-        const readingDate = data["Reading Date"] ?? data["Fecha"] ?? data["Date"];
-        const currentReading = data["Current Reading"] ?? data["Lectura"] ?? data["Reading"];
         if (!hasText(unitNumber)) unresolvedUnitNumbers.push({ sourceRowNumber: row.rowNumber, reason: "Reading row is missing a Unit number." });
-        if (!hasText(readingDate) || !hasText(currentReading)) {
+        if ((!hasText(readingDate) && !hasText(fallbackReadingDate)) || !hasText(currentReading)) {
           invalidRows.push({ sourceRowNumber: row.rowNumber, reason: "Reading row is missing required reading date or current reading fields." });
         }
       }
     }
   }
   rmSync(tmpDir, { recursive: true, force: true });
-  return { rows, unmatchedRows, invalidRows, duplicateRows, unresolvedUnitNumbers };
+  return { rows, unmatchedRows, invalidRows, duplicateRows, unresolvedUnitNumbers, readingSheetDetected };
 }

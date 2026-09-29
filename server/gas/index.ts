@@ -3,11 +3,17 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveDevTestSessionId, getActiveDevTestSessionSummary, recordDevTestMutation } from "@/server/dev-test-session";
 import { getCurrentBuilding, listUnits } from "@/server/units";
+import { getStaffContext } from "@/server/staff-context";
+import { canEditReadyForReviewSourceMonth, getActiveReadingMonth } from "@/server/water/unit-meter-readings";
 import { parseGasWorkbook, type GasImportPreflight } from "./import";
 import { buildMissingGasReadingDrafts, gasReadingDateForSourceMonth } from "./dev-completion";
+import { isGasReadingMonthEditable } from "./editability";
+import { isGasReadingDateInMonth } from "./date";
 
 import type {
   GasBillInput,
+  GasBillsWorkspaceData,
+  GasProcessedBundle,
   GasBillRecord,
   GasBillSummary,
   GasReadingInput,
@@ -30,6 +36,18 @@ type GasWorkbookImportResponse = QueryResult<GasWorkbookImportResult> & {
   };
 };
 
+type GasImportRpcRow = {
+  unit_id: string;
+  current_reading: number;
+  reading_date: string;
+};
+
+type ConfirmedGasReading = {
+  unit_number?: unknown;
+  current_reading?: unknown;
+  reading_date?: unknown;
+};
+
 const GAS_BILL_SELECT =
   "id, building_id, supplier_name, invoice_number, invoice_date, amount, notes, processed_at, legacy_table, legacy_id, legacy_metadata, created_at, updated_at" as const;
 const GAS_READING_SELECT =
@@ -39,16 +57,107 @@ function statusFromBill(row: GasBillRecord) {
   return row.processed_at ? "processed" : "draft";
 }
 
+export function canMutateGasBills(roleKeys: string[]) {
+  return roleKeys.includes("building_manager") || roleKeys.includes("super_admin");
+}
+
+async function gasBillMutationAuthorization() {
+  const staffContext = await getStaffContext();
+  return staffContext && canMutateGasBills(staffContext.roleKeys)
+    ? null
+    : "You are not authorized to manage Gas supplier bills.";
+}
+
+export function classifyGasBillMutationFailure(bill: GasBillSummary | null) {
+  if (!bill) return "Bill not found or unavailable.";
+  return bill.processed_at ? "Processed bills are read-only." : "Bill could not be changed.";
+}
+
+function preflightFromConfirmedRows(value: unknown): GasImportPreflight {
+  const rows = Array.isArray(value) ? value.map((entry, index) => {
+    const reading = entry && typeof entry === "object" ? entry as ConfirmedGasReading : {};
+    const unitNumber = typeof reading.unit_number === "string" ? reading.unit_number.trim() : null;
+    const currentNumber = typeof reading.current_reading === "number"
+      ? reading.current_reading
+      : typeof reading.current_reading === "string" && reading.current_reading.trim()
+        ? Number(reading.current_reading)
+        : Number.NaN;
+    const currentReading = Number.isFinite(currentNumber) ? String(currentNumber) : null;
+    const readingDate = typeof reading.reading_date === "string" ? reading.reading_date.trim() : null;
+    return {
+      sourceRowNumber: index + 2,
+      kind: "reading" as const,
+      data: {
+        Unit: unitNumber,
+        "Current Reading": currentReading,
+        "Reading Date": readingDate,
+      },
+    };
+  }) : [];
+  return {
+    rows,
+    unmatchedRows: [],
+    invalidRows: [],
+    duplicateRows: [],
+    unresolvedUnitNumbers: [],
+    readingSheetDetected: true,
+  };
+}
+
 function isCondoUnit(unitTypeCode: string) {
   return unitTypeCode === "condo";
 }
 
+type GasReviewRosterUnit = {
+  id: string;
+  unit_number: string;
+  unit_type_code: "condo";
+  has_gas_service: true;
+};
+
+async function listGasReviewRoster(buildingId: string): Promise<QueryResult<GasReviewRosterUnit[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tb810_units")
+    .select("id, unit_number, has_gas_service, tb810_unit_types!tb810_units_unit_type_id_fkey!inner(code)")
+    .eq("building_id", buildingId)
+    .eq("has_gas_service", true)
+    .eq("tb810_unit_types.code", "condo")
+    .order("unit_number", { ascending: true });
+  if (error) return { data: [], error: error.message };
+
+  return {
+    data: (data ?? []).map((unit) => ({
+      id: unit.id,
+      unit_number: unit.unit_number,
+      unit_type_code: "condo",
+      has_gas_service: true,
+    })),
+    error: null,
+  };
+}
+
 export function normalizeGasReadingMonth(month: string) {
-  return `${month}-01`;
+  return `${month.slice(0, 7)}-01`;
 }
 
 export function gasReadingMonthKey(date: string) {
   return date.slice(0, 7);
+}
+
+function gasReadingDateError(readingDate: string, readingMonth: string) {
+  return isGasReadingDateInMonth(readingDate, readingMonth)
+    ? null
+    : "Reading date must belong to the selected operational month.";
+}
+
+async function gasReadingMonthEditError(monthKey: string) {
+  if (monthKey === getActiveReadingMonth().key) return null;
+  const correction = await canEditReadyForReviewSourceMonth(monthKey);
+  if (correction.error) return correction.error;
+  return isGasReadingMonthEditable(monthKey, correction.allowed, getActiveReadingMonth().key)
+    ? null
+    : "Only the current editable Gas reading month can be changed.";
 }
 
 export async function getPreviousGasReadingForUnit({
@@ -92,15 +201,139 @@ export async function listGasBills(): Promise<QueryResult<GasBillSummary[]>> {
   return { data: (data ?? []).map((row) => ({ ...row, status: statusFromBill(row) })), error: null };
 }
 
-export async function getGasBillById(id: string): Promise<QueryResult<GasBillSummary | null>> {
+function monthLabel(monthKey: string) {
+  const parsed = new Date(`${monthKey}-01T00:00:00Z`);
+  return Number.isNaN(parsed.getTime())
+    ? monthKey
+    : new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(parsed);
+}
+
+function sourceIdsFromSnapshot(value: unknown) {
+  if (!value || typeof value !== "object") return [];
+  const sourceIds = (value as { sourceIds?: unknown }).sourceIds;
+  return Array.isArray(sourceIds) ? sourceIds.filter((id): id is string => typeof id === "string") : [];
+}
+
+function asGasBillSummary(row: unknown): GasBillSummary {
+  const bill = row as GasBillRecord;
+  return { ...bill, status: statusFromBill(bill) };
+}
+
+type GenericQueryResult = { data: unknown[] | null; error: { message: string } | null };
+type GenericQuery = {
+  select(columns: string): GenericQuery;
+  in(column: string, values: string[]): GenericQuery;
+  eq(column: string, value: string): GenericQuery;
+  then<TResult>(onfulfilled?: (value: GenericQueryResult) => TResult | PromiseLike<TResult>, onrejected?: (reason: unknown) => TResult | PromiseLike<TResult>): PromiseLike<TResult>;
+};
+
+export async function loadGasBillsWorkspace(): Promise<QueryResult<GasBillsWorkspaceData>> {
+  const building = await getCurrentBuilding();
+  if (building.error) return { data: null as never, error: building.error };
+  if (!building.data) return { data: null as never, error: "Building not found." };
   const supabase = await createClient();
-  const { data, error } = await supabase.from("tb810_gas_bills").select(GAS_BILL_SELECT).eq("id", id).maybeSingle();
+
+  const [pendingResult, periodsResult, processedResult] = await Promise.all([
+    supabase
+      .from("tb810_gas_bills")
+      .select(GAS_BILL_SELECT)
+      .eq("building_id", building.data.id)
+      .is("processed_at", null)
+      .order("invoice_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("tb810_billing_periods")
+      .select("id, period_year, period_month, approved_at")
+      .eq("building_id", building.data.id)
+      .in("status", ["approved", "invoices_generated", "closed"])
+      .order("period_year", { ascending: false })
+      .order("period_month", { ascending: false }),
+    supabase
+      .from("tb810_gas_bills")
+      .select(GAS_BILL_SELECT)
+      .eq("building_id", building.data.id)
+      .not("processed_at", "is", null)
+      .order("invoice_date", { ascending: false }),
+  ]);
+  if (pendingResult.error) return { data: null as never, error: pendingResult.error.message };
+  if (periodsResult.error) return { data: null as never, error: periodsResult.error.message };
+  if (processedResult.error) return { data: null as never, error: processedResult.error.message };
+
+  const periods = periodsResult.data ?? [];
+  const processedBills = (processedResult.data ?? []).map(asGasBillSummary);
+  const periodIds = periods.map((period) => period.id);
+  let obligationRows: Array<{ billing_period_id: string; calculation_snapshot: unknown }> = [];
+  if (periodIds.length) {
+    const obligationsResult = await (supabase as unknown as { from(table: string): GenericQuery })
+      .from("tb810_monthly_financial_obligations")
+      .select("billing_period_id, calculation_snapshot")
+      .in("billing_period_id", periodIds)
+      .eq("obligation_type", "gas_consumption");
+    if (obligationsResult.error) return { data: null as never, error: obligationsResult.error.message };
+    obligationRows = (obligationsResult.data ?? []) as typeof obligationRows;
+  }
+
+  const sourceIdsByPeriod = new Map<string, Set<string>>();
+  for (const row of obligationRows) {
+    const ids = sourceIdsFromSnapshot(row.calculation_snapshot);
+    if (!sourceIdsByPeriod.has(row.billing_period_id)) sourceIdsByPeriod.set(row.billing_period_id, new Set());
+    for (const id of ids) sourceIdsByPeriod.get(row.billing_period_id)?.add(id);
+  }
+  const nativeSourceIds = new Set(Array.from(sourceIdsByPeriod.values()).flatMap((ids) => Array.from(ids)));
+  const referencedBillsResult = nativeSourceIds.size
+    ? await supabase
+      .from("tb810_gas_bills")
+      .select(GAS_BILL_SELECT)
+      .eq("building_id", building.data.id)
+      .in("id", Array.from(nativeSourceIds))
+    : { data: [], error: null };
+  if (referencedBillsResult.error) return { data: null as never, error: referencedBillsResult.error.message };
+  const billsById = new Map((referencedBillsResult.data ?? []).map(asGasBillSummary).map((bill) => [bill.id, bill]));
+  const bundles: GasProcessedBundle[] = periods.flatMap((period) => {
+    const ids = sourceIdsByPeriod.get(period.id);
+    if (!ids?.size) return [];
+    const bills = Array.from(ids).map((id) => billsById.get(id)).filter((bill): bill is GasBillSummary => Boolean(bill));
+    if (!bills.length) return [];
+    const monthKey = `${period.period_year}-${String(period.period_month).padStart(2, "0")}`;
+    return [{
+      billingPeriodId: period.id,
+      monthKey,
+      monthLabel: monthLabel(monthKey),
+      processedAt: period.approved_at,
+      bills,
+    }];
+  });
+  const legacyProcessedBills = processedBills.filter((bill) => !nativeSourceIds.has(bill.id));
+
+  return {
+    data: {
+      pendingBills: (pendingResult.data ?? []).map(asGasBillSummary),
+      processedBundles: bundles,
+      legacyProcessedBills,
+    },
+    error: null,
+  };
+}
+
+export async function getGasBillById(id: string): Promise<QueryResult<GasBillSummary | null>> {
+  const building = await getCurrentBuilding();
+  if (building.error) return { data: null, error: building.error };
+  if (!building.data) return { data: null, error: null };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tb810_gas_bills")
+    .select(GAS_BILL_SELECT)
+    .eq("id", id)
+    .eq("building_id", building.data.id)
+    .maybeSingle();
   if (error) return { data: null, error: error.message };
   if (!data) return { data: null, error: null };
   return { data: { ...data, status: statusFromBill(data) }, error: null };
 }
 
 export async function createGasBill(input: GasBillInput): Promise<QueryResult<GasBillRecord>> {
+  const authorizationError = await gasBillMutationAuthorization();
+  if (authorizationError) return { data: null as never, error: authorizationError };
   const building = await getCurrentBuilding();
   if (building.error) return { data: null as never, error: building.error };
   if (!building.data) return { data: null as never, error: "Building not found." };
@@ -115,33 +348,50 @@ export async function createGasBill(input: GasBillInput): Promise<QueryResult<Ga
 }
 
 export async function updateGasBill(id: string, input: GasBillInput): Promise<QueryResult<GasBillRecord>> {
+  const authorizationError = await gasBillMutationAuthorization();
+  if (authorizationError) return { data: null as never, error: authorizationError };
   const building = await getCurrentBuilding();
   if (building.error) return { data: null as never, error: building.error };
   if (!building.data) return { data: null as never, error: "Building not found." };
   const supabase = await createClient();
-  const bill = await getGasBillById(id);
-  if (bill.error) return { data: null as never, error: bill.error };
-  if (!bill.data) return { data: null as never, error: "Bill not found." };
-  if (bill.data.processed_at) return { data: null as never, error: "Processed bills are read-only." };
   const { data, error } = await supabase
     .from("tb810_gas_bills")
     .update({ ...input, building_id: building.data.id })
     .eq("id", id)
     .eq("building_id", building.data.id)
+    .is("processed_at", null)
     .select(GAS_BILL_SELECT)
-    .single();
+    .maybeSingle();
   if (error) return { data: null as never, error: error.message };
+  if (!data) {
+    const bill = await getGasBillById(id);
+    if (bill.error) return { data: null as never, error: bill.error };
+    return { data: null as never, error: classifyGasBillMutationFailure(bill.data) };
+  }
   return { data, error: null };
 }
 
 export async function deleteGasBill(id: string): Promise<QueryResult<{ id: string }>> {
+  const authorizationError = await gasBillMutationAuthorization();
+  if (authorizationError) return { data: null as never, error: authorizationError };
+  const building = await getCurrentBuilding();
+  if (building.error) return { data: null as never, error: building.error };
+  if (!building.data) return { data: null as never, error: "Building not found." };
   const supabase = await createClient();
-  const bill = await getGasBillById(id);
-  if (bill.error) return { data: null as never, error: bill.error };
-  if (!bill.data) return { data: null as never, error: "Bill not found." };
-  if (bill.data.processed_at) return { data: null as never, error: "Processed bills cannot be deleted." };
-  const { error } = await supabase.from("tb810_gas_bills").delete().eq("id", id);
+  const { data, error } = await supabase
+    .from("tb810_gas_bills")
+    .delete()
+    .eq("id", id)
+    .eq("building_id", building.data.id)
+    .is("processed_at", null)
+    .select("id")
+    .maybeSingle();
   if (error) return { data: null as never, error: error.message };
+  if (!data) {
+    const bill = await getGasBillById(id);
+    if (bill.error) return { data: null as never, error: bill.error };
+    return { data: null as never, error: classifyGasBillMutationFailure(bill.data) };
+  }
   return { data: { id }, error: null };
 }
 
@@ -184,6 +434,10 @@ export async function createGasReading(input: GasReadingInput): Promise<QueryRes
   const building = await getCurrentBuilding();
   if (building.error) return { data: null as never, error: building.error };
   if (!building.data) return { data: null as never, error: "Building not found." };
+  const editError = await gasReadingMonthEditError(gasReadingMonthKey(input.reading_month));
+  if (editError) return { data: null as never, error: editError };
+  const readingDateError = gasReadingDateError(input.reading_date, gasReadingMonthKey(input.reading_month));
+  if (readingDateError) return { data: null as never, error: readingDateError };
   const supabase = await createClient();
   const unitResult = await listUnits();
   if (unitResult.error) return { data: null as never, error: unitResult.error };
@@ -231,6 +485,8 @@ export async function completeMissingGasReadingsForCurrentBusinessMonth(
 
   const readingDate = gasReadingDateForSourceMonth(sourceReadingMonth);
   if (!readingDate) return { data: null as never, error: "Gas source month is invalid." };
+  const editError = await gasReadingMonthEditError(sourceReadingMonth);
+  if (editError) return { data: null as never, error: editError };
 
   const supabase = await createClient();
   const unitsResult = await listUnits();
@@ -314,10 +570,16 @@ export async function updateGasReading(id: string, input: GasReadingInput): Prom
   const building = await getCurrentBuilding();
   if (building.error) return { data: null as never, error: building.error };
   if (!building.data) return { data: null as never, error: "Building not found." };
-  const supabase = await createClient();
   const existing = await getGasReadingById(id);
   if (existing.error) return { data: null as never, error: existing.error };
   if (!existing.data) return { data: null as never, error: "Reading not found." };
+  const existingMonthError = await gasReadingMonthEditError(gasReadingMonthKey(existing.data.reading_month));
+  if (existingMonthError) return { data: null as never, error: existingMonthError };
+  const targetMonthError = await gasReadingMonthEditError(gasReadingMonthKey(input.reading_month));
+  if (targetMonthError) return { data: null as never, error: targetMonthError };
+  const readingDateError = gasReadingDateError(input.reading_date, gasReadingMonthKey(input.reading_month));
+  if (readingDateError) return { data: null as never, error: readingDateError };
+  const supabase = await createClient();
   const unitResult = await listUnits();
   if (unitResult.error) return { data: null as never, error: unitResult.error };
   const unit = unitResult.data.find((item) => item.id === input.unit_id);
@@ -348,35 +610,58 @@ export async function updateGasReading(id: string, input: GasReadingInput): Prom
 }
 
 export async function deleteGasReading(id: string): Promise<QueryResult<{ id: string }>> {
+  const existing = await getGasReadingById(id);
+  if (existing.error) return { data: null as never, error: existing.error };
+  if (!existing.data) return { data: null as never, error: "Reading not found." };
+  const editError = await gasReadingMonthEditError(gasReadingMonthKey(existing.data.reading_month));
+  if (editError) return { data: null as never, error: editError };
   const supabase = await createClient();
   const { error } = await supabase.from("tb810_gas_readings").delete().eq("id", id);
   if (error) return { data: null as never, error: error.message };
   return { data: { id }, error: null };
 }
 
+export async function clearCurrentGasMonth(monthKey: string) {
+  const activeMonth = getActiveReadingMonth();
+  if (monthKey !== activeMonth.key) {
+    return { data: null as never, error: "Only the current editable Gas month can be started over." };
+  }
+
+  const supabase = await createClient();
+  const sessionId = await getActiveDevTestSessionId();
+  const { data, error } = await supabase.rpc("tb810_clear_current_gas_reading_month", {
+    p_month_key: monthKey,
+    p_dev_session_id: sessionId,
+  });
+  if (error) return { data: null as never, error: error.message };
+  return { data: { deletedCount: Number(data ?? 0) }, error: null };
+}
+
 function normalizeText(value: string | null | undefined) {
   return value?.trim() ?? "";
 }
 
-function readingMonthFromDate(date: string) {
-  return `${date.slice(0, 7)}-01`;
-}
-
-export async function importGasWorkbook(file: File, confirmed = false): Promise<GasWorkbookImportResponse> {
+export async function importGasWorkbook(
+  file: File | null,
+  confirmed = false,
+  targetReadingMonth = "",
+  importReadingDate = "",
+  confirmedRows?: unknown,
+): Promise<GasWorkbookImportResponse> {
   const supabase = await createClient();
   const building = await getCurrentBuilding();
   if (building.error) return { data: null as never, error: building.error, imported: false, review: { rows: [], unmatchedRows: [], invalidRows: [], duplicateRows: [], unresolvedUnitNumbers: [], billMatches: 0, readingMatches: 0 } };
   if (!building.data) return { data: null as never, error: "Building not found.", imported: false, review: { rows: [], unmatchedRows: [], invalidRows: [], duplicateRows: [], unresolvedUnitNumbers: [], billMatches: 0, readingMatches: 0 } };
 
-  const unitsResult = await listUnits();
-  if (unitsResult.error) return { data: null as never, error: unitsResult.error, imported: false, review: { rows: [], unmatchedRows: [], invalidRows: [], duplicateRows: [], unresolvedUnitNumbers: [], billMatches: 0, readingMatches: 0 } };
+  const rosterResult = await listGasReviewRoster(building.data.id);
+  if (rosterResult.error) return { data: null as never, error: rosterResult.error, imported: false, review: { rows: [], unmatchedRows: [], invalidRows: [], duplicateRows: [], unresolvedUnitNumbers: [], billMatches: 0, readingMatches: 0 } };
   const condoByNumber = new Map(
-    unitsResult.data
-      .filter((unit) => unit.unit_type_code === "condo" && unit.has_gas_service)
-      .map((unit) => [unit.unit_number, unit]),
+    rosterResult.data.map((unit) => [unit.unit_number, unit]),
   );
 
-  const preflight = await parseGasWorkbook(file);
+  const preflight = file
+    ? await parseGasWorkbook(file, importReadingDate)
+    : preflightFromConfirmedRows(confirmedRows);
   const { rows } = preflight;
   const billRows = rows.filter((row) => row.kind === "bill");
   const readingRows = rows.filter((row) => row.kind === "reading");
@@ -384,15 +669,41 @@ export async function importGasWorkbook(file: File, confirmed = false): Promise<
     const unitNumber = normalizeText(row.data["Unit"] ?? row.data["Unidad"] ?? row.data["Unit Number"]);
     return !unitNumber || !condoByNumber.has(unitNumber);
   }).map((row) => ({ sourceRowNumber: row.sourceRowNumber, reason: "Reading row did not resolve to a gas-enabled condo Unit." }));
+  const readingRowsByUnit = new Map<string, typeof readingRows>();
+  for (const row of readingRows) {
+    const unitNumber = normalizeText(row.data["Unit"] ?? row.data["Unidad"] ?? row.data["Unit Number"]);
+    const rowsForUnit = readingRowsByUnit.get(unitNumber) ?? [];
+    rowsForUnit.push(row);
+    readingRowsByUnit.set(unitNumber, rowsForUnit);
+  }
+  const duplicateReadingRows = Array.from(readingRowsByUnit.entries())
+    .filter(([, rowsForUnit]) => rowsForUnit.length > 1)
+    .map(([unitNumber, rowsForUnit]) => ({
+      sourceRowNumber: rowsForUnit[0].sourceRowNumber,
+      reason: `Unit ${unitNumber} appears more than once in the workbook.`,
+    }));
   const review = {
     ...preflight,
     unmatchedRows: preflight.unmatchedRows,
     invalidRows: preflight.invalidRows,
-    duplicateRows: preflight.duplicateRows,
+    duplicateRows: [...preflight.duplicateRows, ...duplicateReadingRows],
     unresolvedUnitNumbers: [...preflight.unresolvedUnitNumbers, ...readingUnresolvedUnitNumbers],
     billMatches: billRows.length,
     readingMatches: readingRows.length,
+    expectedUnitCount: condoByNumber.size,
+    missingUnitNumbers: Array.from(condoByNumber.entries())
+      .filter(([unitNumber]) => !readingRows.some((row) => (row.data["Unit"] ?? row.data["Unidad"] ?? row.data["Unit Number"])?.trim() === unitNumber))
+      .map(([unitNumber]) => unitNumber),
+    readyToImport: false,
   };
+  const readingSetReady = Boolean(preflight.readingSheetDetected) && (
+    readingRows.length === condoByNumber.size &&
+    review.missingUnitNumbers.length === 0 &&
+    review.unresolvedUnitNumbers.length === 0 &&
+    review.invalidRows.length === 0 &&
+    review.duplicateRows.length === 0
+  );
+  review.readyToImport = readingSetReady;
   if (!confirmed) {
     return { data: { importedBillCount: 0, importedReadingCount: 0 }, error: null, imported: false, review };
   }
@@ -403,6 +714,40 @@ export async function importGasWorkbook(file: File, confirmed = false): Promise<
       imported: false,
       review,
     };
+  }
+
+  if (readingRows.length && billRows.length) {
+    return {
+      data: null as never,
+      error: "Upload a Gas readings workbook separately from supplier bills.",
+      imported: false,
+      review,
+    };
+  }
+
+  if (readingRows.length) {
+    if (!review.readyToImport) {
+      return {
+        data: null as never,
+        error: "Workbook review failed. Complete every eligible Gas Unit exactly once before importing.",
+        imported: false,
+        review,
+      };
+    }
+  }
+
+  if (readingRows.length) {
+    if (!/^\d{4}-\d{2}$/.test(targetReadingMonth)) {
+      return { data: null as never, error: "A target operational month is required for Gas reading imports.", imported: false, review };
+    }
+    const editError = await gasReadingMonthEditError(targetReadingMonth);
+    if (editError) return { data: null as never, error: editError, imported: false, review };
+    for (const row of readingRows) {
+      const readingDate = normalizeText(row.data["Reading Date"] ?? row.data["Fecha"] ?? row.data["Date"]) || importReadingDate;
+      if (!isGasReadingDateInMonth(readingDate, targetReadingMonth)) {
+        return { data: null as never, error: `Reading row ${row.sourceRowNumber} has a date outside the target operational month.`, imported: false, review };
+      }
+    }
   }
 
   if (!billRows.length && !readingRows.length) {
@@ -438,37 +783,32 @@ export async function importGasWorkbook(file: File, confirmed = false): Promise<
     importedBillCount += 1;
   }
 
-  for (const row of readingRows) {
-    const unitNumber = normalizeText(row.data["Unit"] ?? row.data["Unidad"] ?? row.data["Unit Number"]);
-    const readingDate = normalizeText(row.data["Reading Date"] ?? row.data["Fecha"] ?? row.data["Date"]);
-    const currentReading = Number(normalizeText(row.data["Current Reading"] ?? row.data["Lectura"] ?? row.data["Reading"]));
-    const previousReadingRaw = normalizeText(row.data["Previous Reading"] ?? row.data["Lectura anterior"] ?? row.data["Previous"]);
-    const previousReading = previousReadingRaw ? Number(previousReadingRaw) : null;
-    if (!unitNumber || !readingDate || !Number.isFinite(currentReading)) {
-      return { data: null as never, error: `Reading row ${row.sourceRowNumber} is invalid after preflight review.`, imported: false, review };
+  if (readingRows.length) {
+    const rpcRows: GasImportRpcRow[] = [];
+    for (const row of readingRows) {
+      const unitNumber = normalizeText(row.data["Unit"] ?? row.data["Unidad"] ?? row.data["Unit Number"]);
+      const readingDate = normalizeText(row.data["Reading Date"] ?? row.data["Fecha"] ?? row.data["Date"]) || importReadingDate;
+      const currentReading = Number(normalizeText(row.data["Current Reading"] ?? row.data["Lectura"] ?? row.data["Reading"]));
+      if (!unitNumber || !readingDate || !Number.isFinite(currentReading)) {
+        return { data: null as never, error: `Reading row ${row.sourceRowNumber} is invalid after preflight review.`, imported: false, review };
+      }
+      const unit = condoByNumber.get(unitNumber);
+      if (!unit) {
+        return { data: null as never, error: `Reading row ${row.sourceRowNumber} did not resolve to a gas-enabled condo Unit.`, imported: false, review };
+      }
+      rpcRows.push({ unit_id: unit.id, current_reading: currentReading, reading_date: readingDate });
     }
-    const unit = condoByNumber.get(unitNumber);
-    if (!unit) {
-      return { data: null as never, error: `Reading row ${row.sourceRowNumber} did not resolve to a gas-enabled condo Unit.`, imported: false, review };
-    }
-    const { error } = await supabase.from("tb810_gas_readings").upsert(
-      {
-        building_id: building.data.id,
-        unit_id: unit.id,
-        reading_month: readingMonthFromDate(readingDate),
-        reading_date: readingDate,
-        previous_reading: previousReading,
-        current_reading: currentReading,
-        consumption: previousReading == null ? null : currentReading - previousReading,
-        notes: normalizeText(row.data["Notes"] ?? row.data["Comentarios"]) || null,
-        legacy_table: "gas_spreadsheet",
-        legacy_id: `${row.sourceRowNumber}`,
-        legacy_metadata: { source_row_number: row.sourceRowNumber, worksheet_row: row.data },
-      },
-      { onConflict: "building_id,unit_id,reading_month" },
-    );
+    const sessionId = await getActiveDevTestSessionId();
+    const rpcName = sessionId
+      ? "tb810_sync_dev_gas_reading_import"
+      : "tb810_sync_gas_reading_import";
+    const rpcArgs = (rpcName === "tb810_sync_dev_gas_reading_import")
+      ? { p_session_id: sessionId, p_month_key: targetReadingMonth, p_rows: rpcRows }
+      : { p_month_key: targetReadingMonth, p_rows: rpcRows };
+    const { data, error } = await (supabase as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { code?: string; message: string; details?: string; hint?: string } | null }> }).rpc(rpcName, rpcArgs);
     if (error) return { data: null as never, error: error.message, imported: false, review };
-    importedReadingCount += 1;
+    const result = (Array.isArray(data) ? data[0] : data) as { processed_count?: number } | undefined;
+    importedReadingCount = Number(result?.processed_count ?? readingRows.length);
   }
 
   return { data: { importedBillCount, importedReadingCount }, error: null, imported: true, review };

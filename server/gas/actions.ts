@@ -8,6 +8,7 @@ import {
   completeMissingGasReadingsForCurrentBusinessMonth,
   createGasBill,
   createGasReading,
+  clearCurrentGasMonth,
   deleteGasBill,
   deleteGasReading,
   importGasWorkbook,
@@ -16,7 +17,7 @@ import {
 } from "./index";
 import { addGasSupplierBillForCurrentBusinessMonth } from "./dev-bill";
 import type { GasImportPreflight } from "./import";
-import { gasBillInputSchema, gasReadingInputSchema } from "./validation";
+import { gasBillInputSchema, gasReadingInputSchema, userFacingGasBillError } from "./validation";
 
 export type GasFormState = {
   success?: string;
@@ -57,9 +58,30 @@ function toBoolean(value: FormDataEntryValue | null) {
   return String(value ?? "").trim() === "true";
 }
 
+function userFacingGasReadingError(error: string) {
+  const internalError = /duplicate key|violates .*constraint|constraint .* violated|relation .* does not exist|column .* does not exist|rpc/i.test(error);
+  return internalError ? "Unable to save this Gas data. Please try again." : error;
+}
+
+function revalidateGasBills() {
+  revalidatePath("/gas/bills", "layout");
+}
+
+function gasReadingFieldError(error: string) {
+  return error === "Reading date must belong to the selected operational month." ? { reading_date: error } : undefined;
+}
+
+function gasReadingRoute(formData: FormData) {
+  return `/gas/unit-gas-readings/${String(formData.get("reading_month") ?? "").slice(0, 7)}`;
+}
+
+function isGasWorkbookReadError(error: unknown) {
+  return error instanceof Error && error.message === "Unable to read workbook.";
+}
+
 export async function createGasBillAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
   const values = {
-    supplier_name: String(formData.get("supplier_name") ?? ""),
+    supplier_name: "Not recorded",
     invoice_number: String(formData.get("invoice_number") ?? ""),
     invoice_date: String(formData.get("invoice_date") ?? ""),
     amount: toNumber(formData.get("amount")),
@@ -70,7 +92,8 @@ export async function createGasBillAction(_prev: GasFormState, formData: FormDat
     return { error: "Please fix the highlighted fields.", fieldErrors: mapFieldErrors(validation.error.issues), values: toValues(formData) };
   }
   const result = await createGasBill(validation.data);
-  if (result.error) return { error: result.error, values: toValues(formData) };
+  if (result.error) return { error: userFacingGasBillError(result.error), values: toValues(formData) };
+  revalidateGasBills();
   return { success: "Bill saved.", values: { bill_id: result.data.id } };
 }
 
@@ -88,13 +111,15 @@ export async function updateGasBillAction(_prev: GasFormState, formData: FormDat
     return { error: "Please fix the highlighted fields.", fieldErrors: mapFieldErrors(validation.error.issues), values: toValues(formData) };
   }
   const result = await updateGasBill(billId, validation.data);
-  if (result.error) return { error: result.error, values: toValues(formData) };
+  if (result.error) return { error: userFacingGasBillError(result.error), values: toValues(formData) };
+  revalidateGasBills();
   return { success: "Bill saved.", values: { bill_id: result.data.id } };
 }
 
 export async function deleteGasBillAction(formData: FormData): Promise<void> {
   const result = await deleteGasBill(String(formData.get("bill_id") ?? ""));
-  if (result.error) throw new Error(result.error);
+  if (result.error) throw new Error(userFacingGasBillError(result.error));
+  revalidateGasBills();
 }
 
 export async function createGasReadingAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
@@ -110,7 +135,11 @@ export async function createGasReadingAction(_prev: GasFormState, formData: Form
     return { error: "Please fix the highlighted fields.", fieldErrors: mapFieldErrors(validation.error.issues), values: toValues(formData) };
   }
   const result = await createGasReading(validation.data);
-  if (result.error) return { error: result.error, values: toValues(formData) };
+  if (result.error) {
+    const error = userFacingGasReadingError(result.error);
+    return { error, fieldErrors: gasReadingFieldError(error), values: toValues(formData) };
+  }
+  revalidatePath(gasReadingRoute(formData));
   return { success: "Reading saved.", values: { reading_id: result.data.id } };
 }
 
@@ -128,30 +157,74 @@ export async function updateGasReadingAction(_prev: GasFormState, formData: Form
     return { error: "Please fix the highlighted fields.", fieldErrors: mapFieldErrors(validation.error.issues), values: toValues(formData) };
   }
   const result = await updateGasReading(readingId, validation.data);
-  if (result.error) return { error: result.error, values: toValues(formData) };
+  if (result.error) {
+    const error = userFacingGasReadingError(result.error);
+    return { error, fieldErrors: gasReadingFieldError(error), values: toValues(formData) };
+  }
+  revalidatePath(gasReadingRoute(formData));
   return { success: "Reading saved.", values: { reading_id: result.data.id } };
 }
 
 export async function deleteGasReadingAction(formData: FormData): Promise<void> {
   const result = await deleteGasReading(String(formData.get("reading_id") ?? ""));
-  if (result.error) throw new Error(result.error);
+  if (result.error) throw new Error(userFacingGasReadingError(result.error));
+}
+
+export async function clearCurrentGasMonthAction(
+  monthKey: string,
+  _prev: GasFormState,
+  _formData: FormData,
+): Promise<GasFormState> {
+  void _prev;
+  void _formData;
+  const result = await clearCurrentGasMonth(monthKey);
+  if (result.error) return { error: userFacingGasReadingError(result.error) };
+  revalidatePath(`/gas/unit-gas-readings/${monthKey}`);
+  return { success: `Removed ${result.data.deletedCount} ${monthKey} Gas meter readings.` };
 }
 
 export async function importGasWorkbookAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
-  const file = formData.get("workbook");
-  if (!(file instanceof File)) {
-    return { error: "Unable to open workbook." };
-  }
   const confirmed = toBoolean(formData.get("confirmed"));
-  const result = await importGasWorkbook(file, confirmed);
-  if (result.error) return { error: result.error, review: result.review };
-  if (!result.imported) {
-    return {
-      review: result.review,
-      success: "Review the workbook summary, then confirm import to write records.",
-    };
+  const file = formData.get("workbook");
+  if (!confirmed && (!(file instanceof File) || file.size === 0 || !file.name.trim())) {
+    return { error: "Choose a workbook to review." };
   }
-  return { success: `Imported ${result.data.importedBillCount} bills and ${result.data.importedReadingCount} readings from ${file.name}.` };
+  const targetReadingMonth = String(formData.get("target_reading_month") ?? "").trim();
+  const importReadingDate = String(formData.get("import_reading_date") ?? "").trim();
+  let confirmedRows: unknown;
+  if (confirmed) {
+    try {
+      confirmedRows = JSON.parse(String(formData.get("confirmed_readings") ?? ""));
+    } catch {
+      return { error: "The review has expired. Upload the workbook again." };
+    }
+  }
+  try {
+    const result = await importGasWorkbook(
+      file instanceof File && file.size > 0 ? file : null,
+      confirmed,
+      targetReadingMonth,
+      importReadingDate,
+      confirmedRows,
+    );
+    if (result.error) {
+      const error = userFacingGasReadingError(result.error);
+      return { error, review: result.review };
+    }
+    if (!result.imported) {
+      return {
+        review: result.review,
+        success: "Review the workbook summary, then confirm import to write records.",
+      };
+    }
+    if (confirmed) revalidatePath(`/gas/unit-gas-readings/${targetReadingMonth}`);
+    return { success: `Imported ${result.data.importedBillCount} bills and ${result.data.importedReadingCount} readings.` };
+  } catch (error) {
+    if (isGasWorkbookReadError(error)) {
+      return { error: "Unable to read this workbook. Choose a valid .xlsx file." };
+    }
+    throw error;
+  }
 }
 
 export async function completeGasReadingsAction(formData: FormData): Promise<void> {

@@ -31,7 +31,7 @@ export function Panel<T extends ElementType = "div">({
   return (
     <Component
       className={joinClasses(
-        "rounded-2xl border border-zinc-200 bg-white shadow-sm",
+        "rounded-2xl  bg-white border border-zinc-200 shadow-sm ",
         paddingClasses[padding],
         className,
       )}

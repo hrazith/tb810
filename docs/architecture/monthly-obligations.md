@@ -4,7 +4,7 @@ Status: Frozen concept document
 
 Date: August 7, 2026
 
-This document is the canonical architecture reference for Monthly Obligations.
+This document is the canonical architecture reference for Monthly Obligations. The historical facts and decisions for the October cutover are recorded separately in [`docs/migrations/october-2026-first-ride.md`](../migrations/october-2026-first-ride.md).
 It consolidates the frozen decisions that define the month-centric financial workspace for TB810.
 
 The snapshot foundation, snapshot-aware bounded read, the first Carlos
@@ -31,11 +31,11 @@ Canonical philosophy:
 
 ### Historical boundary
 
-September 2026 is the canonical beginning of native TB810 Monthly Obligation history.
+For the Road to October cutover, September 2026 is the final legacy-generated obligation month. October 2026 is the first native TB810 Monthly Obligation lifecycle month and the First Real Ride target. September native source inputs build October obligations; they must not be confused with a native September obligation package.
 
-January-August 2026 Billing Period records are historical monthly containers, not incomplete native Obligation packages. Their absence of persisted Monthly Obligation rows is expected and must not be treated as lifecycle corruption or repaired through retroactive obligation generation.
+January-August 2026 Billing Period records are historical monthly containers, not incomplete native Obligation packages. September legacy obligations remain a parity benchmark and must not be retroactively pushed through the native Giuliana -> Pulse -> Carlos -> snapshot workflow merely to make lifecycle state appear complete.
 
-For MVP, TB810 does not reconstruct or persist Monthly Obligation packages for periods before September 2026. Historical source data remains authoritative for those periods.
+For MVP, TB810 does not reconstruct or persist native Monthly Obligation packages for periods before October 2026. Historical source data and the final September legacy obligation remain authoritative for cutover verification.
 
 The implementation provenance is:
 

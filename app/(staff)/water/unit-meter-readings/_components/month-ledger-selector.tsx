@@ -8,6 +8,7 @@ type Props = {
   activeMonthKey: string;
   searchQuery: string;
   monthOptions: MonthOption[];
+  routeBase?: string;
 };
 
 type MonthOption = {
@@ -15,14 +16,14 @@ type MonthOption = {
   label: string;
 };
 
-function routeForMonth(monthKey: string, searchQuery: string) {
+function routeForMonth(monthKey: string, searchQuery: string, routeBase: string) {
   const params = new URLSearchParams();
   if (searchQuery) params.set("q", searchQuery);
   const query = params.toString();
-  return `/water/unit-meter-readings/${monthKey}${query ? `?${query}` : ""}`;
+  return `${routeBase}/${monthKey}${query ? `?${query}` : ""}`;
 }
 
-export function MonthLedgerSelector({ activeMonthKey, searchQuery, monthOptions }: Props) {
+export function MonthLedgerSelector({ activeMonthKey, searchQuery, monthOptions, routeBase = "/water/unit-meter-readings" }: Props) {
   const router = useRouter();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -67,7 +68,7 @@ export function MonthLedgerSelector({ activeMonthKey, searchQuery, monthOptions 
   }, [open, selectedIndex]);
 
   function selectMonth(nextMonth: string) {
-    router.replace(routeForMonth(nextMonth, searchQuery));
+    router.replace(routeForMonth(nextMonth, searchQuery, routeBase));
     setOpen(false);
     buttonRef.current?.focus();
   }

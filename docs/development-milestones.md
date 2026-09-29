@@ -2,7 +2,7 @@
 
 ## Road to October — First Real Ride
 
-**Date context:** September 24, 2026  
+**Date context:** September 2026
 **Target:** Turn of month into October 2026
 
 > **Prove TB810 can carry Giuliana and Carlos through one real turn of the monthly financial cycle using actual building data, with numbers Carlos can trust.**
@@ -17,16 +17,98 @@ The intended demonstration is:
 4. At the correct turn-of-month rhythm, Pulse makes October eligible for handoff.
 5. Giuliana hands October to Carlos.
 6. Carlos sees an October package produced from the real source facts.
-7. TB810's October obligations match the legacy calculation exactly.
+7. TB810's October obligations can be proven against the existing operating model.
 8. Carlos reviews and approves the package.
+9. TB810 creates the immutable October obligation snapshot and processes the exact consumed Gas supplier bills.
 
 The demo should feel like the first credible operational month in TB810, not a feature walkthrough.
 
+### The First Ride — September -> October 2026
+
+The durable historical cutover ledger is [`docs/migrations/october-2026-first-ride.md`](migrations/october-2026-first-ride.md). It separates legacy facts, reconciled facts, Carlos-confirmed business facts, TB810 decisions, and open migration questions.
+
+The First Ride asks whether Giuliana can complete the real September operation in TB810, whether TB810 can produce an October obligation whose numbers can be proven against the existing operating model, and whether that package can make the real handoff to Carlos for approval.
+
+The First Ride ends when:
+
+- real September source facts have been entered;
+- October calculations are proven;
+- October reaches the correct handoff;
+- Carlos can understand and review the package;
+- Carlos approves;
+- the immutable October obligation snapshot is created; and
+- the consumed Gas supplier bills become processed.
+
+Invoice generation and dispatch are not required to complete the First Ride.
+
+### The Ruthless Scope
+
+For any proposed work, ask:
+
+1. Does this help Giuliana complete the real September work?
+2. Does this help prove October's numbers?
+3. Does this help complete the handoff to Carlos?
+
+If the answer is no to all three, it does not enter the First Ride unless explicitly reconsidered.
+
+Long term, TB810 should replace the operational Gas workbook completely. That does not mean every workbook capability belongs in the First Ride. Deferred capabilities remain documented as known omissions, not forgotten requirements.
+
 ### A — Historical lifecycle boundary — CLOSED
 
-September 2026 is the beginning of TB810's native Obligation history. Months before September 2026 remain historical source-data periods. TB810 does not need to reconstruct or approve retroactive obligation packages for earlier periods. Historical lifecycle repair is not part of the October checkpoint.
+The authoritative legacy snapshot is [`legacy/sql/torrebal_admincondo.sql`](../legacy/sql/torrebal_admincondo.sql), replaced with a fresh production export on September 28, 2026. The older `legacy/sql/localhost.sql` is not authoritative and must not be used for cutover or parity decisions.
 
-### B — Water baseline + operational intake
+The cutover boundary is frozen:
+
+- August 2026: final authoritative legacy Unit Water and Sedapal source cycle;
+- September 2026: final legacy-generated obligation month and native TB810 source-input month;
+- October 2026: intended first native TB810 obligation month and First Real Ride.
+
+The month model is:
+
+```text
+August legacy source facts -> September legacy obligation
+September native TB810 source facts -> October native obligation
+```
+
+September source work must not be conflated with September obligation generation. September does not need to be retroactively pushed through the native Giuliana -> Pulse -> Carlos -> snapshot workflow merely to make lifecycle state appear complete. Months before October remain historical/cutover data for this milestone; October is the native lifecycle proof.
+
+### B — Water baseline + operational intake — CLOSED
+
+#### Financial and cutover decisions — FROZEN / OPEN WHERE NOTED
+
+The authoritative legacy September inventory is 77 maintenance bills for 76 distinct owners:
+
+- persisted parent total: PEN 24,687.11;
+- fixed parent total: PEN 21,464.15;
+- Water parent total: PEN 3,042.96;
+- Others parent total: PEN 180.00.
+
+Known cent-level parent/detail differences are part of the legacy record and must not be normalized solely for parity.
+
+The authoritative 2026 monthly operating budget is PEN 20,055.00. TB810's earlier PEN 22,000.00 value was a development entry made through the Budget UI, not a newer business value, and has been corrected through that same UI to PEN 20,055.00. No historical budget versioning is required to explain the former development value.
+
+Legacy `units.bill_adjustment` is a generic legacy mechanism, not a canonical TB810 concept. Its observed behavior is:
+
+```text
+round(monthly budget * participation percentage, 2) + bill_adjustment
+```
+
+The September 28 legacy configuration contains 63 condos at PEN 22.00, Unit 904 at PEN 10.00, EST-13 at PEN 8.40, and EST-42 at PEN 8.00. All 66 adjusted units match their September legacy detail rows. The May 2026 PEN 22 pattern is bulk-like but its mechanism and business purpose are not proven; it must be translated by meaning rather than automatically migrated.
+
+Whether the PEN 22 condo charge continues into October is **BUSINESS CONFIRMATION REQUIRED**. Do not silently carry it forward or silently remove it.
+
+TB810 charge semantics are frozen:
+
+- a Unit Charge belongs to a Unit/property and follows the applicable owner for the obligation period;
+- an Owner Direct Charge belongs directly to an Owner and is not dependent on a Unit;
+- both require a mandatory explanatory comment, including bulk-created charges;
+- bulk operations must remain identifiable as grouped operations and support coherent review/edit/removal before approval.
+
+Carlos confirmed that the May PEN 22 pattern represents `Bono empleados`. For October-December 2026, the intended native representation is a separate grouped PEN 22 Unit Charge for every condo, including Unit 904. Unit 904's historical PEN 10, EST-13's PEN 8.40, and EST-42's PEN 8.00 remain open and must not be carried into October automatically.
+
+The September 2026 legacy financial parity checkpoint is **PROVEN / CLOSED**. All 77 obligations are mathematically explained, with exact detail-level parity and a documented legacy-versus-native Water policy difference. The detailed ledger is [`docs/migrations/september-2026-legacy-parity.md`](migrations/september-2026-legacy-parity.md). Do not materialize native September obligations merely to make lifecycle state appear complete.
+
+Legacy September Metered Water is PEN 2,936.08 because the historical system applied its stored rounded PEN 4.28 unit price per condo. Current TB810's precise-rate result is PEN 2,935.07, a proven PEN 1.01 policy difference. The October Water policy choice remains open and must be explicit before native October approval; no calculation change is implied here.
 
 #### B1 — Sedapal / Common Water — COMPLETE
 
@@ -79,7 +161,7 @@ After reconciliation, freeze the boundary:
 - Legacy Unit Water: through August 2026
 - Native TB810 Unit Water: September 2026 onward
 
-September 2026 is the first native operational Unit Water input month.
+September 2026 is the first native operational Unit Water input month; October 2026 is the first native TB810 obligation lifecycle month.
 
 #### B2.5 Unit Water intake UX — CLOSED / ACCEPTED
 
@@ -101,22 +183,121 @@ Start over is limited to the current editable Unit Water month. It atomically re
 
 Water is now **CLOSED / ACCEPTED** for the Road to October checkpoint. Remaining Water UX debt is non-blocking and deferred to one consolidated pass: replace the native Start over confirmation with a TB810 confirmation dialog; reconsider Start over and Upload readings as one contextual intake/recovery control; reduce the visual dominance of repeated red per-row Delete actions; retain visible month/obligation context in Sedapal intake; rename Sedapal "Save Reading" to bill-operation language; and make the post-review workbook confirmation action the clear focus.
 
-### C — Gas operational readiness
+### Gas business model
 
-Do not turn this into a historical Gas reconstruction project unless history directly blocks the October cycle.
+The frozen Gas model is:
 
-- **C1:** Confirm the actual currently applicable September Gas-served units using current operational applicability.
-- **C2:** Ensure Giuliana can efficiently enter and verify the actual September Gas readings.
-- **C3:** Verify the real Gas supplier-bill workflow and UX. Bill presence is not automatically Gas readiness unless the current business rule requires it.
-- **C4:** Confirm DEV-safe current-month testing and reset without damaging authoritative history.
+```text
+supplier purchases arrive
+-> supplier bills accumulate in an unprocessed pool
+-> Gas meter readings establish unit consumption
+-> accumulated supplier cost / aggregate consumption = blended Gas rate
+-> rate x unit consumption = unit Gas allocation
+-> allocations become part of the monthly obligation
+-> handoff to Carlos
+-> approval creates immutable snapshot
+-> exact consumed supplier bills become processed
+```
 
-### D — September -> October REAL cycle — CARLOS CHECKPOINT
+Frozen semantics:
 
-#### D1 — Clean starting state
+- Draft Supplier Bills are the live unprocessed pool.
+- Multiple supplier bills may accumulate into one obligation.
+- Bills may cross invoice-date/calendar boundaries.
+- Invoice date is source metadata and an eligibility/cutoff fact, not the primary historical grouping model.
+- No supplier-bill service month is introduced for the First Ride.
+- Native processed bills are grouped by the obligation package that consumed them.
+- Native snapshot `sourceIds` are canonical provenance.
+- Native obligation bundles are not fabricated for legacy/pre-snapshot processed bills.
+
+### C — September Gas Meter Readings — CLOSED / ACCEPTED / FROZEN
+
+The Gas reading roster, current-month intake, complete-set import, date validation, current-month editability, historical protection, and safe current-month reset are accepted for the First Ride.
+
+### D — Gas Supplier Bills + Gas business parity — CURRENT
+
+The remaining First Ride work is:
+
+- Draft pool UX pass;
+- Processed obligation-bundle UX pass;
+- real September supplier-bill intake;
+- CRUD acceptance;
+- duplicate and error handling;
+- authorization and building-isolation hardening;
+- processed immutability;
+- calculation integration;
+- exact source provenance and Carlos's read-only constituent-bill view; and
+- thorough functional and UX testing.
+
+#### Gas capabilities inside the First Ride
+
+- September Gas Meter Readings;
+- Gas Supplier Bill intake and the live draft pool;
+- multiple-bill accumulation;
+- supplier bill edit/delete behavior before processing;
+- safe authorization and building isolation;
+- Gas calculation, supplier-pool total, aggregate consumption, blended rate, and per-unit allocation;
+- exact source provenance;
+- October readiness;
+- Pulse/month-turn handoff;
+- Carlos review and proof;
+- Carlos approval;
+- immutable snapshot creation; and
+- processing of the consumed supplier bills.
+
+#### Gas capabilities deliberately deferred
+
+These are known workbook capabilities, but are not required for the First Ride:
+
+- supplier PDF/image storage and OCR;
+- Gas-cylinder inventory management;
+- explicit supplier service-period field;
+- invoice generation and dispatch;
+- owner Gas statements;
+- payment allocation;
+- Gas debt and aging;
+- bank deposit workflow;
+- collection workflow;
+- advanced reconciliation/reporting; and
+- historical bundle reconstruction without authoritative provenance.
+
+### E — Remaining September source inputs / Charges — PENDING
+
+Complete the real September source facts and any Unit/Owner charges relevant to October.
+
+### F — October calculation parity and proof — PENDING
+
+Prove the October calculation against the workbook business model at component, unit, owner where applicable, and grand-total levels. Do not accept an unexplained difference merely because the grand total matches.
+
+### G — Month-turn / Pulse handoff — PENDING
+
+Financial readiness and calendar handoff eligibility remain separate. Pulse must make October eligible at the correct boundary without bypassing the lifecycle.
+
+### H — Carlos review and approval — PENDING
+
+Carlos must see a credible October package, understand the live financial composition and exact constituent Gas bills through a read-only view, and approve only through the server-authorized approval path.
+
+### I — October immutable snapshot / First Ride complete — PENDING
+
+Approval must create the immutable October obligation snapshot and process the exact consumed native Gas supplier bills. Invoice generation and dispatch remain outside this milestone.
+
+### J — Invoice generation / dispatch — POST-FIRST-RIDE / DEFERRED
+
+Invoice generation and dispatch are not required for the First Ride.
+
+### Frozen Gas First Ride decisions
+
+- **Zero supplier bills:** No eligible supplier bills means PEN 0 supplier spend. With complete valid readings and nonzero consumption, the result is a PEN 0 blended rate and PEN 0 Gas allocations. No separate zero-spend confirmation is required for the First Ride.
+- **Calculation and rounding:** The blended rate uses full available precision internally. Each unit multiplies consumption by the unrounded rate, then rounds its final Gas obligation to two decimals. Residual cents are not redistributed merely to force the rounded aggregate to equal the supplier pool. Historical parity covered six representative periods and 348 unit-period comparisons with zero cent-level unit-charge mismatches. TB810's six-decimal returned/displayed rate is acceptable.
+- **Carlos Gas provenance:** Carlos receives a read-only view of the exact constituent Gas supplier bills included in the live package/calculation. The bills come from canonical package inputs/provenance. Carlos does not add, reject, exclude, replace, or otherwise curate the supplier pool during the First Ride. Pool curation and recalculation are post-MVP.
+
+### K — September -> October REAL cycle — FIRST RIDE CHECKPOINT
+
+#### K1 — Clean starting state
 
 Before the real ride, authoritative history through August must be clean enough to support the cycle, stale development/test obligation packages must not contaminate September or October, and September must be available as the real operational source month.
 
-#### D2 — Giuliana enters actual September facts
+#### K2 — Giuliana enters actual September facts
 
 Use real building inputs, not fixtures or demo values:
 
@@ -128,19 +309,19 @@ Use real building inputs, not fixtures or demo values:
 
 The intake workflows must be usable enough for Giuliana to perform this herself.
 
-#### D3 — October unblocks naturally
+#### K3 — October unblocks naturally
 
 Do not manually manufacture Ready state. As required source work is completed, TB810 should progress naturally from Missing / Building / Blocked to Ready and make the remaining blockers obvious.
 
-#### D4 — Legacy parity validation
+#### K4 — Legacy parity validation
 
 Before the Carlos demo, independently reproduce the legacy October calculation from the exact same real September facts. Compare TB810 October with Legacy October at component, unit, owner where applicable, and grand-total levels. Relevant components include Water, Gas, regular/common obligations, Unit Charges, and Owner-direct charges. Do not accept unexplained differences; matching only the grand total is insufficient.
 
-#### D5 — Monthly beat / Pulse
+#### K5 — Monthly beat / Pulse
 
 Financial readiness and handoff eligibility remain separate. October may become financially ready before month-turn; at the appropriate calendar boundary, Pulse makes October eligible for handoff. Giuliana then hands October to Carlos, while operational attention advances into November. Do not bypass Pulse merely to make the demo work.
 
-#### D6 — Carlos review + approval
+#### K6 — Carlos review + approval
 
 Carlos should receive a quiet, credible October package showing approval readiness, source-work completion, package total, relevant component/unit/owner detail, and genuine financial exceptions. He should recognize that TB810 matches the trusted legacy calculation, then approve the package.
 
@@ -157,7 +338,7 @@ Avoid turning the demo into a tour of screens.
 
 ## 4–5 Day Critical Path
 
-### B2.5 Slice A Status
+### B2.5 Slice A Status — CLOSED / ACCEPTED / FROZEN
 
 Slice A implements the primary Unit Water monthly intake contract:
 
@@ -168,22 +349,19 @@ Slice A implements the primary Unit Water monthly intake contract:
 - confirmation uses the canonical `tb810_meter_readings` month identity and one atomic persistence operation;
 - active DEV sessions use the transactional Unit Water import journal wrapper for exact reset ownership.
 
-Manual acceptance remains outstanding, so B2.5 is not complete.
+Slice A is accepted for the First Ride. Further work belongs only in the current Gas, October proof, handoff, or Carlos milestones above.
 
-1. Complete B2.3 Unit Water historical/development cleanup.
-2. Freeze the B2.4 operational boundary.
-3. Inspect and tighten B2.5 Unit Water intake UX.
-4. Validate the C Gas intake workflow using real September needs.
-5. Enter or rehearse actual September source facts.
-6. Validate the October obligation calculation against legacy.
-7. Fix only discrepancies or blockers that prevent parity or the operational ride.
-8. Validate Pulse/handoff at the month boundary.
-9. Validate the Carlos review/approval experience.
-10. Rehearse the complete Giuliana -> Carlos story.
+1. Validate the current Gas Supplier Bills milestone using real September needs.
+2. Enter the remaining real September source facts.
+3. Validate the October obligation calculation against legacy.
+4. Fix only discrepancies or blockers that prevent parity or the operational ride.
+5. Validate Pulse/handoff at the month boundary.
+6. Validate the Carlos review/approval experience.
+7. Rehearse the complete Giuliana -> Carlos story.
 
-This order may change if a direct blocker to D is discovered.
+This order may change if a direct blocker to the First Ride is discovered.
 
-## Explicitly Deferred Unless They Block D
+## Explicitly Deferred Unless They Block the First Ride
 
 Do not allow these to consume the next 4–5 days unless they directly block the October checkpoint:
 
@@ -194,7 +372,14 @@ Do not allow these to consume the next 4–5 days unless they directly block the
 - generalized force-reset infrastructure
 - deep approved-snapshot archaeology
 - generalized snapshot redesign
-- invoice generation
+- invoice generation and dispatch
+- supplier PDF/image storage and OCR
+- Gas-cylinder inventory management
+- owner Gas statements
+- payment allocation
+- Gas debt/aging
+- bank deposit and collection workflows
+- advanced reconciliation/reporting
 - expense-domain expansion
 - collection/delinquency workflow expansion
 - unrelated architectural cleanup

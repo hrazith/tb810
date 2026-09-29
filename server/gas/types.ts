@@ -20,6 +20,20 @@ export type GasBillSummary = GasBillRecord & {
   status: GasBillStatus;
 };
 
+export type GasProcessedBundle = {
+  billingPeriodId: string;
+  monthKey: string;
+  monthLabel: string;
+  processedAt: string | null;
+  bills: GasBillSummary[];
+};
+
+export type GasBillsWorkspaceData = {
+  pendingBills: GasBillSummary[];
+  processedBundles: GasProcessedBundle[];
+  legacyProcessedBills: GasBillSummary[];
+};
+
 export type GasReadingRecord = {
   id: string;
   building_id: string;
