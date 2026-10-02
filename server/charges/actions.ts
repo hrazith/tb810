@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import {
   createOwnerDirectCharge,
+  createBulkCharge,
   createUnitCharge,
   deleteFutureCharge,
   editFutureCharge,
@@ -13,6 +14,7 @@ import {
   stopFutureCharge,
 } from "./index";
 import { addUnitChargeForCurrentBusinessMonth } from "./dev-unit-charge";
+import { userFacingChargeError } from "./user-facing-error";
 import {
   chargeEconomicsSchema,
   chargeInputSchema,
@@ -20,6 +22,7 @@ import {
   futureChargeDeleteSchema,
   futureChargeEditSchema,
   ownerChargeInputSchema,
+  universalChargeInputSchema,
 } from "./validation";
 
 function redirectWithError(returnTo: string, message: string) {
@@ -44,6 +47,65 @@ function pickString(formData: FormData, key: string) {
 
 function validationError(e: z.ZodError) {
   return e.issues[0]?.message ?? "Invalid input.";
+}
+
+export async function createChargeAction(formData: FormData): Promise<void> {
+  const returnTo = pickString(formData, "return_to") || "/obligations";
+  const parsed = universalChargeInputSchema.safeParse({
+    charge_to: pickString(formData, "charge_to"),
+    target_id: pickString(formData, "target_id"),
+    description: pickString(formData, "description"),
+    amount: parseNumber(formData.get("amount")),
+    schedule: pickString(formData, "schedule"),
+    starts_month: pickString(formData, "starts_month"),
+    ends_month: pickString(formData, "ends_month"),
+  });
+  if (!parsed.success) {
+    redirectWithError(returnTo, validationError(parsed.error));
+    return;
+  }
+
+  const input = parsed.data;
+  let result;
+  if (input.charge_to === "all_units" || input.charge_to === "all_owners") {
+    result = await createBulkCharge({
+      target_kind: input.charge_to,
+      description: input.description,
+      amount: input.amount,
+      schedule: input.schedule,
+      starts_month: input.starts_month,
+      ends_month: input.ends_month,
+    });
+  } else if (!input.target_id) {
+    redirectWithError(returnTo, "Charge target is required.");
+    return;
+  } else if (input.charge_to === "unit") {
+    result = await createUnitCharge({
+      unit_id: input.target_id,
+      description: input.description,
+      amount: input.amount,
+      schedule: input.schedule,
+      starts_month: input.starts_month,
+      ends_month: input.ends_month,
+    });
+  } else {
+    result = await createOwnerDirectCharge({
+      owner_id: input.target_id,
+      description: input.description,
+      amount: input.amount,
+      schedule: input.schedule,
+      starts_month: input.starts_month,
+      ends_month: input.ends_month,
+    });
+  }
+  if (result.error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[CHARGE_ACTION_ERROR]", result.error);
+    }
+    redirectWithError(returnTo, userFacingChargeError(result.error));
+  }
+  revalidatePath("/obligations");
+  redirectBack(returnTo);
 }
 
 export async function createUnitChargeAction(formData: FormData): Promise<void> {

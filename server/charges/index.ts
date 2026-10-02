@@ -452,6 +452,59 @@ export async function createOwnerDirectCharge(input: {
   });
 }
 
+export async function createBulkCharge(input: {
+  target_kind: "all_units" | "all_owners";
+  description: string;
+  amount: number;
+  schedule: "one_off" | "recurring";
+  starts_month: string;
+  ends_month?: string | null;
+}): Promise<QueryResult<{ series_id: string | null; inserted_count: number; total_amount: number }>> {
+  const currentMonth = await currentMonthKey();
+  let allowReadyForReviewCorrection = false;
+  if (input.target_kind === "all_units" && input.starts_month < (defaultStartMonthForNewCharge(currentMonth) ?? currentMonth)) {
+    const buildingResult = await getCurrentBuildingId();
+    if (buildingResult.error) return { data: null as never, error: buildingResult.error };
+    if (!buildingResult.data) return { data: null as never, error: "Current building not found." };
+    const correction = await isLatestReadyForReviewUnitChargeMonth(
+      await createClient(),
+      buildingResult.data,
+      input.starts_month,
+    );
+    if (correction.error) return { data: null as never, error: correction.error };
+    allowReadyForReviewCorrection = correction.allowed;
+  }
+
+  const validated = validateChargeLifecycleInput({
+    schedule: input.schedule,
+    starts_month: input.starts_month,
+    ends_month: input.ends_month ?? null,
+    currentMonth,
+  }, allowReadyForReviewCorrection);
+  if (validated.error) return { data: null as never, error: validated.error };
+
+  const sessionId = await getActiveDevTestSessionId();
+  const supabase = await createClient();
+  const { data, error } = await (supabase as unknown as {
+    rpc: (name: "tb810_create_bulk_charge", args: Record<string, unknown>) => Promise<{
+      data: Array<{ series_id: string | null; inserted_count: number; total_amount: number }> | null;
+      error: { message: string } | null;
+    }>;
+  }).rpc("tb810_create_bulk_charge", {
+    p_target_kind: input.target_kind,
+    p_description: input.description,
+    p_amount: input.amount,
+    p_schedule: input.schedule,
+    p_starts_month: input.starts_month,
+    p_ends_month: input.ends_month ?? null,
+    p_dev_session_id: sessionId,
+  });
+  if (error) return { data: null as never, error: error.message };
+  const result = data?.[0];
+  if (!result) return { data: null as never, error: "Unable to create the charge." };
+  return { data: result, error: null };
+}
+
 export async function changeFutureChargeEconomics(
   chargeId: string,
   input: { amount: number; effective_month: string },

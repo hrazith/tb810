@@ -24,6 +24,22 @@ export const ownerChargeInputSchema = z.object({
     .transform((value) => (value ? value : null)),
 }).strict();
 
+export const universalChargeInputSchema = z.object({
+  charge_to: z.enum(["all_units", "all_owners", "unit", "owner"]),
+  target_id: z.string().trim().optional().or(z.literal("")),
+  description: z.string().trim().min(1, "Description is required"),
+  amount: z.number().refine((value) => value !== 0, "Amount must be non-zero"),
+  schedule: z.enum(["one_off", "recurring"]),
+  starts_month: z.string().trim().regex(/^\d{4}-\d{2}$/, "Start month must be YYYY-MM"),
+  ends_month: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}$/, "End month must be YYYY-MM")
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => (value ? value : null)),
+}).strict();
+
 export const chargeEconomicsSchema = z.object({
   amount: z.number().refine((value) => value !== 0, "Amount must be non-zero"),
   effective_month: z.string().trim().regex(/^\d{4}-\d{2}$/, "Effective month must be YYYY-MM"),
