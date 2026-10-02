@@ -4,7 +4,7 @@ import { GasImportDialog } from "@/app/(staff)/gas/_components/gas-import-dialog
 import { listGasReadings } from "@/server/gas";
 import { createGasReadingAction, importGasWorkbookAction, updateGasReadingAction } from "@/server/gas/actions";
 import { getCurrentBuilding, listUnits } from "@/server/units";
-import { canEditReadyForReviewSourceMonth, getActiveReadingMonth } from "@/server/water/unit-meter-readings";
+import { canEditSourceMonth, getActiveReadingMonth } from "@/server/water/unit-meter-readings";
 
 import { GasReadingLedgerPanel, type GasMonthOption, type GasReadingLedgerRow } from "../_components/gas-reading-ledger-panel";
 
@@ -40,11 +40,9 @@ export default async function GasReadingMonthPage({ params }: PageProps) {
     redirect(`/gas/unit-gas-readings/${selectedMonthKey}`);
   }
   const activeMonthKey = getActiveReadingMonth().key;
-  const correctionResult = selectedMonthKey === activeMonthKey
-    ? { allowed: false, error: null }
-    : await canEditReadyForReviewSourceMonth(selectedMonthKey);
+  const correctionResult = await canEditSourceMonth(selectedMonthKey);
   if (correctionResult.error) throw new Error(correctionResult.error);
-  const monthEditable = selectedMonthKey === activeMonthKey || correctionResult.allowed;
+  const monthEditable = correctionResult.allowed;
 
   const [buildingResult, unitsResult] = await Promise.all([
     getCurrentBuilding(),

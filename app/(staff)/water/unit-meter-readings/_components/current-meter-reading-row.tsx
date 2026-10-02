@@ -63,7 +63,8 @@ export function CurrentMeterReadingRow({
   const deleteFormRef = useRef<HTMLFormElement | null>(null);
   const canEditHistoricalReadings =
     isHistoricalMonth && (packageCorrectionAvailable || (historicalEditingAvailable && historicalEditingEnabled));
-  const editable = !isHistoricalMonth && !readOnly;
+  const devHistoricalEditEnabled = historicalEditingAvailable && historicalEditingEnabled && isHistoricalMonth;
+  const editable = !readOnly || canEditHistoricalReadings;
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -104,7 +105,7 @@ export function CurrentMeterReadingRow({
                 <input
                   type="hidden"
                   name="dev_historical_edit_enabled"
-                  value={canEditHistoricalReadings ? "true" : "false"}
+                  value={devHistoricalEditEnabled ? "true" : "false"}
                 />
               </form>
               <Input
@@ -127,9 +128,7 @@ export function CurrentMeterReadingRow({
               />
             </>
           ) : (
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-              {readingValue(row.reading_end)}
-            </div>
+            <div className="text-sm text-zinc-700">{readingValue(row.reading_end)}</div>
           )}
         </div>
         <div className="text-sm text-zinc-600">{consumption == null ? "—" : readingValue(consumption)}</div>
@@ -165,7 +164,7 @@ export function CurrentMeterReadingRow({
                 <input
                   type="hidden"
                   name="dev_historical_edit_enabled"
-                  value={canEditHistoricalReadings ? "true" : "false"}
+                  value={devHistoricalEditEnabled ? "true" : "false"}
                 />
               </form>
               <button

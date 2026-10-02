@@ -851,6 +851,7 @@ function toWaterBillSummary(
   utilityTypeName: string,
   targetObligationMonth: string | null,
   hasPersistedObligation: boolean,
+  consumingPackageStatus: string | null,
 ): WaterBillSummary {
   const billingPeriod = row.tb810_billing_periods;
 
@@ -860,15 +861,18 @@ function toWaterBillSummary(
     billing_period_status: billingPeriod?.status ?? null,
     target_obligation_month: targetObligationMonth,
     has_persisted_obligation: hasPersistedObligation,
+    consuming_package_status: consumingPackageStatus,
     document: row.tb810_documents?.[0] ?? null,
     is_editable: isCommonWaterBillEditable({
-      legacy_table: row.legacy_table,
-      has_persisted_obligation: hasPersistedObligation,
+      consuming_package_status: consumingPackageStatus,
     }),
   };
 }
 
-type ObligationEvidence = Map<string, boolean>;
+type ObligationEvidence = Map<string, {
+  hasPersistedObligation: boolean;
+  status: string | null;
+}>;
 
 async function getObligationEvidenceForMonths(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -887,21 +891,24 @@ async function getObligationEvidenceForMonths(
 
   const { data, error } = await supabase
     .from("tb810_billing_periods")
-    .select("period_year, period_month, tb810_monthly_financial_obligations!tb810_monthly_financial_obligations_billing_period_id_fkey(id)")
+    .select("period_year, period_month, status, tb810_monthly_financial_obligations!tb810_monthly_financial_obligations_billing_period_id_fkey(id)")
     .eq("building_id", buildingId)
     .or(periodFilters);
 
-  if (error) return { data: new Map(), error: error.message };
+  if (error) return { data: new Map<string, { hasPersistedObligation: boolean; status: string | null }>(), error: error.message };
 
   const requestedMonths = new Set(uniqueMonths);
-  const evidence = new Map<string, boolean>();
+  const evidence = new Map<string, { hasPersistedObligation: boolean; status: string | null }>();
   for (const row of data ?? []) {
     const monthKey = `${row.period_year}-${String(row.period_month).padStart(2, "0")}`;
     if (!requestedMonths.has(monthKey)) continue;
     const obligations = (row as unknown as {
       tb810_monthly_financial_obligations?: Array<{ id: string }>;
     }).tb810_monthly_financial_obligations;
-    evidence.set(monthKey, Boolean(obligations?.length));
+    evidence.set(monthKey, {
+      hasPersistedObligation: Boolean(obligations?.length),
+      status: row.status ?? null,
+    });
   }
 
   return { data: evidence, error: null };
@@ -1017,14 +1024,18 @@ export async function listCommonWaterBills(): Promise<
 
   return {
     data: rows.map((row) =>
-      toWaterBillSummary(
-        row,
-        utilityType?.name ?? "Common Water",
-        getAppliedObligationMonthFromReadingDate(row.bill_date),
-        obligationEvidence.data.get(
+      (() => {
+        const evidence = obligationEvidence.data.get(
           getAppliedObligationMonthFromReadingDate(row.bill_date) ?? "",
-        ) ?? false,
-      ),
+        ) ?? { hasPersistedObligation: false, status: null };
+        return toWaterBillSummary(
+          row,
+          utilityType?.name ?? "Common Water",
+          getAppliedObligationMonthFromReadingDate(row.bill_date),
+          evidence.hasPersistedObligation,
+          evidence.status,
+        );
+      })(),
     ),
     error: null,
   };
@@ -1084,12 +1095,17 @@ export async function getWaterBillById(
     return { data: null, error: obligationEvidence.error };
   }
 
+  const evidence = obligationEvidence.data.get(targetObligationMonth ?? "") ?? {
+    hasPersistedObligation: false,
+    status: null,
+  };
   return {
     data: toWaterBillSummary(
       billRow,
       utilityType.name,
       targetObligationMonth,
-      obligationEvidence.data.get(targetObligationMonth ?? "") ?? false,
+      evidence.hasPersistedObligation,
+      evidence.status,
     ),
     error: null,
   };
@@ -1408,9 +1424,7 @@ export async function updateCommonWaterBill(
   if (!isCommonWaterBillEditable(existing.data)) {
     return {
       data: null as never,
-      error: existing.data.legacy_table === "utilities"
-        ? "Historical common water bills are read-only."
-        : "This common water bill is locked because its obligation has been created.",
+      error: "This common water bill is locked because its obligation has been finalized.",
     };
   }
 

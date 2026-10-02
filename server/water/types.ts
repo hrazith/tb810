@@ -30,11 +30,11 @@ export function isNativeCommonWaterBill(
 }
 
 export function isCommonWaterBillEditable(
-  bill: Pick<WaterBillRecord, "legacy_table"> & {
-    has_persisted_obligation: boolean;
+  bill: {
+    consuming_package_status: string | null;
   },
 ) {
-  return isNativeCommonWaterBill(bill) && !bill.has_persisted_obligation;
+  return !["approved", "invoices_generated", "closed"].includes(bill.consuming_package_status ?? "");
 }
 
 export type WaterBillSummary = WaterBillRecord & {
@@ -42,6 +42,7 @@ export type WaterBillSummary = WaterBillRecord & {
   billing_period_status: string | null;
   target_obligation_month: string | null;
   has_persisted_obligation: boolean;
+  consuming_package_status: string | null;
   document: CommonWaterBillDocument | null;
   is_editable: boolean;
 };

@@ -17,6 +17,7 @@ import {
   listUnitMeterReadings,
   updateUnitMeterReading,
   canEditHistoricalReadingsServer,
+  canEditSourceMonth,
 } from "@/server/water/unit-meter-readings";
 import { getActiveDevTestSessionId } from "@/server/dev-test-session";
 
@@ -192,6 +193,10 @@ export async function uploadCompletedTemplateAction(
   _prev: ImportFormState,
   formData: FormData,
 ): Promise<ImportFormState> {
+  const editability = await canEditSourceMonth(monthKey);
+  if (editability.error) return { error: editability.error };
+  if (!editability.allowed) return { error: "This Unit Water month is not available for editing." };
+
   const template = formData.get("template");
   if (!(template instanceof File)) {
     return { error: "Unable to open workbook." };
@@ -234,6 +239,10 @@ export async function confirmCompletedTemplateAction(
   _prev: ImportFormState,
   formData: FormData,
 ): Promise<ImportFormState> {
+  const editability = await canEditSourceMonth(monthKey);
+  if (editability.error) return { error: editability.error };
+  if (!editability.allowed) return { error: "This Unit Water month is not available for editing." };
+
   const readingDate = String(formData.get("reading_date") ?? "").trim();
   const previewRowsValue = String(formData.get("preview_rows") ?? "");
   let previewRows: ImportPreviewRow[];

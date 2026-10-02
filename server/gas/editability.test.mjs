@@ -1,26 +1,48 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import createJiti from "jiti";
 
 const jiti = createJiti(import.meta.url);
 const {
   gasReadingDraftFromCanonical,
   gasReadingMutationKind,
-  isGasReadingMonthEditable,
   reconcileGasReadingDraft,
   shouldSubmitGasReading,
 } = jiti("./editability.ts");
 
-test("current Gas reading month remains editable for incremental entry", () => {
-  assert.equal(isGasReadingMonthEditable("2026-09", false, "2026-09"), true);
+test("Gas mutation boundary delegates month editability to the canonical guard", () => {
+  const source = readFileSync("server/gas/index.ts", "utf8");
+  assert.match(source, /import \{ canEditSourceMonth/);
+  assert.match(source, /async function gasReadingMonthEditError\(monthKey: string\)/);
+  assert.match(source, /const correction = await canEditSourceMonth\(monthKey\)/);
+  for (const functionName of ["createGasReading", "updateGasReading", "deleteGasReading"]) {
+    const start = source.indexOf(`export async function ${functionName}`);
+    const next = source.indexOf("export async function", start + 1);
+    const functionSource = source.slice(start, next === -1 ? undefined : next);
+    assert.match(functionSource, /gasReadingMonthEditError\(/, `${functionName} must use the canonical guard`);
+  }
 });
 
-test("historical Gas reading month is read-only without the existing correction exception", () => {
-  assert.equal(isGasReadingMonthEditable("2026-08", false, "2026-09"), false);
-});
-
-test("latest ready-for-review correction exception remains available", () => {
-  assert.equal(isGasReadingMonthEditable("2026-08", true, "2026-09"), true);
+test("Gas source facts remain editable through handoff and lock after finalization", () => {
+  const { isSourceMonthEditable } = jiti("../water/source-editability.ts");
+  assert.equal(isSourceMonthEditable({
+    sourceMonth: "2026-08",
+    activeMonth: "2026-09",
+    consumingPackage: { status: "ready_for_review" },
+  }), true);
+  for (const status of ["approved", "invoices_generated", "closed"]) {
+    assert.equal(isSourceMonthEditable({
+      sourceMonth: "2026-08",
+      activeMonth: "2026-09",
+      consumingPackage: { status },
+    }), false);
+  }
+  assert.equal(isSourceMonthEditable({
+    sourceMonth: "2026-10",
+    activeMonth: "2026-09",
+    consumingPackage: null,
+  }), false);
 });
 
 test("existing Gas readings use update while missing readings use create", () => {

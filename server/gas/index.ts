@@ -4,10 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getActiveDevTestSessionId, getActiveDevTestSessionSummary, recordDevTestMutation } from "@/server/dev-test-session";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 import { getStaffContext } from "@/server/staff-context";
-import { canEditReadyForReviewSourceMonth, getActiveReadingMonth } from "@/server/water/unit-meter-readings";
+import { canEditSourceMonth, getActiveReadingMonth } from "@/server/water/unit-meter-readings";
 import { parseGasWorkbook, type GasImportPreflight } from "./import";
 import { buildMissingGasReadingDrafts, gasReadingDateForSourceMonth } from "./dev-completion";
-import { isGasReadingMonthEditable } from "./editability";
 import { isGasReadingDateInMonth } from "./date";
 
 import type {
@@ -152,12 +151,9 @@ function gasReadingDateError(readingDate: string, readingMonth: string) {
 }
 
 async function gasReadingMonthEditError(monthKey: string) {
-  if (monthKey === getActiveReadingMonth().key) return null;
-  const correction = await canEditReadyForReviewSourceMonth(monthKey);
+  const correction = await canEditSourceMonth(monthKey);
   if (correction.error) return correction.error;
-  return isGasReadingMonthEditable(monthKey, correction.allowed, getActiveReadingMonth().key)
-    ? null
-    : "Only the current editable Gas reading month can be changed.";
+  return correction.allowed ? null : "Only the current editable Gas reading month can be changed.";
 }
 
 export async function getPreviousGasReadingForUnit({

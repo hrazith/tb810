@@ -1,11 +1,3 @@
-export function isGasReadingMonthEditable(
-  monthKey: string,
-  correctionAvailable: boolean,
-  activeMonthKey: string,
-) {
-  return monthKey === activeMonthKey || correctionAvailable;
-}
-
 export function gasReadingMutationKind(readingId: string | null) {
   return readingId ? "update" : "create";
 }

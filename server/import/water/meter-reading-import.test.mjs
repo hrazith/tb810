@@ -102,6 +102,26 @@ test("primary intake persistence contract is preview then explicit confirmation"
   assert.doesNotMatch(source.slice(source.indexOf("export async function uploadCompletedTemplateAction"), source.indexOf("export async function confirmCompletedTemplateAction")), /persistMeterReadingImport/);
 });
 
+test("Unit Water import uses the canonical source-month editability guard", async () => {
+  const source = await import("node:fs/promises").then((fs) => fs.readFile("app/(staff)/water/unit-meter-readings/actions.ts", "utf8"));
+
+  assert.match(source, /canEditSourceMonth/);
+  assert.match(source, /This Unit Water month is not available for editing/);
+  assert.match(source, /export async function uploadCompletedTemplateAction[\s\S]*canEditSourceMonth\(monthKey\)/);
+  assert.match(source, /export async function confirmCompletedTemplateAction[\s\S]*canEditSourceMonth\(monthKey\)/);
+});
+
+test("individual Unit Water corrections remain separate from complete-set import", async () => {
+  const source = await import("node:fs/promises").then((fs) => fs.readFile("app/(staff)/water/unit-meter-readings/actions.ts", "utf8"));
+  const correctionAction = source.slice(
+    source.indexOf("export async function updateInlineUnitMeterReadingAction"),
+    source.indexOf("export async function deleteUnitMeterReadingAction"),
+  );
+
+  assert.match(source, /export async function updateInlineUnitMeterReadingAction/);
+  assert.doesNotMatch(correctionAction, /validateMeterReadingImport/);
+});
+
 test("active Unit Water ledger uses projected rows for direct entry", async () => {
   const page = await import("node:fs/promises").then((fs) => fs.readFile("app/(staff)/water/unit-meter-readings/_components/unit-meter-readings-month-page.tsx", "utf8"));
   const row = await import("node:fs/promises").then((fs) => fs.readFile("app/(staff)/water/unit-meter-readings/_components/expected-meter-reading-row.tsx", "utf8"));

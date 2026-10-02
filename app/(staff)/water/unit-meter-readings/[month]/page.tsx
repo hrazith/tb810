@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { canEditReadyForReviewSourceMonth, getActiveReadingMonth } from "@/server/water/unit-meter-readings";
+import { canEditSourceMonth, getActiveReadingMonth } from "@/server/water/unit-meter-readings";
 import { parseWaterMonthKey } from "@/server/water/month";
 
 import { UnitMeterReadingsMonthPage } from "../_components/unit-meter-readings-month-page";
@@ -27,7 +27,7 @@ export default async function UnitMeterReadingsMonthRoute({ params, searchParams
   if (!selectedMonth) {
     redirect(`/water/unit-meter-readings/${activeMonth.key}`);
   }
-  const correctionResult = await canEditReadyForReviewSourceMonth(selectedMonth);
+  const correctionResult = await canEditSourceMonth(selectedMonth);
   if (correctionResult.error) throw new Error(correctionResult.error);
 
   return (

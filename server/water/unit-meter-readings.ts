@@ -6,6 +6,9 @@ import {
   recordDevTestMutation,
 } from "@/server/dev-test-session";
 import { getCurrentBuilding } from "@/server/units";
+import { isSourceMonthEditable } from "./source-editability";
+
+export { isSourceMonthEditable } from "./source-editability";
 
 type QueryResult<T> = {
   data: T;
@@ -150,7 +153,7 @@ function obligationMonthForSourceMonth(sourceMonth: string) {
   return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-async function isLatestReadyForReviewSourceMonth(
+async function isSourceMonthEditableForBuilding(
   supabase: Awaited<ReturnType<typeof createClient>>,
   buildingId: string,
   sourceMonth: string,
@@ -160,25 +163,28 @@ async function isLatestReadyForReviewSourceMonth(
 
   const { data, error } = await supabase
     .from("tb810_billing_periods")
-    .select("period_year, period_month")
+    .select("period_year, period_month, status")
     .eq("building_id", buildingId)
-    .eq("status", "ready_for_review")
-    .order("period_year", { ascending: false })
-    .order("period_month", { ascending: false })
-    .limit(1);
+    .eq("period_year", Number(obligationMonth.slice(0, 4)))
+    .eq("period_month", Number(obligationMonth.slice(5, 7)))
+    .maybeSingle();
   if (error) return { allowed: false, error: error.message };
 
-  const latestReadyMonth = data?.[0]
-    ? `${data[0].period_year}-${String(data[0].period_month).padStart(2, "0")}`
-    : null;
-  return { allowed: latestReadyMonth === obligationMonth, error: null };
+  return {
+    allowed: isSourceMonthEditable({
+      sourceMonth,
+      activeMonth: getActiveReadingMonth().key,
+      consumingPackage: data ? { status: data.status } : null,
+    }),
+    error: null,
+  };
 }
 
-export async function canEditReadyForReviewSourceMonth(sourceMonth: string) {
+export async function canEditSourceMonth(sourceMonth: string) {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { allowed: false, error: buildingResult.error };
   if (!buildingResult.data) return { allowed: false, error: null };
-  return isLatestReadyForReviewSourceMonth(await createClient(), buildingResult.data.id, sourceMonth);
+  return isSourceMonthEditableForBuilding(await createClient(), buildingResult.data.id, sourceMonth);
 }
 
 export async function clearCurrentUnitWaterMonth(monthKey: string) {
@@ -652,13 +658,12 @@ async function validateReading(
   allowHistoricalEditing: boolean,
   excludeReadingId?: string,
 ) {
-  const active = getActiveReadingMonth();
   const readingDate = normalizeDate(input.reading_date);
   if (!readingDate) return { error: "Reading date is required and must be valid." };
   const readingMonthKey = monthKeyFromDate(readingDate);
   if (!readingMonthKey) return { error: "Reading date is required and must be valid." };
-  if (readingMonthKey !== active.key && !allowHistoricalEditing) {
-    const correction = await isLatestReadyForReviewSourceMonth(supabase, buildingId, readingMonthKey);
+  if (!allowHistoricalEditing) {
+    const correction = await isSourceMonthEditableForBuilding(supabase, buildingId, readingMonthKey);
     if (correction.error) return { error: correction.error };
     if (!correction.allowed) return { error: "Reading date must belong to the active reading month." };
   }
@@ -897,8 +902,8 @@ export async function deleteUnitMeterReading(
   }
 
   const active = getActiveReadingMonth();
-  if (monthKeyFromDate(reading.reading_date) !== active.key && !allowHistoricalEditing) {
-    const correction = await isLatestReadyForReviewSourceMonth(
+  if (!allowHistoricalEditing) {
+    const correction = await isSourceMonthEditableForBuilding(
       supabase,
       buildingResult.data.id,
       monthKeyFromDate(reading.reading_date) ?? "",

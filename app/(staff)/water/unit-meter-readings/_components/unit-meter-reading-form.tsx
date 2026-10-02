@@ -72,6 +72,7 @@ export function UnitMeterReadingForm({
   const previousReadingDate = readingDefaults?.previousReadingDate ?? null;
   const canEditHistoricalReadings =
     isHistoricalMonth && (packageCorrectionAvailable || (historicalEditingAvailable && historicalEditingEnabled));
+  const devHistoricalEditEnabled = historicalEditingAvailable && historicalEditingEnabled && isHistoricalMonth;
   const editable = !readOnly || canEditHistoricalReadings;
   const consumption = useMemo(() => {
     const previous = previousReading;
@@ -87,7 +88,7 @@ export function UnitMeterReadingForm({
       <input type="hidden" name="reading_id" value={initialValues?.reading_id ?? ""} />
       <input type="hidden" name="status" value={initialValues?.status ?? "recorded"} />
 
-      <input type="hidden" name="dev_historical_edit_enabled" value={canEditHistoricalReadings ? "true" : "false"} />
+      <input type="hidden" name="dev_historical_edit_enabled" value={devHistoricalEditEnabled ? "true" : "false"} />
 
       <div className="grid gap-4 md:grid-cols-2 ">
         <label className="block space-y-2 md:col-span-2">

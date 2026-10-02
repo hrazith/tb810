@@ -25,22 +25,24 @@ test("Sedapal source months map to the following obligation month", () => {
   assert.equal(getNextWaterMonthKey("2026-09"), "2026-10");
 });
 
-test("historical Sedapal bills remain read-only without persisted obligations", () => {
+test("legacy provenance alone does not lock a live Sedapal bill", () => {
   assert.equal(
-    isCommonWaterBillEditable({ legacy_table: "utilities", has_persisted_obligation: false }),
-    false,
+    isCommonWaterBillEditable({ consuming_package_status: "collecting_readings" }),
+    true,
   );
 });
 
-test("native Sedapal bills are editable only before obligation creation", () => {
+test("Sedapal bills remain editable through handoff before approval", () => {
   assert.equal(
-    isCommonWaterBillEditable({ legacy_table: "tb810_common_water_ledger", has_persisted_obligation: false }),
+    isCommonWaterBillEditable({ consuming_package_status: "ready_for_review" }),
     true,
   );
-  assert.equal(
-    isCommonWaterBillEditable({ legacy_table: "tb810_common_water_ledger", has_persisted_obligation: true }),
-    false,
-  );
+});
+
+test("Sedapal bills become immutable after Carlos approval", () => {
+  for (const status of ["approved", "invoices_generated", "closed"]) {
+    assert.equal(isCommonWaterBillEditable({ consuming_package_status: status }), false);
+  }
 });
 
 test("common water denominator is derived from condo units", () => {
