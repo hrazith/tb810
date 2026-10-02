@@ -1,4 +1,4 @@
-const createJiti = require("jiti");
+import { createJiti } from "jiti";
 
 const jiti = createJiti(__filename);
 const { getMonthlyObligation } = jiti("../server/obligations");
