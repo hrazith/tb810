@@ -148,13 +148,14 @@ confirmation and is not specific to September.
 This approved snapshot must preserve the financial facts Carlos reviewed so later source-data changes do not silently change what was approved.
 
 The dashboard may preview the next obligation month before that approval boundary is reached.
-That preview remains live and unapproved until Carlos explicitly approves the resulting Monthly Obligation snapshot.
-Snapshot creation is readiness-driven. Month close is an important guaranteed
-attempt/checkpoint, but it is not the earliest allowed snapshot time: when all
+That preview remains live and unapproved until Pulse hands it to Carlos and he
+explicitly approves the resulting Monthly Obligation snapshot. Handoff is
+readiness- and calendar-driven. Month close is an important guaranteed
+attempt/checkpoint, but it is not the earliest allowed handoff time: when all
 required financial facts for an upcoming package become ready before month
-turn, the system may snapshot that package early. The date alone does not
-freeze an incomplete package; an incomplete package remains live and Not Ready
-without a snapshot until its final blocker resolves.
+turn, Pulse may hand that package off once it is calendar-eligible. The date
+alone does not freeze an incomplete package; an incomplete package remains live
+and Not Ready until its final blocker resolves.
 
 The `ready_for_review` transition is the responsibility handoff boundary.
 While a package is live, Giuliana owns its preparation. At `ready_for_review`,
@@ -181,6 +182,38 @@ advances Giuliana's financial utility to the next live package. The calendar
 alone must not advance that focus. Calendar/business date, financial readiness,
 snapshot creation, and Carlos approval are coordinated lifecycle clocks rather
 than one universal month clock.
+
+### Frozen progression rules
+
+- The active obligation package consumes its canonical prior/source month.
+- Source attention resolves independently as each source fact becomes complete.
+- A package is Ready for handoff when its required financial facts calculate
+  successfully and no blocker remains.
+- Readiness and calendar eligibility are separate. A package is calendar-eligible
+  when `obligationMonth <= operatingMonth`; readiness alone does not hand it off.
+- Pulse hands off a ready, calendar-eligible package by transitioning it to
+  `ready_for_review`. It does not create a second progression path or require
+  the previous Carlos handoff to be approved.
+- `mostRecentHandoff` is selected independently from `activePackage`; when
+  several packages qualify, the latest relevant handoff wins deterministically.
+  Multiple packages may therefore await Carlos without pinning Giuliana's
+  active package.
+- The source timing rule is day 7 for Water, Sedapal, and Gas readings. Gas
+  supplier bills are an asynchronous pool and do not use that date-based rule.
+
+The controlled lifecycle proof reached the following result: November was Ready
+for handoff but calendar-ineligible on October 31, 2026; on November 1 it was
+calendar-eligible and Pulse returned `handed_off`, moving the DEV journal from
+191 to 192. October remained `ready_for_review`, while December became the live
+successor package.
+
+The DEV simulated business date changes lifecycle and calendar interpretation;
+it is not general database time travel. Persisted facts are not automatically
+hidden because their real-world dates are later than the simulated date.
+
+DEV-only Pulse diagnostics expose the business date, operating month, candidate,
+calendar eligibility, calculation readiness/blockers, and canonical Pulse result.
+They reuse existing values, add no database reads, and do not persist logs.
 
 The pulse coordinator is invoked automatically in production by a dumb Vercel
 Cron heartbeat at 06:00 Lima time (11:00 UTC) on the Hobby-plan MVP. It may
@@ -211,16 +244,18 @@ source facts accumulating
 ```
 
 Calendar/business month is advanced by the business date and drives boundaries
-and month-turn attempts. The canonical obligation package advances when facts
-become ready and a snapshot is created. Live Preview financial focus advances
-when Carlos approves the preceding package. These concepts may point at
-different months by design.
+and month-turn attempts. The canonical obligation package becomes handed off
+when facts are ready and Pulse finds the candidate calendar-eligible. Giuliana's
+financial focus advances at `ready_for_review`; Carlos approval then creates the
+immutable snapshot and changes the handed-off package's status. These concepts
+may point at different months by design.
 
 For example, September source facts becoming ready on September 28 may produce
-an October snapshot before October begins. If September facts remain incomplete
-on October 1, October is Not Ready while October source intake proceeds toward
-November. When the final September fact arrives on October 2, a later pulse may
-create the October snapshot without requiring a user to manufacture it.
+an October `ready_for_review` handoff before October begins. If September facts
+remain incomplete on October 1, October is Not Ready while October source intake
+proceeds toward November. When the final September fact arrives on October 2, a
+later pulse may hand October to Carlos without requiring a user to manufacture
+the lifecycle state.
 
 ## 5. Component Contract
 

@@ -32,7 +32,7 @@ Captured behavior:
 - inline Add row;
 - autosave on blur or Enter for current-month edits;
 - inline editing for current-month rows;
-- previous-month rows are read-only;
+- prior source-month rows remain editable while their consuming obligation is live;
 - no Save button;
 - no Cancel button;
 - consumption is auto-calculated;
@@ -55,7 +55,7 @@ Field behavior:
 - Previous is read-only;
 - Consumption is derived;
 - Current is editable;
-- Reading Date is editable during the current month.
+- Reading Date is editable while the source month remains editable.
 
 ### Month Selector
 
@@ -111,6 +111,17 @@ The canonical timing model distinguishes:
 - Sedapal Billed Month
 - Obligation Month
 
+For current Unit Water operation:
+
+`Unit Water source month M -> Obligation month M+1`
+
+For Sedapal:
+
+`Sedapal bill month M -> Obligation month M+1`
+
+The underlying Sedapal service period is separate from both source-month
+labels and must not redefine Unit Water month identity.
+
 For the approved legacy cadence, water service can originate in one month while the assessment obligation belongs to a later month.
 
 The July 2026 Sedapal bill is the canonical example:
@@ -122,6 +133,16 @@ The July 2026 Sedapal bill is the canonical example:
 - Obligation Month: Aug 2026
 
 The timing model must stay traceable across the Sedapal bill, meter readings, obligations, invoices, and payments.
+
+### Unit Water Finalization Boundary
+
+Completeness is not finalization. A complete 64-unit source set remains live
+and individually correctable while the consuming obligation is collecting
+readings or ready for review. Handoff does not freeze Unit Water. Carlos
+approval/finalization freezes the consumed source facts. A missing consuming
+Billing Period does not freeze a source month, while future source months are
+unavailable. Individual corrections do not require workbook resubmission.
+Meter replacement and reset behavior remain outside MVP.
 
 ## 1. Purpose
 
@@ -250,12 +271,10 @@ Examples of system-derived data:
 
 ### Reading Entry Season
 
-Current calendar month is editable.
-
-Previous months are read-only.
-Future months cannot receive readings.
-
-The transition happens automatically on the first day of the new month.
+The current operational month and earlier source months remain editable until
+their consuming obligation is financially finalized. Future source months
+cannot receive readings. Calendar rollover alone does not freeze a source
+month.
 
 There is:
 
@@ -538,7 +557,8 @@ Do not design or implement MVP2 details in this document.
 - The Unit Water Meter Readings workflow does not expose a Building field in the operator form.
 - The operator supplies Unit, Reading Date, Current Reading, and optional Notes where supported by the schema. Blank Lectura rows are ignored silently during workbook processing.
 - The system supplies the previous reading, previous reading date, month context, consumption calculation, and audit metadata.
-- Current-month unit rows are editable inline on the ledger page; historical rows are read-only.
+- Editable source-month unit rows are editable inline on the ledger page;
+  finalized rows remain read-only.
 - The Unit Meter Readings page is the primary operational ledger.
 - The first row functions as an inline creation row.
 - The operational ledger is the primary entry experience.

@@ -30,6 +30,28 @@ The authoritative source is [`legacy/sql/torrebal_admincondo.sql`](../../legacy/
 
 Historical workbooks and import artifacts are supporting evidence only. They do not replace the production export.
 
+## Historical Data Integrity Gates
+
+The Jan-August historical mirror principle is frozen: TB810 historical facts must match the authoritative Legacy export unless an intentional transformation or policy difference is explicitly documented.
+
+Historical truth includes documented gaps in the authoritative Legacy source. TB810 must not manufacture values merely to make a historical dataset structurally complete.
+
+Historical-data status:
+
+- [x] July 2026 Unit Water contamination was restored from authoritative Legacy on September 30, 2026 (`429.997` contaminated aggregate versus `709` authoritative aggregate). The repaired set is 64/64 and matches Legacy row-for-row.
+- [x] Historical Gas import integrity is verified: 452 populated Jan-Aug readings in Legacy and TB810 match after the importer's established three-decimal normalization; there are no duplicate unit-month groups and no synthetic historical Gas readings.
+- [x] The 12 missing Gas cells are confirmed blank in the authoritative Legacy workbook and are documented as a Legacy source gap, not a TB810 import defect.
+- [ ] Remaining effective-ownership provenance cases must be resolved or explicitly documented.
+
+The Legacy Gas source gap remains documented and open for future evidence, but it is not a blocker to First Ride. These historical findings do not change the September lifecycle rehearsal dependency.
+
+The missing cells are in `legacy/data/gas/ConsumoDeGas-25-26-USAR.xlsx`, sheet `Lecturas`:
+
+- Unit 306, meter `2034050.0`: February, March, April, May, June, and August 2026.
+- Unit 804, meter `GA170800161`: February, March, April, May, June, and August 2026.
+
+Continuity evidence is Unit 306: December 2025 `240.741`, January 2026 `0`, July 2026 `0.0`; and Unit 804: December 2025 `11.524`, January 2026 `0`, July 2026 `0.0`. The January decreases are not characterized as confirmed meter resets because the available evidence does not establish their cause.
+
 ## 3. Building and Unit Baseline
 
 **LEGACY FACT**

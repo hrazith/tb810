@@ -43,7 +43,14 @@ The canonical water timing model distinguishes:
 - Sedapal Billed Month
 - Obligation Month
 
-For the July 2026 example:
+For current Unit Water operation:
+
+`Unit Water source month M -> Obligation month M+1`
+
+Sedapal bill month follows the same obligation-month relationship, while the
+underlying Sedapal service period remains separate terminology and provenance.
+
+For the July 2026 historical Sedapal example:
 
 - Service Dates: 05 Jun 2026 - 06 Jul 2026
 - Reading Date: 06 Jul 2026
@@ -111,29 +118,37 @@ flowchart LR
 
 ### Create
 
-- allowed only for the active operational month
+- allowed through the current operational month;
+- future source months are unavailable;
+- the absence of the consuming Billing Period does not block source capture;
 - rejects an existing row in the same building/unit/utility/month
 - preserves provenance fields
 
 ### Update
 
-- allowed only for the active operational month
+- allowed while the consuming obligation remains live;
+- `collecting_readings` and `ready_for_review` remain editable;
+- Carlos approval/finalization makes consumed source facts immutable;
 - excludes the current row id from duplicate checks
 - preserves the canonical row id
 - recalculates reading start and consumption consistently
 
 ### Delete
 
-- allowed only for eligible current-month rows
+- allowed while the source month remains editable under the same rule as Update
 - removes the canonical row
 - is not a soft delete
 
-### Historical Months
+### Source Editability Boundary
 
-- read-only
-- Add is hidden
-- Delete is hidden
-- inline editing is disabled
+- completeness (`64/64`) means source facts are complete, not finalized;
+- individual readings remain correctable without workbook resubmission;
+- handoff and `ready_for_review` do not freeze Unit Water;
+- legacy provenance does not freeze Unit Water;
+- a missing consuming Billing Period does not freeze the source month;
+- only finalized consuming obligations (`approved`, `invoices_generated`, or
+  `closed`) make source facts immutable;
+- meter replacement/reset remains outside MVP.
 
 ## Workbook Template Contract
 

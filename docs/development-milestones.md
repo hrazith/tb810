@@ -72,6 +72,21 @@ September native TB810 source facts -> October native obligation
 
 September source work must not be conflated with September obligation generation. September does not need to be retroactively pushed through the native Giuliana -> Pulse -> Carlos -> snapshot workflow merely to make lifecycle state appear complete. Months before October remain historical/cutover data for this milestone; October is the native lifecycle proof.
 
+### Historical Data Integrity Gates — OWNERSHIP OPEN
+
+The Jan-August historical mirror principle is frozen: TB810 historical facts must match the authoritative Legacy export unless an intentional transformation or policy difference is explicitly documented.
+
+The historical mirror principle includes documented gaps in the authoritative Legacy source. TB810 must not manufacture values merely to make historical datasets structurally complete.
+
+Current status:
+
+- [x] July 2026 Unit Water contamination: restored from the authoritative Legacy readings; the contaminated TB810 aggregate was 429.997 versus the Legacy aggregate of 709. Post-repair July is 64/64 and aggregate 709.
+- [x] Historical Gas import integrity: 452 populated Jan-Aug readings in Legacy and TB810 match after the established three-decimal normalization; duplicate unit-month groups are zero and no synthetic historical Gas readings were created.
+- [x] The 12 missing Gas cells are confirmed blank in the authoritative Legacy workbook and are documented as a Legacy source gap, not a TB810 integrity defect.
+- [ ] Ownership provenance: resolve or document the remaining effective-ownership provenance cases.
+
+The Legacy Gas source gap remains documented and open for future evidence, but it is not a blocker to First Ride. The remaining historical gate is ownership provenance. The detailed evidence is in [`2026-business-fact-provenance-audit.md`](migrations/2026-business-fact-provenance-audit.md).
+
 ### B — Water baseline + operational intake — CLOSED
 
 #### Financial and cutover decisions — FROZEN / OPEN WHERE NOTED
@@ -122,8 +137,8 @@ Frozen UX/product decisions:
 - Step 2 captures Reading date, Invoice amount, and Current reading.
 - Previous reading is contextual information, not an editable Add-mode field.
 - Final Save is the only persistence point.
-- Historical imported bills remain read-only.
-- Native bills may be edited according to the target obligation-month lifecycle.
+- Sedapal bills remain editable until the obligation package that consumes them is approved, regardless of legacy/native provenance.
+- After Carlos approval, the consuming package finalizes the source facts and the bill becomes read-only.
 - The ledger exposes PDF and Edit directly; no separate detail workflow is required for MVP.
 
 Sedapal service-month semantics remain:
@@ -144,15 +159,16 @@ Authoritative Unit Water history exists from September 2023 through August 2026.
 
 Development cleanup policy: old test data does not require production-grade historical preservation. If it conflicts with authoritative history or blocks the October workflow, remove it surgically. Protect authoritative historical and operational data; do not broad-delete or reimport already-correct history.
 
-Current reconciliation target:
+Completed historical reconciliation:
 
 - preserve correct historical rows
-- replace contaminated July 2026 slots for units 201, 202, 203, 204, and 404
-- replace the contaminated August Unit 201 reading
-- insert the remaining missing authoritative August readings
-- clean/reset the development-era September obligation package if it blocks reconciliation
+- replace the 59 contaminated July 2026 trial rows with authoritative Legacy rows
+- preserve the five already-correct July Legacy rows
+- preserve the existing August and September operational sets
 
 Expected historical end state: September 2023 through August 2026, 36 months, 64 readings per month, 2,304 authoritative Unit Water readings.
+
+July 2026 was restored on September 30, 2026 from `legacy/sql/torrebal_admincondo.sql` in one guarded transaction. No active DEV session owned the contaminated rows; the five existing Legacy rows were preserved, and the 59 trial rows were replaced with Legacy-backed rows.
 
 #### B2.4 Establish operational boundary — COMPLETE
 
@@ -269,9 +285,13 @@ Complete the real September source facts and any Unit/Owner charges relevant to 
 
 Prove the October calculation against the workbook business model at component, unit, owner where applicable, and grand-total levels. Do not accept an unexplained difference merely because the grand total matches.
 
-### G — Month-turn / Pulse handoff — PENDING
+### G — Month-turn / Pulse handoff — CLOSED / ACCEPTED
 
-Financial readiness and calendar handoff eligibility remain separate. Pulse must make October eligible at the correct boundary without bypassing the lifecycle.
+Financial readiness and calendar handoff eligibility remain separate. The
+controlled November proof established that a Ready package is a Pulse no-op
+before its obligation month, then hands off on the first eligible business date
+without bypassing the lifecycle. October 31, 2026 was ineligible for November;
+November 1 returned `handed_off` and advanced the DEV journal from 191 to 192.
 
 ### H — Carlos review and approval — PENDING
 
@@ -317,9 +337,14 @@ Do not manually manufacture Ready state. As required source work is completed, T
 
 Before the Carlos demo, independently reproduce the legacy October calculation from the exact same real September facts. Compare TB810 October with Legacy October at component, unit, owner where applicable, and grand-total levels. Relevant components include Water, Gas, regular/common obligations, Unit Charges, and Owner-direct charges. Do not accept unexplained differences; matching only the grand total is insufficient.
 
-#### K5 — Monthly beat / Pulse
+#### K5 — Monthly beat / Pulse — PROVEN IN DEV
 
-Financial readiness and handoff eligibility remain separate. October may become financially ready before month-turn; at the appropriate calendar boundary, Pulse makes October eligible for handoff. Giuliana then hands October to Carlos, while operational attention advances into November. Do not bypass Pulse merely to make the demo work.
+Financial readiness and handoff eligibility remain separate. A ready package is
+quiet while calendar-ineligible; at the appropriate boundary Pulse makes it
+eligible for handoff. The November 1, 2026 controlled proof confirmed this
+behavior, with October still awaiting Carlos while November handed off and
+December became the active successor. Do not bypass Pulse merely to make the
+demo work.
 
 #### K6 — Carlos review + approval
 
@@ -399,7 +424,7 @@ Known importer technical debt: historical Water importer matching uses `unit_id 
 - [ ] TB810 clearly communicates missing and completed source work.
 - [ ] October becomes financially ready from those facts without manually forcing status.
 - [ ] TB810 October obligations match the legacy October calculation at unit/component level and in total.
-- [ ] Pulse behaves correctly at the monthly boundary.
+- [x] Pulse behaves correctly at the monthly boundary.
 - [ ] Giuliana can hand October to Carlos.
 - [ ] Carlos receives the correct October package.
 - [ ] Carlos can inspect the package without confusing live and recomputed information.

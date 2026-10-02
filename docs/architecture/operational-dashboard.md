@@ -637,12 +637,9 @@ Implementation or visual details still open include:
 
 These are implementation details, not domain-open questions.
 
-The frozen source-work rules are ahead of the current projection in one
-known respect: the application may still treat missing Gas readings as
-neutral after day 7. The upcoming Giuliana Dashboard Slice 1 is expected to
-align that projection with the frozen Water/Gas lateness rule. Gas
-supplier-pool historical variance remains a frozen product concept only;
-its calculation and threshold are not implemented.
+The current projection applies the frozen day-7 lateness rule independently to
+Water and Gas readings. Gas supplier-pool historical variance remains a frozen
+product concept only; its calculation and threshold are not implemented.
 
 The ranked notice-frame behavior is a frozen UX rule and is now implemented
 as a small client presentation island. The server projection remains the

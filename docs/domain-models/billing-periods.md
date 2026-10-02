@@ -95,6 +95,12 @@ Current schema values:
 
 These values are current schema fields, but the domain should not be modeled as a workflow state machine.
 
+Historical imported Billing Periods may use `closed` to represent operational
+work completed outside TB810 before the native lifecycle was adopted. In that
+context, `closed` does not imply native Carlos approval, `approved_by`,
+`approved_at`, a native obligation snapshot, or generated invoices. Native
+periods continue through the live TB810 handoff and approval lifecycle.
+
 ### `approved_by`
 
 User who approved the Billing Period.

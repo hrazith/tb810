@@ -263,15 +263,13 @@ MVP2 may store Consumption Period Start, Consumption Period End, Invoice Issue D
 
 ## Record Lifecycle
 
-Current Service Month
+Sedapal source facts remain editable while the obligation package that consumes
+them is live or under review. Calendar rollover and legacy provenance do not
+make a bill immutable.
 
-- editable
-
-Historical Service Months
-
-- immutable
-
-No historical editing.
+After Carlos approves the consuming obligation package, the source bill is
+finalized and becomes immutable. Corrections after approval belong in a future
+obligation through the appropriate charge or credit mechanism.
 
 ## MVP2 Backlog
 
