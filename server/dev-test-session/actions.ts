@@ -138,5 +138,16 @@ export async function runMonthlyObligationPulseAction(formData: FormData) {
   if (result.status === "error") redirect(`${returnTo}?error=${encodeURIComponent(result.reason ?? "Monthly obligation pulse failed.")}`);
   revalidatePath("/", "layout");
   revalidatePath("/obligations");
-  redirect(`${returnTo}?pulse=${result.status}`);
+  if (!result.diagnostics) redirect(`${returnTo}?pulse=${result.status}`);
+  const diagnostics = result.diagnostics;
+  const pulseQuery = new URLSearchParams({
+    pulse: result.status,
+    pulse_business_date: diagnostics.businessDate,
+    pulse_operating_month: diagnostics.operatingMonth,
+    pulse_candidate: diagnostics.candidateObligationMonth ?? "—",
+    pulse_calendar: diagnostics.calendar,
+    pulse_calculation: diagnostics.calculation,
+    pulse_blockers: diagnostics.blockers.join(" | "),
+  });
+  redirect(`${returnTo}?${pulseQuery.toString()}`);
 }

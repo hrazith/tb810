@@ -23,6 +23,10 @@ type QueryResult<T> = {
   data: T | null;
   error: string | null;
   failureKind?: "not_ready" | "not_eligible" | "error";
+  diagnostics?: {
+    calculationReady: boolean;
+    blockers: string[];
+  };
 };
 
 type SnapshotResult = { billingPeriodId: string; status: string; obligationRowCount: number };
@@ -346,12 +350,27 @@ export async function createMonthlyObligationHandoff({
 }): Promise<QueryResult<SnapshotResult>> {
   const supabase = executionContext === "system" ? createSystemClient() : await createClient();
   const factsResult = await loadBuildingMonthFinancialFacts({ buildingId, obligationMonth, client: supabase });
-  if (factsResult.error || !factsResult.data) return { data: null, error: factsResult.error ?? "Building month facts unavailable.", failureKind: "error" };
+  if (factsResult.error || !factsResult.data) return {
+    data: null,
+    error: factsResult.error ?? "Building month facts unavailable.",
+    failureKind: "error",
+    diagnostics: { calculationReady: false, blockers: [factsResult.error ?? "Building month facts unavailable."] },
+  };
   const calculation = await getSnapshotCalculation({ buildingId, buildingName, obligationMonth, facts: factsResult.data.current, supabase });
-  if (calculation.error || !calculation.data) return { data: null, error: calculation.error ?? "Snapshot calculation unavailable.", failureKind: calculation.failureKind === "not_ready" ? "not_ready" : "error" };
+  if (calculation.error || !calculation.data) return {
+    data: null,
+    error: calculation.error ?? "Snapshot calculation unavailable.",
+    failureKind: calculation.failureKind === "not_ready" ? "not_ready" : "error",
+    diagnostics: { calculationReady: false, blockers: [calculation.error ?? "Snapshot calculation unavailable."] },
+  };
 
   if (!isHandoffCalendarEligible(obligationMonth, operatingMonth)) {
-    return { data: null, error: `${obligationMonth} is not eligible for handoff before its obligation month.`, failureKind: "not_eligible" as const };
+    return {
+      data: null,
+      error: `${obligationMonth} is not eligible for handoff before its obligation month.`,
+      failureKind: "not_eligible" as const,
+      diagnostics: { calculationReady: true, blockers: [] },
+    };
   }
 
   const persist = persistence ?? (async ({ supabase: handoffClient, buildingId: handoffBuildingId, obligationMonth: handoffMonth, operatingMonth: handoffOperatingMonth }) => {

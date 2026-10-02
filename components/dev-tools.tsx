@@ -343,6 +343,27 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
     : null;
   const correctionAcknowledged = searchParams.get("dev_correction") === "added";
   const pulseStatus = searchParams.get("pulse");
+  const pulseBusinessDate = searchParams.get("pulse_business_date");
+  const pulseOperatingMonth = searchParams.get("pulse_operating_month");
+  const pulseCandidate = searchParams.get("pulse_candidate");
+  const pulseCalendar = searchParams.get("pulse_calendar");
+  const pulseCalculation = searchParams.get("pulse_calculation");
+  const pulseBlockers = searchParams.get("pulse_blockers");
+  const pulseDiagnostics = pulseStatus ? {
+    businessDate: pulseBusinessDate,
+    operatingMonth: pulseOperatingMonth,
+    candidate: pulseCandidate,
+    calendar: pulseCalendar,
+    calculation: pulseCalculation,
+    blockers: pulseBlockers,
+  } : null;
+  const preRunPulseDiagnostics = dashboardFacts ? {
+    businessDate: dashboardFacts.businessDate,
+    operatingMonth: dashboardFacts.operatingMonth,
+    candidate: dashboardFacts.current.obligations.obligationMonth,
+    calendar: dashboardFacts.current.obligations.obligationMonth <= dashboardFacts.operatingMonth ? "eligible" : "not eligible",
+    calculation: dashboardFacts.current.obligations.total !== null && Object.values(dashboardFacts.current.obligations.components).every((component) => component.state !== "blocked") ? "ready" : "blocked",
+  } : null;
 
   const items = useMemo(
     () => [
@@ -728,6 +749,28 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                     </form>
                   ) : null}
                   {pulseStatus ? <p className="text-right text-white/55">Pulse: {pulseStatus.replaceAll("_", " ")}</p> : null}
+                  {pulseDiagnostics ? (
+                    <div className="space-y-1 border-t border-white/10 pt-2 text-right text-[11px] text-white/55">
+                      <p className="font-medium text-white/75">Pulse diagnostics</p>
+                      <p>Business date: {pulseDiagnostics.businessDate}</p>
+                      <p>Operating month: {pulseDiagnostics.operatingMonth}</p>
+                      <p>Candidate: {pulseDiagnostics.candidate}</p>
+                      <p>Calendar: {pulseDiagnostics.calendar}</p>
+                      <p>Calculation: {pulseDiagnostics.calculation}</p>
+                      {pulseDiagnostics.blockers ? <p>Blockers: {pulseDiagnostics.blockers}</p> : null}
+                    </div>
+                  ) : null}
+                  {!pulseDiagnostics && preRunPulseDiagnostics ? (
+                    <div className="space-y-1 border-t border-white/10 pt-2 text-right text-[11px] text-white/55">
+                      <p className="font-medium text-white/75">Pulse diagnostics</p>
+                      <p>Business date: {preRunPulseDiagnostics.businessDate}</p>
+                      <p>Operating month: {preRunPulseDiagnostics.operatingMonth}</p>
+                      <p>Candidate: {preRunPulseDiagnostics.candidate}</p>
+                      <p>Calendar: {preRunPulseDiagnostics.calendar}</p>
+                      <p>Calculation: {preRunPulseDiagnostics.calculation}</p>
+                      <p>Last result: —</p>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

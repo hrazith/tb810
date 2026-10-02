@@ -28,7 +28,36 @@ test("handoff is calendar eligible only when the obligation month has begun", ()
   assert.equal(isHandoffCalendarEligible("2026-10", "2026-10"), true);
 });
 
+test("November is ineligible on October 31 and eligible on November 1", () => {
+  assert.equal(isHandoffCalendarEligible("2026-11", "2026-10"), false);
+  assert.equal(isHandoffCalendarEligible("2026-11", "2026-11"), true);
+});
+
 test("calendar-ineligible pulse results remain distinct from incomplete facts", () => {
   assert.equal(mapSnapshotResult({ ...context, result: { data: null, error: "October is not eligible yet.", failureKind: "not_eligible" } }).status, "not_eligible");
   assert.equal(mapSnapshotResult({ ...context, result: { data: null, error: "Required readings are missing.", failureKind: "not_ready" } }).status, "not_ready");
+});
+
+test("pulse diagnostics preserve the canonical returned status context", () => {
+  const result = mapSnapshotResult({
+    ...context,
+    diagnostics: {
+      businessDate: "2026-11-01",
+      operatingMonth: "2026-11",
+      candidateObligationMonth: "2026-11",
+      calendar: "eligible",
+      calculation: "ready",
+      blockers: [],
+    },
+    result: { data: { billingPeriodId: "period-1", status: "ready_for_review", obligationRowCount: 0 }, error: null },
+  });
+  assert.equal(result.status, "handed_off");
+  assert.deepEqual(result.diagnostics, {
+    businessDate: "2026-11-01",
+    operatingMonth: "2026-11",
+    candidateObligationMonth: "2026-11",
+    calendar: "eligible",
+    calculation: "ready",
+    blockers: [],
+  });
 });
