@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 type OwnerRow = {
@@ -53,15 +53,6 @@ export function ObligationsSidebarNav({
   const [isPending, startTransition] = useTransition();
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
 
-  useEffect(() => {
-    if (pendingSelection?.kind === "owner" && pendingSelection.id === selectedOwnerId) {
-      setPendingSelection(null);
-    }
-    if (pendingSelection?.kind === "unit" && pendingSelection.id === selectedUnitId) {
-      setPendingSelection(null);
-    }
-  }, [pendingSelection, selectedOwnerId, selectedUnitId]);
-
   return (
     <div className="space-y-6">
       <div className="rounded-[28px] bg-zinc-100 p-1">
@@ -91,7 +82,7 @@ export function ObligationsSidebarNav({
         {mode === "owners" ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
             {(owners ?? []).map((owner) => {
-              const optimistic = pendingSelection?.kind === "owner" && pendingSelection.id === owner.id;
+              const optimistic = isPending && pendingSelection?.kind === "owner" && pendingSelection.id === owner.id;
               const active = optimistic || owner.id === selectedOwnerId;
               return (
                 <Link
@@ -132,7 +123,7 @@ export function ObligationsSidebarNav({
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
             {(units ?? []).map((unit) => {
-              const optimistic = pendingSelection?.kind === "unit" && pendingSelection.id === unit.id;
+              const optimistic = isPending && pendingSelection?.kind === "unit" && pendingSelection.id === unit.id;
               const active = optimistic || unit.id === selectedUnitId;
               return (
                 <Link
