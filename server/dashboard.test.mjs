@@ -15,7 +15,7 @@ const buildingModule = jiti("@/server/building");
 const ownerFactsModule = jiti("@/server/obligations/owner-facts");
 const progressionModule = jiti("@/server/obligations/progression");
 
-const { projectCarlosDashboard, projectGulianaDashboard, deriveUnitChargeWorthNoting, deriveGulianaDashboardMonths, deriveDashboardContext, selectCarlosTargetObligationMonth, financialReadinessDeadline, getGulianaDashboardFacts } = dashboard;
+const { projectCarlosDashboard, projectGulianaDashboard, deriveUnitChargeWorthNoting, deriveGulianaDashboardMonths, deriveDashboardContext, financialReadinessDeadline, getGulianaDashboardFacts } = dashboard;
 
 function buildProjectionFacts(overrides = {}) {
   const businessDate = overrides.businessDate ?? "2026-08-05";
@@ -1115,26 +1115,6 @@ test("Carlos keeps Unit and Owner-direct charge amounts and counts separate", ()
   assert.deepEqual({ amount: projection.components.owner_direct_charge.amount, count: projection.components.owner_direct_charge.count }, { amount: "125.00", count: 2 });
 });
 
-test("Carlos targets the upcoming obligation month before an Aug 31 handoff", () => {
-  assert.equal(selectCarlosTargetObligationMonth({
-    operatingMonth: "2026-08",
-    upcomingObligationMonth: "2026-09",
-    context: "close",
-    activePackage: { obligationMonth: "2026-08" },
-    mostRecentHandoff: null,
-  }), "2026-09");
-});
-
-test("Carlos keeps September selected on Sep 1 before Pulse", () => {
-  assert.equal(selectCarlosTargetObligationMonth({
-    operatingMonth: "2026-09",
-    upcomingObligationMonth: "2026-10",
-    context: "open",
-    activePackage: { obligationMonth: "2026-09" },
-    mostRecentHandoff: null,
-  }), "2026-09");
-});
-
 test("Carlos keeps a complete September package non-actionable before Pulse", () => {
   const base = buildProjectionFacts().upcoming;
   const projection = projectCarlosDashboard(buildProjectionFacts({
@@ -1156,16 +1136,6 @@ test("Carlos keeps a complete September package non-actionable before Pulse", ()
   assert.notEqual(projection.journeyState, "approval_overdue");
 });
 
-test("Carlos prefers an unresolved handed-off package over calendar-derived targets", () => {
-  assert.equal(selectCarlosTargetObligationMonth({
-    operatingMonth: "2026-09",
-    upcomingObligationMonth: "2026-10",
-    context: "open",
-    activePackage: { obligationMonth: "2026-09" },
-    mostRecentHandoff: { obligationMonth: "2026-09", status: "ready_for_review" },
-  }), "2026-09");
-});
-
 test("Carlos advances to the next active package after approval", () => {
   const base = buildProjectionFacts().upcoming;
   const projection = projectCarlosDashboard(buildProjectionFacts({
@@ -1183,18 +1153,6 @@ test("Carlos advances to the next active package after approval", () => {
   assert.equal(projection.obligationMonth, "2026-10");
   assert.equal(projection.approvalState, "not_ready");
   assert.equal(projection.journeyState, "building");
-});
-
-test("Carlos keeps completed handoff statuses from anchoring the active target", () => {
-  for (const status of ["approved", "invoices_generated", "closed"]) {
-    assert.equal(selectCarlosTargetObligationMonth({
-      operatingMonth: "2026-09",
-      upcomingObligationMonth: "2026-10",
-      context: "open",
-      activePackage: { obligationMonth: "2026-10" },
-      mostRecentHandoff: { obligationMonth: "2026-09", status },
-    }), "2026-10");
-  }
 });
 
 test("Carlos builds the next active package charge count from both charge components", () => {
@@ -1292,14 +1250,14 @@ test("September incomplete obligations are blocked by the Aug 31 deadline", () =
   assert.equal(projection.journeyState, "blocked");
 });
 
-test("K Giuliana dashboard targets the upcoming working obligation month with one bounded read", async () => {
+test("K dashboard uses the canonical active package with one bounded read", async () => {
   const originalGetBusinessNow = businessDateModule.getBusinessNow;
   const originalGetFixedBuildingIdentity = buildingModule.getFixedBuildingIdentity;
   const originalLoadBuildingMonthFinancialFacts = ownerFactsModule.loadBuildingMonthFinancialFacts;
   const originalLoadGiulianaPackageProgression = progressionModule.loadGiulianaPackageProgression;
   const obligationMonths = [];
 
-  businessDateModule.getBusinessNow = async () => new Date("2026-09-25T00:00:00Z");
+  businessDateModule.getBusinessNow = async () => new Date("2026-09-30T00:00:00Z");
   buildingModule.getFixedBuildingIdentity = () => ({ id: "building-1", name: "Building One" });
   progressionModule.loadGiulianaPackageProgression = async () => ({
     data: {
@@ -1370,15 +1328,15 @@ test("K Giuliana dashboard targets the upcoming working obligation month with on
       current: {
         ...shared,
         obligationMonth,
-        sourceReadingMonth: "2026-09",
+        sourceReadingMonth: "2026-08",
         commonWaterBill: null,
         waterReadings: [],
         gasReadings: [],
       },
       upcoming: {
         ...shared,
-        obligationMonth: "2026-11",
-        sourceReadingMonth: "2026-10",
+        obligationMonth: "2026-10",
+        sourceReadingMonth: "2026-09",
         commonWaterBill: null,
       },
     };
@@ -1392,17 +1350,17 @@ test("K Giuliana dashboard targets the upcoming working obligation month with on
     assert.equal(result.error, null);
     assert.ok(result.data);
     assert.equal(obligationMonths.length, 1);
-    assert.deepEqual(obligationMonths, ["2026-10"]);
+    assert.deepEqual(obligationMonths, ["2026-09"]);
     assert.equal(result.data?.operatingMonth, "2026-09");
     assert.equal(result.data?.upcomingObligationMonth, "2026-10");
-    assert.equal(result.data?.current.obligations.obligationMonth, "2026-10");
-    assert.equal(result.data?.current.sourceReadingMonth, "2026-09");
+    assert.equal(result.data?.current.obligations.obligationMonth, "2026-09");
+    assert.equal(result.data?.current.sourceReadingMonth, "2026-08");
     assert.equal(result.data?.upcoming.commonWaterBill, null);
     assert.equal(result.data?.upcoming.obligations.components.common_water.state, "blocked");
     assert.equal(result.data?.upcoming.gas.supplierBillCount, 2);
     assert.equal(result.data?.upcoming.gas.supplierBillTotal, "100.00");
     assert.equal(result.data?.upcoming.charges.unitChargeCount, 0);
-    assert.equal(result.data?.upcoming.obligations.obligationMonth, "2026-11");
+    assert.equal(result.data?.upcoming.obligations.obligationMonth, "2026-10");
     assert.equal(result.data?.sourceWork.water.commonWaterBillPresent, false);
     assert.equal(result.data?.sourceWork.water.meterReadingCount, 0);
     assert.equal(result.data?.sourceWork.gas.gasReadingCount, 0);

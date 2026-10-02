@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
-import type { ObligationPackageLifecycle } from "./package-selection";
+import { selectGiulianaWorkspaceMonth, type ObligationPackageLifecycle } from "./package-selection";
 
 export type GiulianaPackageProgression = {
   activePackage: ObligationPackageLifecycle;
@@ -11,6 +11,8 @@ export type GiulianaPackageProgression = {
     status: string;
   } | null;
 };
+
+export { selectGiulianaWorkspaceMonth };
 
 export async function loadGiulianaPackageProgression({
   buildingId,

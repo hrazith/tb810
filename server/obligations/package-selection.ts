@@ -21,6 +21,18 @@ export function selectFinancialFocus(currentLifecycle: Pick<ObligationPackageLif
   return isHandedOffPackage(currentLifecycle) ? "upcoming" as const : "current" as const;
 }
 
+export function selectGiulianaWorkspaceMonth({
+  activePackage,
+  mostRecentHandoff,
+}: {
+  activePackage: Pick<ObligationPackageLifecycle, "obligationMonth">;
+  mostRecentHandoff: { obligationMonth: string; status: string } | null;
+}) {
+  return mostRecentHandoff?.status === "ready_for_review"
+    ? mostRecentHandoff.obligationMonth
+    : activePackage.obligationMonth;
+}
+
 export function selectProgressionPackage({
   current,
   upcoming,

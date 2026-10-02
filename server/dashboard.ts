@@ -633,25 +633,7 @@ export function deriveDashboardContext(businessNow: Date): DashboardContext {
   return businessNow.getUTCDate() === 1 ? "open" : "close";
 }
 
-export function selectCarlosTargetObligationMonth({
-  operatingMonth,
-  upcomingObligationMonth,
-  context,
-  activePackage,
-  mostRecentHandoff,
-}: {
-  operatingMonth: string;
-  upcomingObligationMonth: string;
-  context: DashboardContext;
-  activePackage: { obligationMonth: string };
-  mostRecentHandoff: { obligationMonth: string; status: string } | null;
-}) {
-  if (mostRecentHandoff?.status === "ready_for_review") return mostRecentHandoff.obligationMonth;
-  if (context === "close" && activePackage.obligationMonth === operatingMonth) return upcomingObligationMonth;
-  return activePackage.obligationMonth;
-}
-
-async function loadDashboardFacts(forCarlos: boolean): Promise<QueryResult<GulianaDashboardFacts>> {
+async function loadDashboardFacts(): Promise<QueryResult<GulianaDashboardFacts>> {
   const businessNow = await getBusinessNow();
   const { operatingMonth, upcomingObligationMonth } = deriveGulianaDashboardMonths(businessNow);
   const context = deriveDashboardContext(businessNow);
@@ -664,15 +646,7 @@ async function loadDashboardFacts(forCarlos: boolean): Promise<QueryResult<Gulia
     return { data: null as never, error: progressionResult.error ?? "Giuliana package progression unavailable." };
   }
 
-  const activeObligationMonth = forCarlos
-    ? selectCarlosTargetObligationMonth({
-        operatingMonth,
-        upcomingObligationMonth,
-        context,
-        activePackage: progressionResult.data.activePackage,
-        mostRecentHandoff: progressionResult.data.mostRecentHandoff,
-      })
-    : upcomingObligationMonth;
+  const activeObligationMonth = progressionResult.data.activePackage.obligationMonth;
   const activeUpcomingObligationMonth = nextMonthKey(activeObligationMonth) ?? activeObligationMonth;
   const factsResult = await loadBuildingMonthFinancialFacts({
     buildingId: building.id,
@@ -706,9 +680,9 @@ async function loadDashboardFacts(forCarlos: boolean): Promise<QueryResult<Gulia
   };
 }
 
-export const getGulianaDashboardFacts = cache(async (): Promise<QueryResult<GulianaDashboardFacts>> => loadDashboardFacts(false));
+export const getGulianaDashboardFacts = cache(async (): Promise<QueryResult<GulianaDashboardFacts>> => loadDashboardFacts());
 
-export const getCarlosDashboardFacts = cache(async (): Promise<QueryResult<GulianaDashboardFacts>> => loadDashboardFacts(true));
+export const getCarlosDashboardFacts = cache(async (): Promise<QueryResult<GulianaDashboardFacts>> => loadDashboardFacts());
 
 export async function getDashboardMonthFacts() {
   return getGulianaDashboardFacts();

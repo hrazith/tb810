@@ -21,6 +21,7 @@ import { getSelectedUnitOwnershipSnapshot } from "@/server/ownerships";
 import { listOwners } from "@/server/owners";
 import { isPerfLoggingEnabled } from "@/server/perf";
 import { getSelectedUnitTransactionsForUnit } from "@/server/transactions";
+import { loadGiulianaPackageProgression, selectGiulianaWorkspaceMonth } from "@/server/obligations/progression";
 import { listUnitDirectory } from "@/server/units";
 import { measure, type TimedResult } from "@/server/perf/timing";
 import { ObligationsNavigationShell } from "./_components/obligations-navigation-shell";
@@ -75,7 +76,15 @@ function componentLabel(key: string) {
 export default async function ObligationsPage({ searchParams }: PageProps) {
   const pageStartedAt = process.hrtime.bigint();
   const params = await searchParams;
-  const monthKey = await currentMonthKey();
+  const operatingMonth = await currentMonthKey();
+  const progressionResult = await loadGiulianaPackageProgression({
+    buildingId: TB810_BUILDING_ID,
+    startMonth: operatingMonth,
+  });
+  if (progressionResult.error || !progressionResult.data) {
+    throw new Error(progressionResult.error ?? "Giuliana package progression unavailable.");
+  }
+  const monthKey = selectGiulianaWorkspaceMonth(progressionResult.data);
   const mode = params.mode ?? "owners";
 
   const unitsMeasurement = await measure(listUnitDirectory());
