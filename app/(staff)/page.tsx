@@ -284,7 +284,7 @@ export default async function DashboardPage() {
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col space-y-6 px-6 py-6 sm:py-8">
-      <div className="flex flex-wrap items-start justify-between gap-6 mt-12">
+      <div className="flex flex-wrap items-start justify-between gap-6 mt-12 ">
         <div className="space-y-4 ">
           <p className="text-md  text-zinc-800">{formatDateLabel(result.data.businessDate)}</p>
             <DashboardGreeting firstName={firstName} />
@@ -322,7 +322,7 @@ export default async function DashboardPage() {
         />
       ) : null}
 
-      <div className="mt-20 space-y-1">
+      <div className="mt-12 space-y-1 ">
         <p className="text-lg font-medium text-zinc-950">Source inputs for <span className="font-semibold">{financialMonthLabel} </span> obligations</p>
 
       </div>
@@ -425,7 +425,7 @@ export default async function DashboardPage() {
           <span className="text-sm font-semibold text-zinc-950">Obligations</span>
           <span className="text-sm text-zinc-600">{shortMonthLabel(financialFacts.obligations.obligationMonth)}</span>
           <span className="text-xs font-semibold tracking-[0.12em] text-zinc-500">
-            {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for approval" : "Not ready"}
+            {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for handoff" : "Not ready"}
           </span>
           <CaretDown size={16} aria-hidden="true" />
         </summary>
@@ -434,7 +434,7 @@ export default async function DashboardPage() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{financialMonthLabel} obligations</p>
               <p className="mt-1 text-lg font-semibold text-zinc-950">
-                {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for approval" : "Not ready"}
+                {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for handoff" : "Not ready"}
               </p>
             </div>
             <Link href="/obligations" className="text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">Open obligations →</Link>
