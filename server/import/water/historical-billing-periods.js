@@ -37,7 +37,7 @@ export function buildHistoricalBillingPeriodSequence(startKey, endKey) {
     const key = `${year}-${String(month).padStart(2, "0")}`;
     months.push({
       ...parsePeriodKey(key),
-      status: year === 2026 && month === 8 ? "collecting_readings" : "closed",
+      status: "closed",
     });
     current = new Date(Date.UTC(year, month, 1));
   }
