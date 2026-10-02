@@ -141,12 +141,12 @@ test("B2 missing Sedapal plus incomplete water readings are late from day seven"
   assert.deepEqual(projection.attentions, [
     {
       source: "water",
-      happened: "Sedapal bill for August is late.",
+      happened: "August Sedapal bill is still missing for September obligations.",
       impact: "September water obligations cannot be completed.",
     },
     {
       source: "water",
-      happened: "Water meter readings for August are late. 63 readings are still missing.",
+      happened: "63 August Water readings are still missing for September obligations.",
       impact: "September water obligations cannot be completed.",
     },
   ]);
@@ -417,9 +417,9 @@ test("late source work changes Water and Gas emphasis without financial blocking
   assert.equal(projection.water.emphasis, "attention");
   assert.equal(projection.gas.emphasis, "attention");
   assert.deepEqual(projection.attentions.map((attention) => attention.happened), [
-    "Sedapal bill for August is late.",
-    "Water meter readings for August are late. 64 readings are still missing.",
-    "Gas meter readings for August are late. 58 readings are still missing.",
+    "August Sedapal bill is still missing for September obligations.",
+    "64 August Water readings are still missing for September obligations.",
+    "58 August Gas readings are still missing for September obligations.",
   ]);
 });
 
@@ -434,7 +434,7 @@ test("late Gas readings create attention independently of supplier bills", () =>
   assert.equal(projection.gas.emphasis, "attention");
   assert.deepEqual(projection.attentions.filter((attention) => attention.source === "gas"), [{
     source: "gas",
-    happened: "Gas meter readings for August are late. 58 readings are still missing.",
+    happened: "58 August Gas readings are still missing for September obligations.",
     impact: "September gas obligations cannot be completed.",
   }]);
 });
@@ -903,17 +903,17 @@ test("Sep 8 approved current obligations advance financial focus to upcoming", (
   assert.deepEqual(projection.attentions, [
     {
       source: "water",
-      happened: "Sedapal bill for September is late.",
+      happened: "September Sedapal bill is still missing for October obligations.",
       impact: "October water obligations cannot be completed.",
     },
     {
       source: "water",
-      happened: "Water meter readings for September are late. 64 readings are still missing.",
+      happened: "64 September Water readings are still missing for October obligations.",
       impact: "October water obligations cannot be completed.",
     },
     {
       source: "gas",
-      happened: "Gas meter readings for September are late. 58 readings are still missing.",
+      happened: "58 September Gas readings are still missing for October obligations.",
       impact: "October gas obligations cannot be completed.",
     },
   ]);
@@ -1397,12 +1397,12 @@ test("L late Water source attentions remain separate and deterministic", () => {
   assert.deepEqual(projection.attentions, [
     {
       source: "water",
-      happened: "Sedapal bill for August is late.",
+      happened: "August Sedapal bill is still missing for September obligations.",
       impact: "September water obligations cannot be completed.",
     },
     {
       source: "water",
-      happened: "Water meter readings for August are late. 63 readings are still missing.",
+      happened: "63 August Water readings are still missing for September obligations.",
       impact: "September water obligations cannot be completed.",
     },
   ]);
@@ -1485,7 +1485,7 @@ test("future Gas calculation blockers become attention after the source deadline
 
   assert.deepEqual(projection.attentions, [{
     source: "gas",
-    happened: "Gas meter readings for October are late. 58 readings are still missing.",
+    happened: "58 October Gas readings are still missing for November obligations.",
     impact: "November gas obligations cannot be completed.",
   }]);
   assert.equal(projection.gas.readingsEmphasis, "attention");

@@ -371,7 +371,7 @@ function deriveAttentions(
     attentions.push({
       source: "water",
       happened: sourceSedapalLate
-        ? `Sedapal bill for ${sourceWorkMonthLabel} is late.`
+        ? `${sourceWorkMonthLabel} Sedapal bill is still missing for ${sourceWorkObligationMonthLabel} obligations.`
         : `Sedapal bill is missing for ${sourceMonthLabel}.`,
       impact: sourceSedapalLate
         ? `${sourceWorkObligationMonthLabel} water obligations cannot be completed.`
@@ -382,7 +382,7 @@ function deriveAttentions(
   if (sourceWorkLate && waterMissingCount > 0) {
     attentions.push({
       source: "water",
-      happened: `Water meter readings for ${sourceWorkMonthLabel} are late. ${waterMissingCount} readings are still missing.`,
+      happened: `${waterMissingCount} ${sourceWorkMonthLabel} Water readings are still missing for ${sourceWorkObligationMonthLabel} obligations.`,
       impact: `${sourceWorkObligationMonthLabel} water obligations cannot be completed.`,
     });
   }
@@ -390,7 +390,7 @@ function deriveAttentions(
   if (sourceWorkLate && gasMissingCount > 0) {
     attentions.push({
       source: "gas",
-      happened: `Gas meter readings for ${sourceWorkMonthLabel} are late. ${gasMissingCount} readings are still missing.`,
+      happened: `${gasMissingCount} ${sourceWorkMonthLabel} Gas readings are still missing for ${sourceWorkObligationMonthLabel} obligations.`,
       impact: `${sourceWorkObligationMonthLabel} gas obligations cannot be completed.`,
     });
   }
