@@ -50,6 +50,12 @@ function priorReadingsForUnit(readings: GasCompletionReading[], unitId: string, 
     .sort((left, right) => right.reading_month.localeCompare(left.reading_month));
 }
 
+function nextReadingForUnit(readings: GasCompletionReading[], unitId: string, sourceReadingMonth: string) {
+  return readings
+    .filter((reading) => reading.unit_id === unitId && monthKeyFromDateKey(reading.reading_month) > sourceReadingMonth)
+    .sort((left, right) => left.reading_month.localeCompare(right.reading_month))[0] ?? null;
+}
+
 export function buildMissingGasReadingDrafts(input: {
   sourceReadingMonth: string;
   readingDate: string;
@@ -75,6 +81,24 @@ export function buildMissingGasReadingDrafts(input: {
     .map((unit) => {
       const priorReadings = priorReadingsForUnit(input.readings, unit.id, input.sourceReadingMonth);
       const previousReading = priorReadings[0] ?? null;
+      const nextReading = nextReadingForUnit(input.readings, unit.id, input.sourceReadingMonth);
+      if (previousReading && nextReading?.previous_reading != null) {
+        if (nextReading.previous_reading < previousReading.current_reading) {
+          throw new Error(`Cannot synthesize Gas reading for ${unit.unit_number}: meter continuity moves backwards.`);
+        }
+
+        const generatedConsumption = roundToThree(nextReading.previous_reading - previousReading.current_reading);
+        return {
+          unitId: unit.id,
+          unitNumber: unit.unit_number,
+          readingMonth: `${input.sourceReadingMonth}-01`,
+          readingDate: input.readingDate,
+          previousReading: previousReading.current_reading,
+          currentReading: nextReading.previous_reading,
+          consumption: generatedConsumption,
+        };
+      }
+
       const historicalConsumptionValues = priorReadings
         .map((reading) => reading.consumption)
         .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
