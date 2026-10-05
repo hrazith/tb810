@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import {
   useEffect,
@@ -30,6 +31,21 @@ const STORAGE_KEYS = {
 };
 
 const ACTIVE_TAB_STORAGE_KEY = "tb810-dev-active-tab";
+
+function DevCompletionSubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className={pending
+        ? "cursor-wait text-white/45 underline decoration-white/15 underline-offset-2"
+        : "text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"}
+    >
+      {pending ? "Completing…" : "+ Complete"}
+    </button>
+  );
+}
 
 type DevToolsSnapshot = {
   outline: boolean;
@@ -644,12 +660,7 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
                             <form action={completeGasReadingsAction}>
                               <input type="hidden" name="return_to" value={pathname} />
                               <input type="hidden" name="source_reading_month" value={dashboardFacts.current.sourceReadingMonth} />
-                              <button
-                                type="submit"
-                                className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
-                              >
-                                + Complete
-                              </button>
+                              <DevCompletionSubmitButton />
                             </form>
                           ) : (
                             <button

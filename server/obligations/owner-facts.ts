@@ -42,7 +42,13 @@ export type BuildingMonthFinancialFacts = {
     reading_date: string;
     created_at: string;
   }>;
-  gasBills: Array<{ id: string; amount: number | string; processed_at: string | null; invoice_date: string }>;
+  gasBills: Array<{
+    id: string;
+    amount: number | string;
+    processed_at: string | null;
+    invoice_date: string;
+    reserved_billing_period_id?: string | null;
+  }>;
   gasReadings: Array<{
     unit_id: string;
     reading_month: string;
@@ -59,6 +65,7 @@ export type ObligationLifecycle = {
   mode: "live" | "snapshotted";
   billingPeriodId: string | null;
   billingPeriodStatus: string | null;
+  gasReservationState: "native_reserved" | "native_empty" | "legacy" | null;
 };
 
 export type PersistedObligationSnapshot = {
@@ -246,6 +253,7 @@ export function buildGasCalculationInputFromFacts(
       amount: String(bill.amount),
       status: bill.processed_at ? "processed" : "unprocessed",
     })),
+    reservationState: financialFacts.obligationLifecycle.gasReservationState,
     units: financialFacts.unitRows.map((row) => {
       const reading = financialFacts.gasReadings.find((item) => item.unit_id === row.id) ?? null;
       return {
@@ -351,10 +359,33 @@ export async function loadBuildingMonthFinancialFacts({
 
   const payload = rpc.data as BuildingMonthFinancialFactsRpcPayload;
   const upcomingMonth = nextMonthKey(obligationMonth) ?? obligationMonth;
+  const selectGasBillsForLifecycle = (
+    bills: BuildingMonthFinancialFacts["gasBills"],
+    lifecycle: BuildingMonthFinancialFacts["obligationLifecycle"] | undefined,
+  ) => {
+    const isHandedOff = lifecycle?.billingPeriodStatus
+      && ["ready_for_review", "approved", "invoices_generated", "closed"].includes(lifecycle.billingPeriodStatus);
+    if (isHandedOff && lifecycle?.gasReservationState === "native_reserved" && lifecycle.billingPeriodId) {
+      return bills.filter((bill) => bill.reserved_billing_period_id === lifecycle.billingPeriodId);
+    }
+    if (isHandedOff) return [];
+    return bills.filter((bill) => bill.processed_at === null && !bill.reserved_billing_period_id);
+  };
+  const currentLifecycle = payload.current?.obligationLifecycle;
+  const upcomingLifecycle = payload.upcoming?.obligationLifecycle;
+  const normalizeLifecycle = (lifecycle: ObligationLifecycle | undefined): ObligationLifecycle => {
+    const handedOff = lifecycle?.billingPeriodStatus
+      && ["ready_for_review", "approved", "invoices_generated", "closed"].includes(lifecycle.billingPeriodStatus);
+    return {
+      mode: lifecycle?.mode ?? "live",
+      billingPeriodId: lifecycle?.billingPeriodId ?? null,
+      billingPeriodStatus: lifecycle?.billingPeriodStatus ?? null,
+      gasReservationState: lifecycle?.gasReservationState ?? (handedOff ? "legacy" : null),
+    };
+  };
   const sharedFacts = {
     commonWaterType: payload.commonWaterType ?? null,
     unitRows: payload.unitRows ?? [],
-    gasBills: payload.gasBills ?? [],
     charges: payload.charges ?? [],
   };
   const current = {
@@ -363,10 +394,11 @@ export async function loadBuildingMonthFinancialFacts({
     planYear: Number(obligationMonth.slice(0, 4)),
     plan: payload.currentPlan ? { currency: String(payload.currentPlan.currency), monthly_operating_budget: String(payload.currentPlan.monthly_operating_budget) } : null,
     ...sharedFacts,
+    gasBills: selectGasBillsForLifecycle(payload.gasBills ?? [], currentLifecycle),
     commonWaterBill: payload.current?.commonWaterBill ?? null,
     waterReadings: payload.current?.waterReadings ?? [],
     gasReadings: payload.current?.gasReadings ?? [],
-    obligationLifecycle: payload.current?.obligationLifecycle ?? { mode: "live", billingPeriodId: null, billingPeriodStatus: null },
+    obligationLifecycle: normalizeLifecycle(currentLifecycle),
     obligationSnapshot: payload.current?.obligationSnapshot ?? null,
   } satisfies BuildingMonthFinancialFacts;
   const upcoming = {
@@ -375,10 +407,11 @@ export async function loadBuildingMonthFinancialFacts({
     planYear: Number(upcomingMonth.slice(0, 4)),
     plan: payload.upcomingPlan ? { currency: String(payload.upcomingPlan.currency), monthly_operating_budget: String(payload.upcomingPlan.monthly_operating_budget) } : null,
     ...sharedFacts,
+    gasBills: selectGasBillsForLifecycle(payload.gasBills ?? [], upcomingLifecycle),
     commonWaterBill: payload.upcoming?.commonWaterBill ?? null,
     waterReadings: payload.upcoming?.waterReadings ?? [],
     gasReadings: payload.upcoming?.gasReadings ?? [],
-    obligationLifecycle: payload.upcoming?.obligationLifecycle ?? { mode: "live", billingPeriodId: null, billingPeriodStatus: null },
+    obligationLifecycle: normalizeLifecycle(upcomingLifecycle),
     obligationSnapshot: payload.upcoming?.obligationSnapshot ?? null,
   } satisfies BuildingMonthFinancialFacts;
   const facts = {

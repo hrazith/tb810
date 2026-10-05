@@ -48,6 +48,7 @@ export type HandoffPersistence = (input: {
   buildingId: string;
   obligationMonth: string;
   operatingMonth: string;
+  gasBillIds: string[];
 }) => Promise<QueryResult<SnapshotResult>>;
 
 type SnapshotRow = {
@@ -373,7 +374,7 @@ export async function createMonthlyObligationHandoff({
     };
   }
 
-  const persist = persistence ?? (async ({ supabase: handoffClient, buildingId: handoffBuildingId, obligationMonth: handoffMonth, operatingMonth: handoffOperatingMonth }) => {
+  const persist = persistence ?? (async ({ supabase: handoffClient, buildingId: handoffBuildingId, obligationMonth: handoffMonth, operatingMonth: handoffOperatingMonth, gasBillIds }) => {
     const rpc = await (handoffClient as unknown as {
       rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: SnapshotResult | null; error: { message: string } | null }>;
     }).rpc(executionContext === "system" ? "tb810_mark_monthly_obligation_ready_for_review_system" : "tb810_mark_monthly_obligation_ready_for_review", {
@@ -382,12 +383,13 @@ export async function createMonthlyObligationHandoff({
       p_period_month: Number(handoffMonth.slice(5, 7)),
       p_operating_year: Number(handoffOperatingMonth.slice(0, 4)),
       p_operating_month: Number(handoffOperatingMonth.slice(5, 7)),
+      p_gas_bill_ids: gasBillIds,
     });
     if (rpc.error) return { data: null, error: rpc.error.message, failureKind: "error" as const };
     return { data: rpc.data, error: null };
   });
 
-  return persist({ supabase, buildingId, obligationMonth, operatingMonth });
+  return persist({ supabase, buildingId, obligationMonth, operatingMonth, gasBillIds: calculation.data.gasBillIds });
 }
 
 export async function createCurrentBuildingMonthlyObligationSnapshot({ obligationMonth }: { obligationMonth: string }) {

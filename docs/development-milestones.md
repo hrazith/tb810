@@ -311,6 +311,19 @@ Invoice generation and dispatch are not required for the First Ride.
 - **Calculation and rounding:** The blended rate uses full available precision internally. Each unit multiplies consumption by the unrounded rate, then rounds its final Gas obligation to two decimals. Residual cents are not redistributed merely to force the rounded aggregate to equal the supplier pool. Historical parity covered six representative periods and 348 unit-period comparisons with zero cent-level unit-charge mismatches. TB810's six-decimal returned/displayed rate is acceptable.
 - **Carlos Gas provenance:** Carlos receives a read-only view of the exact constituent Gas supplier bills included in the live package/calculation. The bills come from canonical package inputs/provenance. Carlos does not add, reject, exclude, replace, or otherwise curate the supplier pool during the First Ride. Pool curation and recalculation are post-MVP.
 
+K6 Gas reservation decision: the complete available supplier-bill pool is used
+for preparation, and handoff atomically reserves the exact participating bills
+to the Billing Period. Reserved bills are exclusive to that package, remain
+available as provenance through approval, and are processed only when that
+package is approved. An empty supplier-bill pool is valid. October and November
+2026 pre-K6 pending packages are preserved for deliberate reconciliation and
+fail closed rather than silently consuming later bills. The single reservation
+identity is `reserved_billing_period_id`; DEV reset releases only unapproved
+DEV-owned reservations. Bill-pool curation remains an MVP2 decision. The
+immutable approved artifact is the approved Billing Period plus its persisted
+obligation rows carrying `calculation_snapshot` metadata; there is no
+standalone approval-snapshot table or fingerprint column.
+
 ### K — September -> October REAL cycle — FIRST RIDE CHECKPOINT
 
 #### K1 — Clean starting state
@@ -349,6 +362,18 @@ demo work.
 #### K6 — Carlos review + approval
 
 Carlos should receive a quiet, credible October package showing approval readiness, source-work completion, package total, relevant component/unit/owner detail, and genuine financial exceptions. He should recognize that TB810 matches the trusted legacy calculation, then approve the package.
+
+##### K6.2 — simultaneous Carlos review packages, oldest first
+
+This is a new K6 lifecycle decision, not a historical rule. Multiple packages
+may be `ready_for_review` simultaneously. Carlos reviews them chronologically:
+the oldest unresolved package is approval-eligible, while newer packages remain
+visible as Ready for review. This ordering applies only to Carlos approval and
+does not block Giuliana's active package, source work, calculation, or later
+handoffs. Carlos Attention may therefore contain multiple obligation items.
+The floating Obligations action represents the oldest actionable package, and
+each selected item opens the canonical centered obligation modal. The server
+approval boundary enforces the same ordering.
 
 ## Demo Story
 

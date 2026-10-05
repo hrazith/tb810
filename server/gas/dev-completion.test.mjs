@@ -10,6 +10,10 @@ test("dates generated readings at the source month boundary", () => {
   assert.equal(gasReadingDateForSourceMonth("2026-10"), "2026-10-31");
 });
 
+test("rejects an invalid Gas source month", () => {
+  assert.equal(gasReadingDateForSourceMonth("not-a-month"), null);
+});
+
 test("builds drafts only for missing gas readings", () => {
   const units = [
     { id: "u1", unit_number: "101", unit_type_code: "condo", has_gas_service: true },

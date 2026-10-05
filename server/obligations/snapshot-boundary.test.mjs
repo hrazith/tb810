@@ -69,3 +69,20 @@ test("DEV reset composes handoff ownership before and after approval", () => {
   assert.match(devHandoffMigration, /DEV-owned Billing Period changed before handoff reset/);
   assert.match(devHandoffMigration, /not exists \(\s*select 1 from public\.tb810_monthly_financial_obligations/);
 });
+
+test("K6 Gas handoff reserves the available pool and package-scopes reads", () => {
+  const migration = readFileSync(new URL("../../supabase/migrations/20261004120000_gas_bill_pool_reservation.sql", import.meta.url), "utf8");
+  const snapshot = readFileSync(new URL("./snapshot.ts", import.meta.url), "utf8");
+  const facts = readFileSync(new URL("./owner-facts.ts", import.meta.url), "utf8");
+  assert.match(migration, /reserved_billing_period_id uuid/);
+  assert.match(migration, /reserved_period_same_building_fk/);
+  assert.doesNotMatch(migration, /reserved_obligation_month/);
+  assert.match(migration, /Gas bill set changed before handoff/);
+  assert.match(migration, /tb810_assert_gas_bill_reservation/);
+  assert.match(snapshot, /p_gas_bill_ids: gasBillIds/);
+  assert.match(facts, /bill\.processed_at === null && !bill\.reserved_billing_period_id/);
+  assert.match(facts, /bill\.reserved_billing_period_id === lifecycle\.billingPeriodId/);
+  assert.match(migration, /requires Gas reservation reconciliation before approval/);
+  assert.match(migration, /Gas bill approval set cannot contain NULL IDs/);
+  assert.match(migration, /gas_reservation_before/);
+});

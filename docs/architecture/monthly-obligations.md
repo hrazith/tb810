@@ -136,11 +136,13 @@ rows, consumes the selected Gas bills, and marks the package approved.
 
 Carlos's approval is the financial authority boundary. He reviews the live
 package, verifies that it has not changed since review, and creates the
-immutable snapshot on approval. Existing legacy snapshots are approved without
-being recreated.
+immutable approved artifact on approval: the approved Billing Period plus its
+persisted obligation rows, each carrying `calculation_snapshot` metadata.
+There is no standalone approval-snapshot table or standalone fingerprint
+column. Existing legacy snapshots are approved without being recreated.
 
 The provisional approval target is the fifth calendar day of the obligation
-month. A `ready_for_review` snapshot is Ready for Carlos approval through day 5;
+month. A `ready_for_review` package is Ready for Carlos approval through day 5;
 from day 6 onward, while still awaiting approval, it is Approval overdue and
 dispatch is blocked. This operating policy is provisional pending Carlos's
 confirmation and is not specific to September.
@@ -149,7 +151,7 @@ This approved snapshot must preserve the financial facts Carlos reviewed so late
 
 The dashboard may preview the next obligation month before that approval boundary is reached.
 That preview remains live and unapproved until Pulse hands it to Carlos and he
-explicitly approves the resulting Monthly Obligation snapshot. Handoff is
+explicitly approves the resulting approved Billing Period and obligation rows. Handoff is
 readiness- and calendar-driven. Month close is an important guaranteed
 attempt/checkpoint, but it is not the earliest allowed handoff time: when all
 required financial facts for an upcoming package become ready before month
@@ -160,7 +162,7 @@ and Not Ready until its final blocker resolves.
 The `ready_for_review` transition is the responsibility handoff boundary.
 While a package is live, Giuliana owns its preparation. At `ready_for_review`,
 Carlos owns review and approval while the package remains live and correctable;
-approval creates the immutable snapshot. Giuliana immediately
+approval finalizes the immutable approved artifact described above. Giuliana immediately
 begins preparing the immediate successor package. Carlos approval does not cause
 a second Giuliana focus advance. Calendar month, package lifecycle, Giuliana's
 operational focus, and Carlos's review state are related but independent clocks.
@@ -198,6 +200,13 @@ than one universal month clock.
   several packages qualify, the latest relevant handoff wins deterministically.
   Multiple packages may therefore await Carlos without pinning Giuliana's
   active package.
+- **New K6 decision:** Carlos approves simultaneous `ready_for_review` packages
+  chronologically, oldest first. Newer reviewable packages remain visible but
+  are not approval-eligible while an earlier package is unresolved. This queue
+  does not block Giuliana's progression, source work, calculation, or later
+  handoffs. Carlos's dashboard may show multiple Attention items, and its
+  floating Obligations action represents the oldest actionable package. Opening
+  an item uses the canonical centered obligation modal.
 - The source timing rule is day 7 for Water, Sedapal, and Gas readings. Gas
   supplier bills are an asynchronous pool and do not use that date-based rule.
 
@@ -331,9 +340,46 @@ Gas supplier bills are an operationally unprocessed pool. Bills may arrive at
 any time, and eligible unprocessed bills may be considered during obligation
 preparation or finalization. A bill already consumed for one obligation
 package must not be reused for a later package. The current `processed_at`
-field provides a basic processed/unprocessed distinction, but consumed-by-
-obligation attribution and atomic processing during finalization are not yet
+field remains separate from the K6 reservation/provenance boundary described
+below.
+
+### K6 Gas bill reservation decision
+
+K6 establishes the MVP reservation boundary. Before handoff, a package uses the
+complete pool of available Gas bills: bills that are unprocessed and not already
+reserved. An empty pool is valid and does not by itself block a package when
+required Gas readings are complete.
+
+When a package transitions to `ready_for_review`, the handoff transaction
+atomically reserves the exact bills used by its calculation to that Billing
+Period. A reserved bill cannot be used by a later package. Review reads the
+reserved bills for that package, while approval persists the immutable approved artifact
+and marks those same bills processed. Reservation and processing remain separate;
+the reservation is retained as provenance. The single reservation identity is
+`tb810_gas_bills.reserved_billing_period_id`; obligation month is derived from
+the referenced Billing Period rather than duplicated on the bill.
+
+This is a new K6 architectural decision, not a rewrite of historical behavior.
+The preserved October and November 2026 `ready_for_review` packages predate this
+boundary and require deliberate reconciliation; the migration does not backfill
+or reassign them. They fail closed rather than consuming newly available bills
+and must be explicitly reconciled before approval. A native K6 package records
+whether its reserved pool is populated or intentionally empty. Reservation
+release is explicit DEV-reset behavior for an unapproved DEV-owned package, not
+a generic Billing Period update/delete trigger. Approved and processed
+provenance is retained. MVP2 bill-pool curation is deferred and is not
 implemented.
+
+Reservation and package-state fields are system-controlled metadata: direct
+authenticated table writes cannot set or update them. DEV handoff journal
+records retain each bill's prior reservation identity, and reset restores only
+those bill rows still reserved to the session-owned Billing Period. This
+ownership check remains valid after DEV approval is temporarily rolled back to
+`ready_for_review`; it does not infer ownership from that transient status.
+
+Carlos may review multiple packages and approves them oldest first. Approval of
+one package must not change the financial inputs of another package already
+waiting for review.
 
 Owner-direct charges do not contribute to Monthly Obligations and are handled in the Owner Account path instead.
 The Monthly Obligation read model may therefore be progressive and incomplete while upstream source facts are still arriving.

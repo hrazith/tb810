@@ -18,6 +18,7 @@ export type GasCalculationInput = {
   obligationMonth: string;
   supplierBills: GasCalculationBill[];
   units: GasCalculationUnit[];
+  reservationState?: "native_reserved" | "native_empty" | "legacy" | null;
 };
 
 export type GasUnitCharge = {
@@ -109,6 +110,7 @@ export function calculateGasCharges(input: GasCalculationInput): GasCalculationR
 
   const totalConsumptionValue = [...consumptionByUnit.values()].reduce((total, value) => total + value, 0);
   const blockers: string[] = [];
+  if (input.reservationState === "legacy") blockers.push("This Gas package requires reconciliation before approval.");
   if (missingUnits.length > 0) blockers.push("Required gas readings are missing.");
   if (totalConsumptionValue === 0) blockers.push("Total gas consumption is zero.");
 

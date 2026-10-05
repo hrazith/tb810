@@ -10,6 +10,14 @@ export type GiulianaPackageProgression = {
     obligationMonth: string;
     status: string;
   } | null;
+  pendingReviews: Array<{
+    billingPeriodId: string;
+    obligationMonth: string;
+    status: string;
+    outstanding: boolean;
+    chronologicallyActionable: boolean;
+    approvalEligible: boolean;
+  }>;
 };
 
 export { selectGiulianaWorkspaceMonth };
@@ -41,6 +49,14 @@ export async function loadGiulianaPackageProgression({
   const payload = rpc.data as {
     activePackage?: { obligationMonth?: string; mode?: "live" | "snapshotted"; status?: string | null };
     mostRecentHandoff?: { obligationMonth?: string; status?: string } | null;
+    pendingReviews?: Array<{
+      billingPeriodId?: string;
+      obligationMonth?: string;
+      status?: string;
+      outstanding?: boolean;
+      chronologicallyActionable?: boolean;
+      approvalEligible?: boolean;
+    }>;
   };
   if (!payload.activePackage?.obligationMonth) {
     return { data: null, error: "Active Giuliana package unavailable.", requestCount: 1 };
@@ -59,6 +75,18 @@ export async function loadGiulianaPackageProgression({
             status: payload.mostRecentHandoff.status,
           }
         : null,
+      pendingReviews: (payload.pendingReviews ?? []).flatMap((review) => (
+        review.billingPeriodId && review.obligationMonth && review.status
+          ? [{
+              billingPeriodId: review.billingPeriodId,
+              obligationMonth: review.obligationMonth,
+              status: review.status,
+              outstanding: review.outstanding === true,
+              chronologicallyActionable: review.chronologicallyActionable === true,
+              approvalEligible: review.approvalEligible === true,
+            }]
+          : []
+      )),
     },
     error: null,
     requestCount: 1,

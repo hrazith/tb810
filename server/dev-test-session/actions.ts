@@ -117,7 +117,7 @@ export async function runMonthlyObligationPulseAction(formData: FormData) {
   const session = await getActiveDevTestSessionSummary();
   if (!session) redirect(`${returnTo}?error=${encodeURIComponent("Start a DEV test session first.")}`);
 
-  const persistence: HandoffPersistence = async ({ supabase, buildingId, obligationMonth, operatingMonth }) => {
+  const persistence: HandoffPersistence = async ({ supabase, buildingId, obligationMonth, operatingMonth, gasBillIds }) => {
     const rpc = await (supabase as unknown as {
       rpc: (
         name: string,
@@ -130,6 +130,7 @@ export async function runMonthlyObligationPulseAction(formData: FormData) {
       p_period_month: Number(obligationMonth.slice(5, 7)),
       p_operating_year: Number(operatingMonth.slice(0, 4)),
       p_operating_month: Number(operatingMonth.slice(5, 7)),
+      p_gas_bill_ids: gasBillIds,
     });
     if (rpc.error) return { data: null, error: rpc.error.message, failureKind: "error" as const };
     return { data: rpc.data, error: null };

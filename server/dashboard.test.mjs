@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import path from "node:path";
 import createJiti from "jiti";
 
@@ -15,7 +16,7 @@ const buildingModule = jiti("@/server/building");
 const ownerFactsModule = jiti("@/server/obligations/owner-facts");
 const progressionModule = jiti("@/server/obligations/progression");
 
-const { projectCarlosDashboard, projectGulianaDashboard, deriveUnitChargeWorthNoting, deriveGulianaDashboardMonths, deriveDashboardContext, financialReadinessDeadline, getGulianaDashboardFacts } = dashboard;
+const { projectCarlosDashboard, projectGulianaDashboard, deriveUnitChargeWorthNoting, deriveGulianaDashboardMonths, deriveDashboardContext, financialReadinessDeadline, getGulianaDashboardFacts, selectDashboardPackageMonth, deriveCarlosApprovalAttentions } = dashboard;
 
 function buildProjectionFacts(overrides = {}) {
   const businessDate = overrides.businessDate ?? "2026-08-05";
@@ -86,6 +87,7 @@ function buildProjectionFacts(overrides = {}) {
     context: overrides.context ?? (businessDate.endsWith("-09-01") ? "open" : "close"),
     sourceWork,
     mostRecentHandoff: overrides.mostRecentHandoff ?? null,
+    pendingReviews: overrides.pendingReviews ?? [],
     current: overrides.current ?? upcoming,
     upcoming,
   };
@@ -1153,6 +1155,77 @@ test("Carlos advances to the next active package after approval", () => {
   assert.equal(projection.obligationMonth, "2026-10");
   assert.equal(projection.approvalState, "not_ready");
   assert.equal(projection.journeyState, "building");
+});
+
+test("Carlos selects the latest reviewable handoff while Giuliana keeps the active package", () => {
+  const progression = {
+    activePackage: { obligationMonth: "2026-12", mode: "live", status: null },
+    mostRecentHandoff: { obligationMonth: "2026-11", status: "ready_for_review" },
+  };
+
+  assert.equal(selectDashboardPackageMonth({ audience: "carlos", ...progression }), "2026-11");
+  assert.equal(selectDashboardPackageMonth({ audience: "giuliana", ...progression }), "2026-12");
+});
+
+test("Carlos selects the oldest pending review package while Giuliana stays on active work", () => {
+  const progression = {
+    activePackage: { obligationMonth: "2026-12", mode: "live", status: null },
+    mostRecentHandoff: { obligationMonth: "2026-11", status: "ready_for_review" },
+    pendingReviews: [
+      { billingPeriodId: "october", obligationMonth: "2026-10", status: "ready_for_review", approvalEligible: true },
+      { billingPeriodId: "november", obligationMonth: "2026-11", status: "ready_for_review", approvalEligible: false },
+    ],
+  };
+
+  assert.equal(selectDashboardPackageMonth({ audience: "carlos", ...progression }), "2026-10");
+  assert.equal(selectDashboardPackageMonth({ audience: "giuliana", ...progression }), "2026-12");
+  assert.deepEqual(deriveCarlosApprovalAttentions(progression.pendingReviews).map((item) => [item.obligationMonth, item.happened]), [
+    ["2026-10", "October 2026 obligations are ready for your approval"],
+    ["2026-11", "November 2026 obligations are ready for review"],
+  ]);
+});
+
+test("Carlos makes the next review package actionable after the oldest is resolved", () => {
+  const pendingReviews = [{ billingPeriodId: "november", obligationMonth: "2026-11", status: "ready_for_review", approvalEligible: true }];
+  assert.equal(selectDashboardPackageMonth({
+    audience: "carlos",
+    activePackage: { obligationMonth: "2026-12" },
+    mostRecentHandoff: { obligationMonth: "2026-11", status: "ready_for_review" },
+    pendingReviews,
+  }), "2026-11");
+  assert.equal(deriveCarlosApprovalAttentions(pendingReviews)[0].happened, "November 2026 obligations are ready for your approval");
+});
+
+test("Carlos review blocker copy derives the oldest other pending package", () => {
+  const workspace = fs.readFileSync("app/(staff)/_components/carlos-approval-workspace.tsx", "utf8");
+
+  assert.match(workspace, /!selectedReview\.chronologicallyActionable/);
+  assert.match(workspace, /This package is ready for review\. \$\{formatMonthLabel\(blockingReview\.obligationMonth\)\} must be approved first\./);
+});
+
+test("Carlos marks a chronologically first legacy review as review-only", () => {
+  const pendingReviews = [{
+    billingPeriodId: "november",
+    obligationMonth: "2026-11",
+    status: "ready_for_review",
+    outstanding: true,
+    chronologicallyActionable: true,
+    approvalEligible: false,
+  }];
+  assert.equal(deriveCarlosApprovalAttentions(pendingReviews)[0].happened, "November 2026 obligations are ready for review");
+});
+
+test("Carlos workspace keeps approval pending/success and legacy blocker states local", () => {
+  const workspace = fs.readFileSync("app/(staff)/_components/carlos-approval-workspace.tsx", "utf8");
+  const page = fs.readFileSync("app/(staff)/page.tsx", "utf8");
+  assert.match(workspace, /useActionState/);
+  assert.match(workspace, /disabled=\{approvalPending\}/);
+  assert.match(workspace, /Approving \$\{formatMonthLabel\(selectedDetail\.obligationMonth\)\}/);
+  assert.match(workspace, /formatMonthLabel\(approvalResult\.obligationMonth\).*approved/);
+  assert.match(workspace, /Review next package/);
+  assert.match(workspace, /selectedDetail\.financialBlockers\.join\(" "\)/);
+  assert.doesNotMatch(workspace, /Ready for your approval<\/span>/);
+  assert.doesNotMatch(page, /<CarlosApprovalWorkspace\s+key=\{projection\.pendingReviews/);
 });
 
 test("Carlos builds the next active package charge count from both charge components", () => {

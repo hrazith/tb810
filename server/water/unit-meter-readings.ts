@@ -157,6 +157,7 @@ async function isSourceMonthEditableForBuilding(
   supabase: Awaited<ReturnType<typeof createClient>>,
   buildingId: string,
   sourceMonth: string,
+  referenceDate = new Date(),
 ) {
   const obligationMonth = obligationMonthForSourceMonth(sourceMonth);
   if (!obligationMonth) return { allowed: false, error: null };
@@ -173,18 +174,18 @@ async function isSourceMonthEditableForBuilding(
   return {
     allowed: isSourceMonthEditable({
       sourceMonth,
-      activeMonth: getActiveReadingMonth().key,
+      activeMonth: getActiveReadingMonth(referenceDate).key,
       consumingPackage: data ? { status: data.status } : null,
     }),
     error: null,
   };
 }
 
-export async function canEditSourceMonth(sourceMonth: string) {
+export async function canEditSourceMonth(sourceMonth: string, referenceDate = new Date()) {
   const buildingResult = await getCurrentBuilding();
   if (buildingResult.error) return { allowed: false, error: buildingResult.error };
   if (!buildingResult.data) return { allowed: false, error: null };
-  return isSourceMonthEditableForBuilding(await createClient(), buildingResult.data.id, sourceMonth);
+  return isSourceMonthEditableForBuilding(await createClient(), buildingResult.data.id, sourceMonth, referenceDate);
 }
 
 export async function clearCurrentUnitWaterMonth(monthKey: string) {

@@ -14,8 +14,8 @@ const {
 test("Gas mutation boundary delegates month editability to the canonical guard", () => {
   const source = readFileSync("server/gas/index.ts", "utf8");
   assert.match(source, /import \{ canEditSourceMonth/);
-  assert.match(source, /async function gasReadingMonthEditError\(monthKey: string\)/);
-  assert.match(source, /const correction = await canEditSourceMonth\(monthKey\)/);
+  assert.match(source, /async function gasReadingMonthEditError\(monthKey: string, referenceDate\?: Date\)/);
+  assert.match(source, /const correction = await canEditSourceMonth\(monthKey, referenceDate\)/);
   for (const functionName of ["createGasReading", "updateGasReading", "deleteGasReading"]) {
     const start = source.indexOf(`export async function ${functionName}`);
     const next = source.indexOf("export async function", start + 1);
@@ -43,6 +43,25 @@ test("Gas source facts remain editable through handoff and lock after finalizati
     activeMonth: "2026-09",
     consumingPackage: null,
   }), false);
+});
+
+test("DEV Gas completion can evaluate the simulated business month without changing production defaults", () => {
+  const { isSourceMonthEditable } = jiti("../water/source-editability.ts");
+  assert.equal(isSourceMonthEditable({
+    sourceMonth: "2026-11",
+    activeMonth: "2026-11",
+    consumingPackage: null,
+  }), true);
+  assert.equal(isSourceMonthEditable({
+    sourceMonth: "2026-11",
+    activeMonth: "2026-10",
+    consumingPackage: null,
+  }), false);
+
+  const source = readFileSync("server/gas/index.ts", "utf8");
+  assert.match(source, /import \{ getBusinessNow \} from "@\/server\/business-date"/);
+  assert.match(source, /gasReadingMonthEditError\(sourceReadingMonth, await getBusinessNow\(\)\)/);
+  assert.match(source, /async function gasReadingMonthEditError\(monthKey: string, referenceDate\?: Date\)/);
 });
 
 test("existing Gas readings use update while missing readings use create", () => {

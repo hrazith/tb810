@@ -99,7 +99,7 @@ test("successful approval updates the billing period", { concurrency: false }, a
 
   try {
     const result = await approval.approveMonthlyObligation({ billingPeriodId: "period-1" });
-    assert.deepEqual(result, { data: { status: "approved" }, error: null });
+    assert.deepEqual(result, { data: { status: "approved", obligationMonth: "2026-09", obligationRowCount: 0, total: "0" }, error: null });
     assert.equal(rpcCalls, 2);
   } finally {
     supabaseServer.createClient = originalCreateClient;

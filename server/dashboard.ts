@@ -54,6 +54,7 @@ type UpcomingFacts = {
 
 export type DashboardContext = "close" | "open";
 export type DashboardFinancialFocus = "current" | "upcoming";
+export type DashboardAudience = "giuliana" | "carlos";
 export type CarlosApprovalState = "ready" | "overdue" | "approved" | "not_ready";
 export type CarlosJourneyState = "building" | "ready" | "blocked" | "ready_for_approval" | "approval_overdue" | "approved";
 
@@ -69,6 +70,14 @@ export type GulianaDashboardFacts = {
     obligationMonth: string;
     status: string;
   } | null;
+  pendingReviews: Array<{
+    billingPeriodId: string;
+    obligationMonth: string;
+    status: string;
+    outstanding: boolean;
+    chronologicallyActionable: boolean;
+    approvalEligible: boolean;
+  }>;
   current: UpcomingFacts;
   upcoming: UpcomingFacts;
 };
@@ -151,6 +160,34 @@ export type CarlosDashboardProjection = {
   billingPeriodStatus: string | null;
   approvalState: CarlosApprovalState;
   journeyState: CarlosJourneyState;
+  pendingReviews: Array<{
+    billingPeriodId: string;
+    obligationMonth: string;
+    status: string;
+    outstanding: boolean;
+    chronologicallyActionable: boolean;
+    approvalEligible: boolean;
+  }>;
+};
+
+export type CarlosApprovalAttention = {
+  billingPeriodId: string;
+  obligationMonth: string;
+  outstanding: boolean;
+  chronologicallyActionable: boolean;
+  approvalEligible: boolean;
+  happened: string;
+};
+
+export type CarlosObligationReviewDetail = {
+  obligationMonth: string;
+  billingPeriodId: string | null;
+  billingPeriodStatus: string | null;
+  total: string | null;
+  components: UpcomingFacts["obligations"]["components"];
+  financialReadiness: "ready" | "blocked";
+  financialBlockers: string[];
+  reviewFingerprint: string;
 };
 
 function countCompletedWaterReadings(financialFacts: BuildingMonthFinancialFacts) {
@@ -332,7 +369,17 @@ export function projectCarlosDashboard(monthFacts: GulianaDashboardFacts): Carlo
     billingPeriodStatus: lifecycle.billingPeriodStatus,
     approvalState,
     journeyState,
+    pendingReviews: monthFacts.pendingReviews ?? [],
   };
+}
+
+export function deriveCarlosApprovalAttentions(
+  pendingReviews: Array<{ billingPeriodId: string; obligationMonth: string; outstanding: boolean; chronologicallyActionable: boolean; approvalEligible: boolean }>,
+): CarlosApprovalAttention[] {
+  return pendingReviews.map((review) => ({
+    ...review,
+    happened: `${new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${review.obligationMonth}-01T00:00:00Z`))} obligations are ${review.approvalEligible ? "ready for your approval" : "ready for review"}`,
+  }));
 }
 
 function isSourceWorkLate(businessDate: string, sourceReadingMonth: string) {
@@ -623,6 +670,35 @@ function buildUpcomingFacts(
   };
 }
 
+export function buildCarlosObligationReviewDetail(financialFacts: BuildingMonthFinancialFacts): CarlosObligationReviewDetail {
+  const facts = buildUpcomingFacts(financialFacts, financialFacts.obligationMonth);
+  const financiallyReady = isReadyToApprove(facts);
+
+  return {
+    obligationMonth: facts.obligations.obligationMonth,
+    billingPeriodId: financialFacts.obligationLifecycle.billingPeriodId,
+    billingPeriodStatus: financialFacts.obligationLifecycle.billingPeriodStatus,
+    total: facts.obligations.total,
+    components: facts.obligations.components,
+    financialReadiness: financiallyReady ? "ready" : "blocked",
+    financialBlockers: getFinancialBlockers(facts),
+    reviewFingerprint: facts.reviewFingerprint,
+  };
+}
+
+export async function getCarlosObligationReviewDetail(obligationMonth: string): Promise<QueryResult<CarlosObligationReviewDetail>> {
+  const building = getFixedBuildingIdentity();
+  const factsResult = await loadBuildingMonthFinancialFacts({
+    buildingId: building.id,
+    obligationMonth,
+  });
+  if (factsResult.error || !factsResult.data) {
+    return { data: null as never, error: factsResult.error ?? "Building month facts unavailable." };
+  }
+
+  return { data: buildCarlosObligationReviewDetail(factsResult.data.current), error: null };
+}
+
 export function deriveGulianaDashboardMonths(businessNow: Date) {
   const operatingMonth = `${businessNow.getUTCFullYear()}-${String(businessNow.getUTCMonth() + 1).padStart(2, "0")}`;
   const upcomingObligationMonth = nextMonthKey(operatingMonth) ?? operatingMonth;
@@ -633,7 +709,26 @@ export function deriveDashboardContext(businessNow: Date): DashboardContext {
   return businessNow.getUTCDate() === 1 ? "open" : "close";
 }
 
-async function loadDashboardFacts(): Promise<QueryResult<GulianaDashboardFacts>> {
+export function selectDashboardPackageMonth({
+  audience,
+  activePackage,
+  mostRecentHandoff,
+  pendingReviews = [],
+}: {
+  audience: DashboardAudience;
+  activePackage: { obligationMonth: string };
+  mostRecentHandoff: { obligationMonth: string; status: string } | null;
+  pendingReviews?: Array<{ obligationMonth: string; status: string }>;
+}) {
+  if (audience === "carlos") {
+    const oldestReview = pendingReviews.find((review) => review.status === "ready_for_review");
+    if (oldestReview) return oldestReview.obligationMonth;
+    if (mostRecentHandoff?.status === "ready_for_review") return mostRecentHandoff.obligationMonth;
+  }
+  return activePackage.obligationMonth;
+}
+
+export async function loadDashboardFacts(audience: DashboardAudience = "giuliana"): Promise<QueryResult<GulianaDashboardFacts>> {
   const businessNow = await getBusinessNow();
   const { operatingMonth, upcomingObligationMonth } = deriveGulianaDashboardMonths(businessNow);
   const context = deriveDashboardContext(businessNow);
@@ -646,11 +741,16 @@ async function loadDashboardFacts(): Promise<QueryResult<GulianaDashboardFacts>>
     return { data: null as never, error: progressionResult.error ?? "Giuliana package progression unavailable." };
   }
 
-  const activeObligationMonth = progressionResult.data.activePackage.obligationMonth;
-  const activeUpcomingObligationMonth = nextMonthKey(activeObligationMonth) ?? activeObligationMonth;
+  const packageMonth = selectDashboardPackageMonth({
+    audience,
+    activePackage: progressionResult.data.activePackage,
+    mostRecentHandoff: progressionResult.data.mostRecentHandoff,
+    pendingReviews: progressionResult.data.pendingReviews,
+  });
+  const activeUpcomingObligationMonth = nextMonthKey(packageMonth) ?? packageMonth;
   const factsResult = await loadBuildingMonthFinancialFacts({
     buildingId: building.id,
-    obligationMonth: activeObligationMonth,
+    obligationMonth: packageMonth,
   });
 
   if (factsResult.error) {
@@ -661,7 +761,7 @@ async function loadDashboardFacts(): Promise<QueryResult<GulianaDashboardFacts>>
     return { data: null as never, error: "Building month facts unavailable." };
   }
 
-  const current = buildUpcomingFacts(factsResult.data.current, activeObligationMonth);
+  const current = buildUpcomingFacts(factsResult.data.current, packageMonth);
   const upcoming = buildUpcomingFacts(factsResult.data.upcoming, activeUpcomingObligationMonth);
   const sourceWork = buildSourceWorkFacts(factsResult.data.current);
 
@@ -673,6 +773,7 @@ async function loadDashboardFacts(): Promise<QueryResult<GulianaDashboardFacts>>
       context,
       sourceWork,
       mostRecentHandoff: progressionResult.data.mostRecentHandoff,
+      pendingReviews: progressionResult.data.pendingReviews,
       current,
       upcoming,
     },
@@ -680,9 +781,9 @@ async function loadDashboardFacts(): Promise<QueryResult<GulianaDashboardFacts>>
   };
 }
 
-export const getGulianaDashboardFacts = cache(async (): Promise<QueryResult<GulianaDashboardFacts>> => loadDashboardFacts());
+export const getGulianaDashboardFacts = cache(async (): Promise<QueryResult<GulianaDashboardFacts>> => loadDashboardFacts("giuliana"));
 
-export const getCarlosDashboardFacts = cache(async (): Promise<QueryResult<GulianaDashboardFacts>> => loadDashboardFacts());
+export const getCarlosDashboardFacts = cache(async (): Promise<QueryResult<GulianaDashboardFacts>> => loadDashboardFacts("carlos"));
 
 export async function getDashboardMonthFacts() {
   return getGulianaDashboardFacts();

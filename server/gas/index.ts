@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { createClient } from "@/lib/supabase/server";
+import { getBusinessNow } from "@/server/business-date";
 import { getActiveDevTestSessionId, getActiveDevTestSessionSummary, recordDevTestMutation } from "@/server/dev-test-session";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 import { getStaffContext } from "@/server/staff-context";
@@ -150,8 +151,8 @@ function gasReadingDateError(readingDate: string, readingMonth: string) {
     : "Reading date must belong to the selected operational month.";
 }
 
-async function gasReadingMonthEditError(monthKey: string) {
-  const correction = await canEditSourceMonth(monthKey);
+async function gasReadingMonthEditError(monthKey: string, referenceDate?: Date) {
+  const correction = await canEditSourceMonth(monthKey, referenceDate);
   if (correction.error) return correction.error;
   return correction.allowed ? null : "Only the current editable Gas reading month can be changed.";
 }
@@ -481,7 +482,7 @@ export async function completeMissingGasReadingsForCurrentBusinessMonth(
 
   const readingDate = gasReadingDateForSourceMonth(sourceReadingMonth);
   if (!readingDate) return { data: null as never, error: "Gas source month is invalid." };
-  const editError = await gasReadingMonthEditError(sourceReadingMonth);
+  const editError = await gasReadingMonthEditError(sourceReadingMonth, await getBusinessNow());
   if (editError) return { data: null as never, error: editError };
 
   const supabase = await createClient();

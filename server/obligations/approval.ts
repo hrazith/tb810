@@ -45,7 +45,7 @@ export async function approveMonthlyObligation({ billingPeriodId, reviewFingerpr
 
   const transition = validateApprovalTransition(String(periodResult.data.status));
   if (!transition.ok) return { data: null, error: transition.error };
-  if (transition.idempotent) return { data: { status: "approved" }, error: null };
+  if (transition.idempotent) return { data: { status: "approved", obligationMonth: `${periodResult.data.period_year}-${String(periodResult.data.period_month).padStart(2, "0")}`, obligationRowCount: 0, total: null }, error: null };
 
   const factsResult = await loadBuildingMonthFinancialFacts({
     buildingId: building.id,
@@ -91,7 +91,15 @@ export async function approveMonthlyObligation({ billingPeriodId, reviewFingerpr
   });
   if (approvalResult.error) return { data: null, error: approvalResult.error.message };
   if (!approvalResult.data) return { data: null, error: "Monthly Obligation approval failed." };
-  return { data: { status: String(approvalResult.data.status) }, error: null };
+  const obligationMonth = `${periodResult.data.period_year}-${String(periodResult.data.period_month).padStart(2, "0")}`;
+  const rows = calculation?.data?.rows ?? [];
+  const total = calculation?.data
+    ? rows.reduce((sum, row) => sum + Number(row.amount), 0).toFixed(2)
+    : facts.obligationSnapshot?.total == null ? null : String(facts.obligationSnapshot.total);
+  const obligationRowCount = calculation?.data
+    ? rows.length
+    : Object.values(facts.obligationSnapshot?.components ?? {}).reduce((sum, component) => sum + component.count, 0);
+  return { data: { status: String(approvalResult.data.status), obligationMonth, obligationRowCount, total }, error: null };
 }
 
 export async function resetCurrentMonthlyObligationApprovalForDev() {

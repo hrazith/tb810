@@ -106,6 +106,15 @@ recent handoff separately, so multiple consecutive packages may await Carlos
 without pinning Giuliana to Carlos's backlog. An absent Billing Period is the
 first live candidate and stops the progression lookup.
 
+The K6 Carlos review model is intentionally separate from Giuliana's active
+package. Multiple `ready_for_review` packages may remain visible to Carlos at
+once, ordered by obligation month. Only the oldest unresolved package is
+actionable; newer packages are labeled Ready for review until the older package
+is approved. Giuliana's progression and later handoffs remain independent.
+Carlos Attention items open the selected package in the centered obligation
+modal, while the floating Obligations action opens the oldest actionable
+package.
+
 The behavior of an incomplete package remains no snapshot, a live obligation, and Not Ready. Giuliana sees actionable blockers; Carlos sees oversight/status and has no approval action until the delayed snapshot occurs.
 
 After approval, these three concepts remain visible concurrently and must not be collapsed:
@@ -226,7 +235,8 @@ ready earlier, the package may be handed off early. The date alone does not
 hand off an incomplete package. An incomplete package remains live while
 Giuliana enters or corrects the missing prior-period facts; a later pulse may
 snapshot it when the final blocker resolves and return it to Awaiting Carlos
-Approval. Carlos approval then creates the immutable financial snapshot.
+Approval. Carlos approval then finalizes the immutable approved Billing Period
+and persisted obligation rows.
 
 ### Business-date month boundary
 
@@ -322,6 +332,16 @@ That is a genuine close/posting boundary, not a manufactured overdue state.
 
 Gas supplier bills are different: they can arrive throughout the month.
 Therefore "Upload supplier bill" is an ongoing intake action and should remain available even when no supplier bill is currently expected.
+
+K6 now reserves the complete available Gas bill pool atomically at obligation
+handoff. Available means unprocessed and unreserved; an empty pool is valid.
+After handoff, the package reads only its reserved bills, and approval processes
+only those bills. Reservation remains separate from `processed_at` and remains
+package provenance. The preserved pre-K6 October and November DEV packages are
+not automatically rewritten and fail closed rather than consuming future
+available bills. The canonical reservation identity is the bill's
+`reserved_billing_period_id`; the package month is derived from the referenced
+Billing Period. Future bill-pool curation is deferred to MVP2.
 
 The accumulated Gas supplier-bill pool may eventually be Worth noting when it is materially different from its historical norm for a comparable period, such as unusually high September supplier costs. This is not automatically an error, Needs attention, or Blocking condition. The comparison method, historical window, comparable-month methodology, seasonality treatment, minimum sample, materiality threshold, and insufficient-history fallback remain TBD; implementation is deferred.
 
@@ -423,7 +443,7 @@ If the current month's obligations require Carlos's review, that actionable stat
 Once Carlos has reviewed or approved the obligations, this section compresses.
 Collections then naturally becomes the dominant dashboard responsibility.
 
-The first Carlos implementation slice is intentionally narrow: review and approval of the live monthly obligation package. Carlos does not redefine its amounts; approval atomically creates the immutable snapshot for new packages. Legacy persisted packages are approved without re-snapshotting.
+The first Carlos implementation slice is intentionally narrow: review and approval of the live monthly obligation package. Carlos does not redefine its amounts; approval atomically finalizes the immutable approved artifact for new packages: the approved Billing Period plus persisted obligation rows containing their `calculation_snapshot` metadata. There is no standalone approval-snapshot table or fingerprint column. Legacy persisted packages are approved without re-snapshotting.
 
 The provisional approval target is the fifth calendar day of the obligation month. A `ready_for_review` package is shown as Ready for your approval through day 5 and as Approval overdue / Dispatch blocked from day 6 onward. This is a provisional operating policy pending Carlos's confirmation, not a September-specific rule.
 
