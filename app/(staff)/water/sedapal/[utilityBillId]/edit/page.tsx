@@ -1,9 +1,5 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
-import { Panel } from "@/components/ui/panel";
-import { formatPeruvianDate } from "@/lib/water-dates";
 import {
   getCommonWaterReadingDefaults,
   getWaterBillById,
@@ -46,37 +42,15 @@ export default async function EditWaterBillPage({ params }: PageProps) {
   const canEditPreviousReading = !(readingDefaults.data?.hasPriorBill ?? true);
 
   return (
-    <section className="space-y-6">
-      <Panel as="div" className="space-y-3">
-        <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-          Sedapal Invoice
-        </p>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">
-              Edit Sedapal bill
-            </h1>
-            <p className="max-w-2xl text-sm text-zinc-600">
-              Update the open month only. Previous reading stays fixed from the
-              prior Sedapal record.
-            </p>
-            <p className="text-sm text-zinc-500">
-              {canEditPreviousReading ? "Opening Reading" : "Previous Reading"}:{" "}
-              {formatReading(bill.previous_reading)}
-            </p>
-            <p className="text-sm text-zinc-500">
-              Reading Date: {formatPeruvianDate(bill.bill_date)}
-            </p>
-          </div>
-          <Button asChild variant="secondary" size="sm">
-            <Link href={`/water/sedapal/${bill.id}`}>Back to bill</Link>
-          </Button>
-        </div>
-      </Panel>
+    <section className="mx-auto my-12 w-full max-w-sm space-y-6 rounded-2xl bg-white p-10 sm:p-12">
+      <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">
+        Edit Sedapal bill
+      </h1>
 
       <CommonWaterBillForm
         action={updateCommonWaterBillAction}
         submitLabel="Update bill"
+        cancelHref={`/water/sedapal/${bill.id}`}
         previousReadingHelpText={
           canEditPreviousReading
             ? "Giuliana can adjust the opening reading until this first record is locked."
@@ -95,6 +69,7 @@ export default async function EditWaterBillPage({ params }: PageProps) {
         }}
         showDescription={false}
         showNotes={false}
+        showSummary={false}
       />
     </section>
   );

@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import Link from "next/link";
 
 import { CaretLeft, FilePdf } from "@phosphor-icons/react/dist/ssr";
 import {
@@ -41,6 +42,7 @@ type Props = {
   compact?: boolean;
   hideCancel?: boolean;
   onCancel?: () => void;
+  cancelHref?: string;
   onSuccess?: () => void;
   showSummary?: boolean;
 };
@@ -97,6 +99,7 @@ export function CommonWaterBillForm({
   compact = false,
   hideCancel = false,
   onCancel,
+  cancelHref,
   onSuccess,
   showSummary = true,
 }: Props) {
@@ -186,7 +189,9 @@ export function CommonWaterBillForm({
         <input type="hidden" name="utility_bill_id" value={utilityBillId} />
       ) : null}
       {devTestContext ? <input type="hidden" name="dev_test_context" value="1" /> : null}
-      <input type="hidden" name="previous_reading" value={previousReading} />
+      {!utilityBillId ? (
+        <input type="hidden" name="previous_reading" value={previousReading} />
+      ) : null}
       {!utilityBillId
         ? step === 2
           ? (
@@ -329,7 +334,7 @@ export function CommonWaterBillForm({
             ) : null}
           </label>
 
-          {utilityBillId ? (
+          {utilityBillId && !previousReadingReadOnly ? (
             <label className="space-y-2">
               <span className="block text-lg font-medium text-zinc-900">
                 {previousReadingLabel}
@@ -476,6 +481,13 @@ export function CommonWaterBillForm({
             >
               Cancel
             </button>
+          ) : cancelHref ? (
+            <Link
+              href={cancelHref}
+              className="inline-flex h-12 cursor-pointer items-center justify-center rounded-xl border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950"
+            >
+              Cancel
+            </Link>
           ) : null}
         </div>
       </div>

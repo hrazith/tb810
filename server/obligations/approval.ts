@@ -18,6 +18,14 @@ export function validateApprovalTransition(status: string) {
   return { ok: true as const, idempotent: false as const };
 }
 
+const PACKAGE_CHANGED_MESSAGE = "The Monthly Obligations package changed. Review it again before approving.";
+
+// The database rejects approval when the Sedapal facts behind the reviewed
+// rows no longer match the bill that exists at commit.
+export function mapApprovalRpcError(message: string) {
+  return message.includes("Sedapal source changed after review") ? PACKAGE_CHANGED_MESSAGE : message;
+}
+
 export function validateDevApprovalReset(status: string) {
   return status === "approved"
     ? { ok: true as const }
@@ -56,7 +64,7 @@ export async function approveMonthlyObligation({ billingPeriodId, reviewFingerpr
   const facts = factsResult.data.current;
   const hasPersistedSnapshot = facts.obligationSnapshot !== null;
   if (!hasPersistedSnapshot && reviewFingerprint && buildFinancialReviewFingerprint(facts) !== reviewFingerprint) {
-    return { data: null, error: "The Monthly Obligations package changed. Review it again before approving." };
+    return { data: null, error: PACKAGE_CHANGED_MESSAGE };
   }
 
   const calculation = hasPersistedSnapshot
@@ -89,7 +97,7 @@ export async function approveMonthlyObligation({ billingPeriodId, reviewFingerpr
     p_rows: calculation?.data?.rows ?? [],
     p_gas_bill_ids: calculation?.data?.gasBillIds ?? [],
   });
-  if (approvalResult.error) return { data: null, error: approvalResult.error.message };
+  if (approvalResult.error) return { data: null, error: mapApprovalRpcError(approvalResult.error.message) };
   if (!approvalResult.data) return { data: null, error: "Monthly Obligation approval failed." };
   const obligationMonth = `${periodResult.data.period_year}-${String(periodResult.data.period_month).padStart(2, "0")}`;
   const rows = calculation?.data?.rows ?? [];

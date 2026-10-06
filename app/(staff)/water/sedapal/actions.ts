@@ -34,11 +34,11 @@ function displayValues(values: ReturnType<typeof toInput>) {
 function toUpdateInput(formData: FormData) {
   return {
     bill_date: String(formData.get("bill_date") ?? ""),
-    previous_reading: String(formData.get("previous_reading") ?? ""),
+    ...(formData.has("previous_reading")
+      ? { previous_reading: String(formData.get("previous_reading")) }
+      : {}),
     current_reading: String(formData.get("current_reading") ?? ""),
     amount: String(formData.get("amount") ?? ""),
-    description: String(formData.get("description") ?? ""),
-    notes: String(formData.get("notes") ?? ""),
   };
 }
 

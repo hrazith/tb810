@@ -106,6 +106,33 @@ function sourceIdFromBill(bill: unknown) {
   return typeof id === "string" ? id : null;
 }
 
+export type SedapalBillProvenance = {
+  id: string;
+  billingPeriodId: string;
+  amount: string;
+  previousReading: string;
+  currentReading: string;
+  totalConsumption: string;
+};
+
+// The exact Common Water bill values used by the calculation. Approval
+// persistence compares these with the bill that exists when approval commits.
+export function sedapalProvenanceFromBill(bill: unknown): SedapalBillProvenance | null {
+  if (!bill) return null;
+  const record = asRecord(bill);
+  const text = (value: unknown) =>
+    typeof value === "string" ? value : typeof value === "number" && Number.isFinite(value) ? String(value) : null;
+  const provenance = {
+    id: text(record.id),
+    billingPeriodId: text(record.billing_period_id),
+    amount: text(record.amount),
+    previousReading: text(record.previous_reading),
+    currentReading: text(record.current_reading),
+    totalConsumption: text(record.total_consumption),
+  };
+  return Object.values(provenance).every((value) => value !== null) ? provenance as SedapalBillProvenance : null;
+}
+
 function buildSnapshotPayload(
   composed: MonthlyObligationResult,
   facts: BuildingMonthFinancialFacts,
@@ -124,6 +151,7 @@ function buildSnapshotPayload(
       .filter((entry): entry is [string, string] => typeof entry[1] === "string"),
   );
   const commonWaterBillId = sourceIdFromBill(facts.commonWaterBill);
+  const sedapalBill = sedapalProvenanceFromBill(facts.commonWaterBill);
   const rows: SnapshotRow[] = [];
 
   for (const unit of composed.units) {
@@ -170,6 +198,10 @@ function buildSnapshotPayload(
       }
 
       if (!sourceId) return { data: null, error: `Missing provenance for ${component.key} on ${unit.unitNumber}.`, failureKind: "not_ready" };
+      const dependsOnSedapal = component.key === "metered_water" || component.key === "common_water";
+      if (dependsOnSedapal && !sedapalBill) {
+        return { data: null, error: `Missing Sedapal provenance for ${component.key} on ${unit.unitNumber}.`, failureKind: "not_ready" };
+      }
 
       const sourceMonth = component.sourceMonth ?? facts.sourceReadingMonth;
       rows.push({
@@ -186,6 +218,7 @@ function buildSnapshotPayload(
           sourceMonth,
           sourceIds,
           amount: component.amount,
+          ...(dependsOnSedapal ? { sedapalBill } : {}),
         },
       });
     }

@@ -14,7 +14,14 @@ const accounts = new Map([
 
 const facts = {
   sourceReadingMonth: "2026-08",
-  commonWaterBill: { id: "water-bill-1" },
+  commonWaterBill: {
+    id: "water-bill-1",
+    billing_period_id: "source-period-1",
+    amount: 2760.5,
+    previous_reading: 12146,
+    current_reading: 12846,
+    total_consumption: 700,
+  },
   gasBills: [{ id: "gas-bill-1", processed_at: null }],
   gasReadings: [{ id: "gas-reading-1" }],
 };
@@ -151,7 +158,66 @@ test("missing source provenance refuses an otherwise complete component", () => 
   );
 
   assert.equal(result.data, null);
-  assert.equal(result.error, "Missing provenance for common_water on 101.");
+  // Metered Water is the first Sedapal-dependent component to fail closed.
+  assert.equal(result.error, "Missing Sedapal provenance for metered_water on 101.");
+});
+
+test("Sedapal-dependent rows persist the exact bill values used for calculation", () => {
+  const result = buildSnapshotPayload(
+    completeComposition,
+    facts,
+    accounts,
+    "budget-plan-1",
+    new Map([["unit-1", "water-reading-1"]]),
+  );
+
+  assert.equal(result.error, null);
+  const expected = {
+    id: "water-bill-1",
+    billingPeriodId: "source-period-1",
+    amount: "2760.5",
+    previousReading: "12146",
+    currentReading: "12846",
+    totalConsumption: "700",
+  };
+  const byType = Object.fromEntries(result.data.rows.map((row) => [row.obligation_type, row.calculation_snapshot]));
+  assert.deepEqual(byType.water_consumption.sedapalBill, expected);
+  assert.deepEqual(byType.common_water.sedapalBill, expected);
+  for (const type of ["fixed_assessment", "gas_consumption", "other_charge"]) {
+    assert.equal(byType[type].sedapalBill, undefined, `${type} must not claim Sedapal provenance`);
+  }
+});
+
+test("Sedapal provenance preserves string values from the facts read", () => {
+  const result = buildSnapshotPayload(
+    completeComposition,
+    { ...facts, commonWaterBill: { ...facts.commonWaterBill, amount: "2760.50", total_consumption: "700.000" } },
+    accounts,
+    "budget-plan-1",
+    new Map([["unit-1", "water-reading-1"]]),
+  );
+
+  const commonWater = result.data.rows.find((row) => row.obligation_type === "common_water");
+  assert.equal(commonWater.calculation_snapshot.sedapalBill.amount, "2760.50");
+  assert.equal(commonWater.calculation_snapshot.sedapalBill.totalConsumption, "700.000");
+});
+
+test("incomplete Sedapal provenance refuses materialization before persistence", () => {
+  for (const missing of ["billing_period_id", "amount", "previous_reading", "current_reading", "total_consumption"]) {
+    const bill = { ...facts.commonWaterBill };
+    delete bill[missing];
+    const result = buildSnapshotPayload(
+      completeComposition,
+      { ...facts, commonWaterBill: bill },
+      accounts,
+      "budget-plan-1",
+      new Map([["unit-1", "water-reading-1"]]),
+    );
+
+    assert.equal(result.data, null, `missing ${missing}`);
+    assert.equal(result.failureKind, "not_ready");
+    assert.equal(result.error, "Missing Sedapal provenance for metered_water on 101.");
+  }
 });
 
 test("non-Gas condo units do not require Gas provenance", () => {
