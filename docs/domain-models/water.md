@@ -93,12 +93,12 @@ The timing model must remain traceable across:
 
 ## Current Live Implementation
 
-The live Water implementation is split across two operational surfaces:
+The live Water implementation is split across two operational source surfaces:
 
-- `/water/{period}` for the Monthly Water Ledger
+- `/water/sedapal` for the Sedapal / Common Water ledger
 - `/water/unit-meter-readings` for Unit Water Meter Readings
 
-Both surfaces consume the same canonical reading records.
+The former Monthly Water Ledger (`/water/{period}`) was retired by WATER-011. `/water/{YYYY-MM}` now redirects to `/water/unit-meter-readings/{YYYY-MM}`.
 
 The live Unit Water Meter Readings workflow currently behaves like an operational ledger:
 

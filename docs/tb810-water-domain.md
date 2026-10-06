@@ -15,10 +15,10 @@ This document captures the frozen business definition of the water domain for TB
 
 ### Water Domain Routes
 
-- `/water` is the Water domain home.
-- `/water/{period}` is the Monthly Water Ledger.
 - `/water/sedapal` is the Sedapal / common-water CRUD surface.
 - `/water/unit-meter-readings` is the Unit Water Meter Readings operational ledger.
+- `/water` redirects to `/water/unit-meter-readings`.
+- `/water/{YYYY-MM}` redirects to `/water/unit-meter-readings/{YYYY-MM}` (WATER-011).
 
 These routes support the monthly water workflow as separate operational tools.
 Sedapal bills and unit meter readings are captured separately, but both feed the broader monthly Water workflow.
@@ -90,7 +90,7 @@ The accepted Unit Water workflow also supports direct Current and Reading Date e
 
 `tb810_meter_readings` remains the single source of truth for meter readings.
 
-The Monthly Water Ledger consumes the same canonical records.
+Monthly Obligations consumes the same canonical records.
 There is no duplicate reading model.
 
 Historical meter readings from `2023-09` through `2026-06` have now been imported into the canonical table for all 64 residential Units.
@@ -217,24 +217,18 @@ Operations Home:
 
 Water Domain:
 
-- `/water`
+- `/water` (redirects to `/water/unit-meter-readings`)
 
-Monthly Water Ledger:
+Source surfaces:
 
-- `/water/{period}`
+- `/water/sedapal`: the building source bill (Sedapal)
+- `/water/unit-meter-readings/{YYYY-MM}`: per-unit source readings
 
-Examples:
+There is no separate Monthly Water Ledger operator object (WATER-011, superseding UX-004). `/water/{YYYY-MM}` is kept only as a compatibility redirect to `/water/unit-meter-readings/{YYYY-MM}`. Financial allocation and its consequence belong to Monthly Obligations.
 
-- `/water/2026-07`
-- `/water/2026-08`
+Historical note: the Monthly Water Ledger (`/water/{period}`, examples `/water/2026-07`, `/water/2026-08`) used to combine Sedapal Invoice, Master Meter and Unit Meter Readings sections. It was retired on 2026-10-06 because it duplicated those source surfaces and its writes bypassed the Unit Water freeze and intake and the K6 lifecycle.
 
-The Monthly Water Ledger is the canonical business object for the Water domain.
-
-It contains these workflow sections:
-
-- Sedapal Invoice
-- Master Meter
-- Unit Meter Readings
+Known gap: canonical Sedapal Add requires its source billing-period row to exist. The retired "Start New Month" action was the only operator UI that could create a future source period ahead of K6 handoff. That is not a reason to keep it; the gap belongs to the future Sedapal Add / source-period lifecycle acceptance work.
 
 The following remain deferred to MVP2:
 
@@ -359,7 +353,7 @@ Slice 4 completes the import workflow:
 The monthly water cycle follows this business sequence:
 
 1. Receive the Sedapal invoice.
-2. Record the invoice in the Monthly Water Ledger.
+2. Record the invoice in the Sedapal ledger (`/water/sedapal`).
 3. Record the 64 current meter readings.
 4. The system calculates monthly consumption.
 5. Guliana reviews the source-fact cycle.
@@ -526,10 +520,10 @@ For the accepted September 2026 cycle, September source facts build October obli
 ## 9. Canonical Live URLs
 
 - `/` is the authenticated operations home.
-- `/water` is the Water domain home.
-- `/water/{period}` is the Monthly Water Ledger.
 - `/water/sedapal` is the Sedapal / common-water CRUD surface.
+- `/water/sedapal/{utilityBillId}` is the Sedapal bill detail.
 - `/water/unit-meter-readings` is the Unit Water Meter Readings CRUD surface.
+- `/water` and `/water/{YYYY-MM}` are compatibility redirects into Unit Water (WATER-011).
 
 ## 10. MVP2
 
@@ -552,7 +546,7 @@ Do not design or implement MVP2 details in this document.
 
 ## 11. Current Implementation Notes
 
-- The Monthly Water Ledger and the Unit Water Meter Readings surface both reuse the canonical reading records stored in `tb810_meter_readings`.
+- The Unit Water Meter Readings surface (and its import) is the only operator write path for the canonical reading records stored in `tb810_meter_readings`. The retired Monthly Water Ledger's direct reading writes were removed (WATER-011).
 - Unit meter readings are currently entered and edited through the operational UI, with the active reading month derived from the current calendar month.
 - The Unit Water Meter Readings workflow does not expose a Building field in the operator form.
 - The operator supplies Unit, Reading Date, Current Reading, and optional Notes where supported by the schema. Blank Lectura rows are ignored silently during workbook processing.

@@ -250,7 +250,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
       <div className={`grid gap-8 sm:grid-cols-2 xl:grid-cols-4 ${isOpen ? "order-3" : "order-2"}`}>
 
 {/*   Water insights */}
-        <Link href="/water" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
+        <Link href="/water/unit-meter-readings" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
           <div className="flex items-start justify-between gap-4 ">
 
             <div>
@@ -269,7 +269,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
           </div>
         </Link>
 
-         <Link href="/water" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
+         <Link href="/water/sedapal" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
           <div className="flex items-start justify-between gap-4 ">
 
             <div>
@@ -278,7 +278,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
             <UtilityStatusIndicator emphasis={projection.water.billEmphasis} complete={projection.water.billPresent} />
           </div>
           <div className="mt-10 h-36 rounded-3xl   w-36 ">
-              <p className="text-lg font-normal text-zinc-950">Sedepal Bill</p>
+              <p className="text-lg font-normal text-zinc-950">Sedapal Bill</p>
               <p className="mt-2 text-lg font-medium text-zinc-950">{waterBill ? "Present" : isOpen ? "Not received yet" : "Missing"}</p>
           </div>
         </Link>

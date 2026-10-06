@@ -43,13 +43,14 @@ The old sibling detail route `/water/unit-meter-readings/[readingId]` was remove
 
 ## Historical Routes
 
-The older water-ledger route family still exists separately:
+The older water-ledger route family `/water/[period]` used to serve a separate Monthly Water Ledger, and this document originally said it should not be collapsed into the Unit Meter Readings URL space.
 
-- `/water/[period]`
+That guidance is superseded by WATER-011 (2026-10-06). The Monthly Water Ledger was retired, and its routes are now compatibility redirects:
 
-It is preserved because it serves the Monthly Water Ledger, not the unit meter-reading ledger.
-
-It is not the same workflow and should not be collapsed into the Unit Meter Readings URL space.
+- `/water` redirects to `/water/unit-meter-readings`.
+- `/water/YYYY-MM` redirects to `/water/unit-meter-readings/YYYY-MM`.
+- Any other `/water/[period]` value is not found and is never reinterpreted.
+- `/workspace/water/[period]` still forwards to `/water/[period]`, so it reaches the same Unit Water month.
 
 ## Why Query Parameters Were Replaced
 

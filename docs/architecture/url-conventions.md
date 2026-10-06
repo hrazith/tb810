@@ -23,8 +23,8 @@ This document defines the canonical URL philosophy for TB810.
 ## Examples
 
 - `/`
-- `/water`
-- `/water/2026-07`
+- `/water` (redirects to `/water/unit-meter-readings`)
+- `/water/sedapal`
 - `/water/unit-meter-readings/2026-07`
 - `/water/unit-meter-readings/2026-07/reading/953c19da-fecd-49f0-bbf3-f48058100ecd`
 - `/gas`
@@ -36,18 +36,19 @@ This document defines the canonical URL philosophy for TB810.
 
 ## Water Example
 
-- `/water` is the Water domain entry point.
-- `/water/{period}` is the Monthly Water Ledger business object.
-- `/water/2026-07` and `/water/2026-08` are valid object URLs.
+Water has no separate Monthly Water Ledger object (WATER-011, which supersedes UX-004). Its canonical source surfaces are:
+
+- `/water/sedapal` is the Sedapal ledger (the building source bill).
+- `/water/sedapal/{utilityBillId}` is the Sedapal bill detail route.
+- `/water/unit-meter-readings` is the Unit Water Meter Readings entry; it opens the active month.
 - `/water/unit-meter-readings/{month}` is the canonical Unit Water Meter Readings month route.
 - `/water/unit-meter-readings/{month}/reading/{readingId}` is the canonical unit-reading detail route.
 
-The Monthly Water Ledger object contains workflow sections such as:
+Compatibility redirects:
 
-- Sedapal Invoice
-- Master Meter
-- Unit Meter Readings
-
-Those sections are not top-level resources.
+- `/water` redirects to `/water/unit-meter-readings`.
+- `/water/{YYYY-MM}` redirects to `/water/unit-meter-readings/{YYYY-MM}`; any other period is not found.
 
 For the Unit Water Meter Readings workflow, the month is part of the canonical route rather than a query parameter.
+
+Historical note: until 2026-10-06, `/water` was a Water domain home and `/water/{period}` a Monthly Water Ledger object with Sedapal Invoice, Master Meter and Unit Meter Readings sections. Those responsibilities now belong to Sedapal, Unit Meter Readings and Monthly Obligations, and the ledger's noncanonical writes were removed.
