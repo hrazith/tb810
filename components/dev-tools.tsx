@@ -333,17 +333,10 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const showToolbar = process.env.NODE_ENV === "development";
-  const toolbarRef = useRef<HTMLDivElement | null>(null);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
   const dateFormRef = useRef<HTMLFormElement | null>(null);
-  const dragStateRef = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-    startLeft: number;
-    startTop: number;
-  } | null>(null);
-  const [position, setPosition] = useState({ left: 0, top: 0 });
+  // Docked top-right and collapsed on load; the panel overlays the page.
+  const [expanded, setExpanded] = useState(false);
   const businessDateKey = isCanonicalDateKey(state.businessDateValue) ? state.businessDateValue : "";
   const businessDateLabel = businessDateKey ? formatCanonicalDateKey(businessDateKey) : null;
   const dataMonthLabel = dashboardFacts ? formatMonthYearKey(dashboardFacts.operatingMonth) : null;
@@ -393,38 +386,6 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
 
   if (!showToolbar) return null;
 
-  const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
-    const toolbar = toolbarRef.current;
-    if (!toolbar) return;
-    const rect = toolbar.getBoundingClientRect();
-    dragStateRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      startLeft: rect.left,
-      startTop: rect.top,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handlePointerMove = (event: React.PointerEvent<HTMLElement>) => {
-    const dragState = dragStateRef.current;
-    const toolbar = toolbarRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId || !toolbar) return;
-
-    const width = toolbar.offsetWidth;
-    const height = toolbar.offsetHeight;
-    const nextLeft = Math.max(12, Math.min(window.innerWidth - width - 12, dragState.startLeft + (event.clientX - dragState.startX)));
-    const nextTop = Math.max(12, Math.min(window.innerHeight - height - 12, dragState.startTop + (event.clientY - dragState.startY)));
-    setPosition({ left: nextLeft, top: nextTop });
-  };
-
-  const handlePointerUp = (event: React.PointerEvent<HTMLElement>) => {
-    if (dragStateRef.current?.pointerId === event.pointerId) {
-      dragStateRef.current = null;
-    }
-  };
-
   const openBusinessDatePicker = () => {
     const input = dateInputRef.current;
     if (!input) return;
@@ -436,29 +397,33 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
   };
 
   return (
-    <>
-      <div
-        ref={toolbarRef}
-        className="fixed z-[10000] w-[24rem] max-w-[calc(100vw-24px)] rounded-xl border border-white/10 bg-black/75 p-3 text-xs text-white shadow-xl backdrop-blur"
-        style={{ left: position.left, top: position.top }}
+    <div className="pointer-events-none fixed right-3 top-3 z-[10000] flex flex-col items-end">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+        aria-controls="tb810-dev-panel"
+        title={expanded ? "Collapse DEV tools" : "Open DEV tools"}
+        className="pointer-events-auto rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70 shadow-sm backdrop-blur hover:bg-black/75 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
       >
-        <div
-          className="flex items-center justify-between gap-3"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          role="presentation"
-        >
+        Dev
+      </button>
+
+      <div
+        id="tb810-dev-panel"
+        hidden={!expanded}
+        className="pointer-events-auto mt-2 max-h-[calc(100dvh-4.5rem)] w-[24rem] max-w-[calc(100vw-24px)] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-black/75 p-3 text-xs text-white shadow-xl backdrop-blur"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <span className="px-1 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">Dev only</span>
           <button
             type="button"
-            className="flex cursor-grab items-center gap-2 rounded-md px-1 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80"
-            aria-label="Drag DEV toolbar"
-            title="Drag to move"
+            onClick={() => setExpanded(false)}
+            className="rounded-md px-1 py-1 text-[10px] font-normal uppercase tracking-[0.18em] text-white/45 hover:text-white"
+            aria-label="Collapse DEV tools"
           >
-            <span>Dev only</span>
+            Collapse
           </button>
-          <span className="text-[10px] font-normal uppercase tracking-[0.18em] text-white/45">Drag</span>
         </div>
 
         <div className="mt-2 flex items-center gap-4 border-b border-white/10 text-[11px]">
@@ -832,6 +797,6 @@ function DevToolsToolbarInner({ dashboardFacts }: { dashboardFacts?: GulianaDash
           ) : null}
         </div>
       </div>
-    </>
+    </div>
   );
 }
