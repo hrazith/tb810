@@ -107,8 +107,8 @@ test("Unit Water import uses the canonical source-month editability guard", asyn
 
   assert.match(source, /canEditSourceMonth/);
   assert.match(source, /This Unit Water month is not available for editing/);
-  assert.match(source, /export async function uploadCompletedTemplateAction[\s\S]*canEditSourceMonth\(monthKey\)/);
-  assert.match(source, /export async function confirmCompletedTemplateAction[\s\S]*canEditSourceMonth\(monthKey\)/);
+  assert.match(source, /export async function uploadCompletedTemplateAction[\s\S]*canEditSourceMonth\(monthKey, await getBusinessNow\(\)\)/);
+  assert.match(source, /export async function confirmCompletedTemplateAction[\s\S]*canEditSourceMonth\(monthKey, await getBusinessNow\(\)\)/);
 });
 
 test("individual Unit Water corrections remain separate from complete-set import", async () => {

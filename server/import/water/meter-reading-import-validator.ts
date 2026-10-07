@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getActiveReadingMonth } from "@/server/water/unit-meter-readings";
+import { getBusinessNow } from "@/server/business-date";
+import { canEditSourceMonth } from "@/server/water/unit-meter-readings";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 
 import type { ParsedMeterReadingRow } from "../excel/meter-reading-template";
@@ -78,8 +79,11 @@ export async function validateMeterReadingImport(
   monthKey: string,
   rows: ParsedMeterReadingRow[],
 ): Promise<MeterReadingImportSyncResult> {
-  const active = getActiveReadingMonth();
-  if (monthKey !== active.key) {
+  // Same source-month editability as inline entry: open until its consuming
+  // package is finalized, never after the operating month.
+  const editability = await canEditSourceMonth(monthKey, await getBusinessNow());
+  if (editability.error) throw new Error(editability.error);
+  if (!editability.allowed) {
     throw new Error(`The selected month ${monthLabel(monthKey)} is not editable.`);
   }
 

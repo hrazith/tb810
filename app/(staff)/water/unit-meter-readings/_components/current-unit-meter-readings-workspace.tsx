@@ -26,6 +26,7 @@ type Props = {
   deleted?: string;
   historicalEditingAvailable: boolean;
   packageCorrectionAvailable: boolean;
+  startOverAvailable: boolean;
 };
 
 export function CurrentUnitMeterReadingsWorkspace({
@@ -37,6 +38,7 @@ export function CurrentUnitMeterReadingsWorkspace({
   deleted,
   historicalEditingAvailable,
   packageCorrectionAvailable,
+  startOverAvailable,
 }: Props) {
   const [query, setQuery] = useState("");
   const currentRowsByUnitId = new Map(rows.map((row) => [row.unit_id, row]));
@@ -116,6 +118,7 @@ export function CurrentUnitMeterReadingsWorkspace({
         month={month}
         currentReadingCount={rows.length}
         expectedReadingCount={units.length}
+        startOverAvailable={startOverAvailable}
       />
     </section>
   );

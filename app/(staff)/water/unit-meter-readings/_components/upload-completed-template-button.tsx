@@ -27,6 +27,8 @@ type Props = {
   month: string;
   currentReadingCount: number;
   expectedReadingCount: number;
+  /** Start over follows source editability and the database start-over contract. */
+  startOverAvailable?: boolean;
   className?: string;
 };
 
@@ -42,7 +44,7 @@ export function DownloadTemplateLink() {
   );
 }
 
-export function UploadCompletedTemplateButton({ month, currentReadingCount, expectedReadingCount, className }: Props) {
+export function UploadCompletedTemplateButton({ month, currentReadingCount, expectedReadingCount, startOverAvailable = true, className }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [startOverOpen, setStartOverOpen] = useState(false);
@@ -88,6 +90,7 @@ export function UploadCompletedTemplateButton({ month, currentReadingCount, expe
     <>
       <div className={className ?? "fixed bottom-4 right-4 z-40 flex items-center gap-3 sm:bottom-6 sm:right-6"}>
         {currentMonthComplete ? (
+          startOverAvailable ? (
           <StartOverButton
             month={month}
             readingCount={currentReadingCount}
@@ -95,6 +98,7 @@ export function UploadCompletedTemplateButton({ month, currentReadingCount, expe
             onOpenChange={setStartOverOpen}
             formRef={startOverFormRef}
           />
+          ) : null
         ) : (
           <Button type="button" variant="primary" shape="pill" className="shadow-lg" onClick={() => setOpen(true)}>
             + Upload readings

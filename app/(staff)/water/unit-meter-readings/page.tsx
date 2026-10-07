@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { getActiveReadingMonth } from "@/server/water/unit-meter-readings";
+import { getOperatingReadingMonth } from "@/server/water/unit-meter-readings";
 import { parseWaterMonthKey } from "@/server/water/month";
 
 type PageProps = {
@@ -13,7 +13,7 @@ type PageProps = {
 
 export default async function UnitMeterReadingsRedirectPage({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
-  const activeMonth = getActiveReadingMonth();
+  const activeMonth = await getOperatingReadingMonth();
   const selectedMonth = parseWaterMonthKey(params.month) ?? activeMonth.key;
   const query = new URLSearchParams();
   if (params.q) query.set("q", params.q);

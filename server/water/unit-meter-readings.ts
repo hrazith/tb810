@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getBusinessNow } from "@/server/business-date";
 import { isPerfLoggingEnabled } from "@/server/perf";
 import {
   getActiveDevTestSessionId,
@@ -6,7 +7,7 @@ import {
   recordDevTestMutation,
 } from "@/server/dev-test-session";
 import { getCurrentBuilding } from "@/server/units";
-import { isSourceMonthEditable } from "./source-editability";
+import { FINALIZED_OBLIGATION_STATUSES, isSourceMonthEditable, sourceMonthCandidates } from "./source-editability";
 
 export { isSourceMonthEditable } from "./source-editability";
 
@@ -140,6 +141,11 @@ export function getActiveReadingMonth(now = new Date()) {
   };
 }
 
+/** The Unit Water operating month, from the canonical (DEV-overridable) business date. */
+export async function getOperatingReadingMonth() {
+  return getActiveReadingMonth(await getBusinessNow());
+}
+
 function monthKeyFromDate(date: string) {
   const parsed = parseDate(date);
   if (!parsed) return null;
@@ -157,8 +163,9 @@ async function isSourceMonthEditableForBuilding(
   supabase: Awaited<ReturnType<typeof createClient>>,
   buildingId: string,
   sourceMonth: string,
-  referenceDate = new Date(),
+  referenceDate?: Date,
 ) {
+  const reference = referenceDate ?? await getBusinessNow();
   const obligationMonth = obligationMonthForSourceMonth(sourceMonth);
   if (!obligationMonth) return { allowed: false, error: null };
 
@@ -174,7 +181,7 @@ async function isSourceMonthEditableForBuilding(
   return {
     allowed: isSourceMonthEditable({
       sourceMonth,
-      activeMonth: getActiveReadingMonth(referenceDate).key,
+      activeMonth: getActiveReadingMonth(reference).key,
       consumingPackage: data ? { status: data.status } : null,
     }),
     error: null,
@@ -188,9 +195,79 @@ export async function canEditSourceMonth(sourceMonth: string, referenceDate = ne
   return isSourceMonthEditableForBuilding(await createClient(), buildingResult.data.id, sourceMonth, referenceDate);
 }
 
+/**
+ * Source months that are open now: candidates from the latest finalized
+ * consuming package through the operating month, each evaluated with the
+ * canonical isSourceMonthEditable rule. No billing-period row is required for
+ * an empty source month to be open.
+ */
+export async function listOpenUnitWaterSourceMonths(referenceDate?: Date): Promise<QueryResult<string[]>> {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: [], error: buildingResult.error };
+  if (!buildingResult.data) return { data: [], error: null };
+
+  const operatingMonth = getActiveReadingMonth(referenceDate ?? await getBusinessNow()).key;
+  const supabase = await createClient();
+  const { data: latestFinalized, error: latestError } = await supabase
+    .from("tb810_billing_periods")
+    .select("period_year, period_month")
+    .eq("building_id", buildingResult.data.id)
+    .in("status", [...FINALIZED_OBLIGATION_STATUSES])
+    .order("period_year", { ascending: false })
+    .order("period_month", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latestError) return { data: [], error: latestError.message };
+
+  const candidates = sourceMonthCandidates({
+    latestFinalizedConsumingMonth: latestFinalized
+      ? `${latestFinalized.period_year}-${String(latestFinalized.period_month).padStart(2, "0")}`
+      : null,
+    operatingMonth,
+  });
+  if (candidates.length === 0) return { data: [], error: null };
+
+  const consumingMonths = candidates.map((month) => obligationMonthForSourceMonth(month) ?? "");
+  const { data: consumingPeriods, error: periodsError } = await supabase
+    .from("tb810_billing_periods")
+    .select("period_year, period_month, status")
+    .eq("building_id", buildingResult.data.id)
+    .in("period_year", [...new Set(consumingMonths.map((month) => Number(month.slice(0, 4))))]);
+  if (periodsError) return { data: [], error: periodsError.message };
+
+  const statusByMonth = new Map(
+    (consumingPeriods ?? []).map((period) => [
+      `${period.period_year}-${String(period.period_month).padStart(2, "0")}`,
+      period.status as string,
+    ]),
+  );
+  return {
+    data: candidates.filter((sourceMonth, index) => {
+      const status = statusByMonth.get(consumingMonths[index]);
+      return isSourceMonthEditable({
+        sourceMonth,
+        activeMonth: operatingMonth,
+        consumingPackage: status ? { status } : null,
+      });
+    }),
+    error: null,
+  };
+}
+
+/**
+ * Start over is offered for an open source month. The database function
+ * tb810_clear_current_unit_water_month still accepts only its own calendar
+ * month (current_date), so that remains an additional limit until the
+ * database contract is changed.
+ */
+export function isUnitWaterStartOverAvailable(monthKey: string, sourceMonthOpen: boolean, now = new Date()) {
+  return sourceMonthOpen && monthKey === getActiveReadingMonth(now).key;
+}
+
 export async function clearCurrentUnitWaterMonth(monthKey: string) {
-  const activeMonth = getActiveReadingMonth();
-  if (monthKey !== activeMonth.key) {
+  const editability = await canEditSourceMonth(monthKey, await getBusinessNow());
+  if (editability.error) return { data: null as never, error: editability.error };
+  if (!isUnitWaterStartOverAvailable(monthKey, editability.allowed)) {
     return { data: null as never, error: "Only the current editable Unit Water month can be started over." };
   }
 
@@ -262,16 +339,19 @@ export async function listUnitMeterReadingMonths(): Promise<QueryResult<UnitMete
   });
   if (error) return { data: [], error: error.message };
 
-  const months = ((data ?? []) as Array<{ reading_month: string | null }>)
-    .map((row) => (row.reading_month ? row.reading_month.slice(0, 7) : null))
-    .filter((key): key is string => Boolean(key))
-    .map((key) => ({ key, label: monthLabelFromKey(key) }));
+  const openMonths = await listOpenUnitWaterSourceMonths();
+  if (openMonths.error) return { data: [], error: openMonths.error };
 
-  const active = getActiveReadingMonth();
-  if (!months.some((month) => month.key === active.key)) {
-    months.unshift({ key: active.key, label: active.label });
-  }
+  // Months holding readings stay navigable for inspection; open source months
+  // are listed even with zero readings because they are actionable.
+  const keys = new Set(
+    ((data ?? []) as Array<{ reading_month: string | null }>)
+      .map((row) => (row.reading_month ? row.reading_month.slice(0, 7) : null))
+      .filter((key): key is string => Boolean(key)),
+  );
+  for (const key of openMonths.data) keys.add(key);
 
+  const months = [...keys].map((key) => ({ key, label: monthLabelFromKey(key) }));
   return { data: months.sort((a, b) => b.key.localeCompare(a.key)), error: null };
 }
 
@@ -451,7 +531,7 @@ export async function getReadingDefaults(readingDate?: string): Promise<QueryRes
   if (utilityType.error) return { data: null, error: utilityType.error };
   if (!utilityType.data) return { data: null, error: "Common Water utility type is missing." };
 
-  const active = getActiveReadingMonth();
+  const active = await getOperatingReadingMonth();
   const date = readingDate ?? active.start;
   const unitResult = await getCondoUnits();
   if (unitResult.error) return { data: null, error: unitResult.error };
@@ -902,7 +982,6 @@ export async function deleteUnitMeterReading(
     }
   }
 
-  const active = getActiveReadingMonth();
   if (!allowHistoricalEditing) {
     const correction = await isSourceMonthEditableForBuilding(
       supabase,
@@ -929,7 +1008,7 @@ export async function deleteUnitMeterReading(
 
   if (error) return { data: null as never, error: error.message };
   return {
-    data: { reading: reading as UnitMeterReadingRecord, readingMonthKey: active.key, unit_number: unit.unit_number },
+    data: { reading: reading as UnitMeterReadingRecord, readingMonthKey: monthKeyFromDate(reading.reading_date) ?? "", unit_number: unit.unit_number },
     error: null,
   };
 }

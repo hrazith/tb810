@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { getBusinessNow } from "@/server/business-date";
 import { parseMeterReadingTemplateWorkbook } from "@/server/import/excel/meter-reading-template";
 import { persistMeterReadingImport } from "@/server/import/water/meter-reading-import-persistence";
 import {
@@ -193,7 +194,7 @@ export async function uploadCompletedTemplateAction(
   _prev: ImportFormState,
   formData: FormData,
 ): Promise<ImportFormState> {
-  const editability = await canEditSourceMonth(monthKey);
+  const editability = await canEditSourceMonth(monthKey, await getBusinessNow());
   if (editability.error) return { error: editability.error };
   if (!editability.allowed) return { error: "This Unit Water month is not available for editing." };
 
@@ -239,7 +240,7 @@ export async function confirmCompletedTemplateAction(
   _prev: ImportFormState,
   formData: FormData,
 ): Promise<ImportFormState> {
-  const editability = await canEditSourceMonth(monthKey);
+  const editability = await canEditSourceMonth(monthKey, await getBusinessNow());
   if (editability.error) return { error: editability.error };
   if (!editability.allowed) return { error: "This Unit Water month is not available for editing." };
 

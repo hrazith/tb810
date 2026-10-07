@@ -2,7 +2,7 @@ import { Panel } from "@/components/ui/panel";
 import { SearchInput } from "@/components/ui/search-input";
 import { isPerfLoggingEnabled } from "@/server/perf";
 import {
-  getActiveReadingMonth,
+  getOperatingReadingMonth,
   getPreviousMeterReadingsForMonth,
   getWaterReadingUnits,
   listUnitMeterReadingMonths,
@@ -27,12 +27,17 @@ type Props = {
   query?: string;
   deleted?: string;
   historicalEditingAvailable: boolean;
-  packageCorrectionAvailable: boolean;
+  /** Source month is editable under the canonical source-editability rule. */
+  sourceMonthOpen: boolean;
+  startOverAvailable: boolean;
 };
 
-export async function UnitMeterReadingsMonthPage({ month, query, deleted, historicalEditingAvailable, packageCorrectionAvailable }: Props) {
-  const activeMonth = getActiveReadingMonth();
-  const isActiveMonth = month === activeMonth.key;
+export async function UnitMeterReadingsMonthPage({ month, query, deleted, historicalEditingAvailable, sourceMonthOpen, startOverAvailable }: Props) {
+  const activeMonth = await getOperatingReadingMonth();
+  // An open source month gets the intake workspace even with zero readings;
+  // finalized source months stay a read-only history view.
+  const intakeOpen = sourceMonthOpen;
+  const packageCorrectionAvailable = sourceMonthOpen;
   const pageStartedAt = process.hrtime.bigint();
   const populationPromise = (async () => {
     const startedAt = process.hrtime.bigint();
@@ -49,10 +54,10 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
   const resultPromise = populationPromise.then(async ({ result: populationResult }) => {
     if (populationResult.error) return { result: { data: [], error: populationResult.error }, elapsedMs: 0 };
     const startedAt = process.hrtime.bigint();
-    const result = await listUnitMeterReadings({ query: isActiveMonth ? undefined : query, month }, populationResult.data ?? []);
+    const result = await listUnitMeterReadings({ query: intakeOpen ? undefined : query, month }, populationResult.data ?? []);
     return { result, elapsedMs: Number(process.hrtime.bigint() - startedAt) / 1_000_000 };
   });
-  const previousPromise = isActiveMonth
+  const previousPromise = intakeOpen
     ? populationPromise.then(() => getPreviousMeterReadingsForMonth(month))
     : Promise.resolve({ data: {}, error: null });
 
@@ -63,14 +68,14 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
     ? [{ key: activeMonth.key, label: activeMonth.label }]
     : monthsResult.data;
 
-  const previousByUnitId = isActiveMonth ? previousResult.data as Record<string, { previous_reading: number | null; previous_reading_date: string | null }> : Object.fromEntries(
+  const previousByUnitId = intakeOpen ? previousResult.data as Record<string, { previous_reading: number | null; previous_reading_date: string | null }> : Object.fromEntries(
     result.data.map((row) => [row.unit_id, { previous_reading: row.previous_reading, previous_reading_date: row.previous_reading_date }]),
   );
   const currentRowsByUnitId = new Map(result.data.map((row) => [row.unit_id, row]));
   const visibleUnits = query
     ? units.data.filter((unit) => `${unit.unit_number} ${unit.floor ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()))
     : units.data;
-  const completedCount = isActiveMonth ? result.data.filter((row) => row.reading_end != null).length : null;
+  const completedCount = intakeOpen ? result.data.filter((row) => row.reading_end != null).length : null;
 
   if (isPerfLoggingEnabled()) {
     console.info(
@@ -86,7 +91,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
     );
   }
 
-  if (isActiveMonth) {
+  if (intakeOpen) {
     return (
       <CurrentUnitMeterReadingsWorkspace
         month={month}
@@ -97,6 +102,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
         deleted={deleted}
         historicalEditingAvailable={historicalEditingAvailable}
         packageCorrectionAvailable={packageCorrectionAvailable}
+        startOverAvailable={startOverAvailable}
       />
     );
   }
@@ -116,7 +122,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
               className="h-11 w-full min-w-0 max-w-xs rounded-full border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 xl:w-[22rem]"
             />
           </form>
-          {isActiveMonth ? <DownloadTemplateLink /> : null}
+          {intakeOpen ? <DownloadTemplateLink /> : null}
         </div>
       </div>
 
@@ -124,7 +130,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
 
       {result.error ? <Panel className="border-red-200 bg-red-50 text-sm text-red-700">{result.error}</Panel> : null}
       {deleted ? <Panel className="border-emerald-200 bg-emerald-50 text-sm text-emerald-700">{deleted}</Panel> : null}
-      <HistoricalEditingBanner historicalEditingAvailable={historicalEditingAvailable} isHistoricalMonth={!isActiveMonth} />
+      <HistoricalEditingBanner historicalEditingAvailable={historicalEditingAvailable} isHistoricalMonth={!intakeOpen} />
 
       <Panel className="space-y-4  ">
         <div className="flex items-center justify-between gap-4">
@@ -141,7 +147,7 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
               <div>Reading Date</div>
               <div />
             </div>
-            {isActiveMonth ? visibleUnits.map((unit) => {
+            {intakeOpen ? visibleUnits.map((unit) => {
               const row = currentRowsByUnitId.get(unit.id);
               return row ? (
                 <CurrentMeterReadingRow
@@ -167,17 +173,18 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
             }) : result.data.map((row) => (
               <CurrentMeterReadingRow key={row.id} row={row} action={updateInlineUnitMeterReadingAction} deleteAction={deleteUnitMeterReadingAction} readOnly historicalEditingAvailable={historicalEditingAvailable} packageCorrectionAvailable={packageCorrectionAvailable} isHistoricalMonth />
             ))}
-            {!result.data.length && !isActiveMonth ? (
+            {!result.data.length && !intakeOpen ? (
               <div className="px-4 py-6 text-sm text-zinc-600">No meter readings found for {month}.</div>
             ) : null}
           </div>
         </div>
       </Panel>
-      {isActiveMonth ? (
+      {intakeOpen ? (
         <UploadCompletedTemplateButton
           month={month}
           currentReadingCount={result.data.length}
           expectedReadingCount={units.data.length}
+          startOverAvailable={startOverAvailable}
         />
       ) : null}
     </section>
