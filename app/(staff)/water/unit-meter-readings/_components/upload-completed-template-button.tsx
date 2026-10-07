@@ -6,6 +6,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Dialog } from "@/components/ui/dialog";
 
 import { clearCurrentUnitWaterMonthAction, confirmCompletedTemplateAction, uploadCompletedTemplateAction, type ImportFormState } from "../actions";
@@ -229,15 +230,15 @@ export function UploadCompletedTemplateButton({ month, currentReadingCount, expe
             ) : (
               <label className="block space-y-2 text-sm font-medium text-zinc-950">
                 Reading date
-                <input
+                <DateInput
                   name="reading_date"
-                  type="date"
                   required
                   value={readingDate}
                   min={`${month}-01`}
                   max={endOfMonth}
-                  onChange={(event) => setReadingDate(event.target.value)}
-                  className="block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm font-normal text-zinc-950 focus:border-zinc-950 focus:outline-none"
+                  onValueChange={setReadingDate}
+                  appearance="outlined"
+                  className="font-normal"
                 />
               </label>
             )}

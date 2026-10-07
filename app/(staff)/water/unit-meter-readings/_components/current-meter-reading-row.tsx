@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { useDevTools } from "@/components/dev-tools";
 import { formatPeruvianDate } from "@/lib/water-dates";
@@ -135,12 +136,11 @@ export function CurrentMeterReadingRow({
         <div>
           {editable ? (
             <>
-              <Input
+              <DateInput
                 form={formId}
                 name="reading_date"
-                type="date"
                 value={readingDate}
-                onChange={(e) => setReadingDate(e.target.value)}
+                onValueChange={setReadingDate}
                 onBlur={submitIfChanged}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -148,6 +148,7 @@ export function CurrentMeterReadingRow({
                     formRef.current?.requestSubmit();
                   }
                 }}
+                aria-label={`Reading date for Unit ${row.unit_number}`}
               />
               {pending ? <p className="mt-2 text-xs text-zinc-500">Saving...</p> : null}
               {state.error ? <p className="mt-2 text-xs text-red-600">{state.error}</p> : null}

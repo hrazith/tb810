@@ -2,6 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { LEDGER_GRID_CLASS } from "./ledger-layout";
 
@@ -71,12 +72,11 @@ export function ExpectedMeterReadingRow({ unitNumber, unitId, floor, previousRea
           aria-label={`Current reading for Unit ${unitNumber}`}
         />
         <div className="text-sm text-zinc-600">{consumption == null ? "—" : readingText(consumption)}</div>
-        <Input
+        <DateInput
           name="reading_date"
-          type="date"
           value={readingDate}
           disabled={pending}
-          onChange={(event) => setReadingDate(event.target.value)}
+          onValueChange={setReadingDate}
           onBlur={submitIfReady}
           onKeyDown={(event) => {
             if (event.key === "Enter") {

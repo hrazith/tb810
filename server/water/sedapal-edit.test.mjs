@@ -99,7 +99,7 @@ function harness(status = "collecting_readings") {
     },
   };
   const mocks = {
-    "@phosphor-icons/react/dist/ssr": { CaretLeft: () => null, FilePdf: () => null },
+    "@phosphor-icons/react/dist/ssr": { CaretLeft: () => null, CaretRight: () => null, CalendarBlank: () => null, FilePdf: () => null },
     "@/lib/supabase/server": { createClient: async () => supabase },
     "@/server/units": { getCurrentBuilding: async () => ({ data: { id: fixture.building_id }, error: null }) },
     "@/server/perf": { isPerfLoggingEnabled: () => false },
@@ -153,6 +153,7 @@ test("Edit renders canonical prepopulated details with immutable context and Can
   for (const [name, value] of Object.entries(form.props.initialValues)) {
     if (name !== "previous_reading") assert.match(html, new RegExp(`name="${name}"[^>]*value="${value}"`));
   }
+  assert.match(html, /<input(?=[^>]*type="text")(?=[^>]*value="05\/09\/2026")[^>]*>/, "bill date is shown as DD/MM/YYYY");
   assert.match(html, /Previous reading/);
   assert.match(html, /12,146/);
   assert.doesNotMatch(html, /name="previous_reading"/);

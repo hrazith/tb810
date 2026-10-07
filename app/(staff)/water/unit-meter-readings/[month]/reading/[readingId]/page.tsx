@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import { formatPeruvianDate } from "@/lib/water-dates";
 import { parseWaterMonthKey } from "@/server/water/month";
 import { getUnitMeterReadingById } from "@/server/water/unit-meter-readings";
 
@@ -37,7 +38,7 @@ export default async function UnitMeterReadingDetailPage({ params }: PageProps) 
       <div className="grid gap-4 md:grid-cols-2">
         <Panel as="div" className="space-y-2">
           <p className="text-sm font-medium text-zinc-500">Reading Date</p>
-          <p className="text-zinc-950">{reading.reading_date}</p>
+          <p className="text-zinc-950">{formatPeruvianDate(reading.reading_date)}</p>
           <p className="text-sm font-medium text-zinc-500">Current Reading</p>
           <p className="text-zinc-950">{reading.reading_end ?? "—"}</p>
           <p className="text-sm font-medium text-zinc-500">Previous Reading</p>

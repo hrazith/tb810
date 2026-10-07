@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 
 import { CaretLeft, FilePdf } from "@phosphor-icons/react/dist/ssr";
+import { DateInput } from "@/components/ui/date-input";
 import {
   formatMonthYear,
   getChargeMonthFromServiceMonth,
@@ -293,15 +294,15 @@ export function CommonWaterBillForm({
             <span className="block text-lg font-medium text-zinc-900">
               Reading date
             </span>
-            <input
+            <DateInput
               name="bill_date"
-              type="date"
               value={billDate}
-              onChange={(event) => setBillDate(event.target.value)}
+              onValueChange={setBillDate}
               onBlur={() =>
                 setTouchedFields((fields) => ({ ...fields, bill_date: true }))
               }
-              className="h-12 w-full rounded-xl border border-zinc-300 px-4 text-sm outline-none transition selection:bg-zinc-200 selection:text-zinc-950 focus:border-zinc-950"
+              appearance="outlined"
+              aria-invalid={displayedFieldError("bill_date") ? true : undefined}
             />
             {displayedFieldError("bill_date") ? (
               <p className="text-sm text-red-600">

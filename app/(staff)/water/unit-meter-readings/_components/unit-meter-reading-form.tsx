@@ -3,8 +3,10 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 
 import { useDevTools } from "@/components/dev-tools";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
+import { formatPeruvianDate } from "@/lib/water-dates";
 import type { UnitMeterReadingDefaults, UnitOption } from "@/server/water/unit-meter-readings";
 
 type FormState = {
@@ -122,11 +124,10 @@ export function UnitMeterReadingForm({
 
         <label className="block space-y-2">
           <span className="text-sm font-medium text-zinc-900">Reading Date</span>
-          <Input
+          <DateInput
             name="reading_date"
-            type="date"
             value={readingDate}
-            onChange={(e) => setReadingDate(e.target.value)}
+            onValueChange={setReadingDate}
             readOnly={!editable}
           />
         </label>
@@ -157,7 +158,7 @@ export function UnitMeterReadingForm({
         <label className="block space-y-2">
           <span className="text-sm font-medium text-zinc-900">Previous Reading Date</span>
           <Input
-            value={previousReadingDate ?? "—"}
+            value={previousReadingDate ? formatPeruvianDate(previousReadingDate) : "—"}
             readOnly
             className="bg-zinc-50 text-zinc-700"
           />
