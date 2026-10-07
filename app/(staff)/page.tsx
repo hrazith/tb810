@@ -95,7 +95,7 @@ function uploadHrefForAttention(source: string, happened: string) {
 
 function UtilityStatusIndicator({ emphasis, complete }: { emphasis: string; complete: boolean }) {
   if (complete && emphasis !== "attention") {
-    return <span className="absolute right-0 -top-2 h-3 w-3 rounded-full bg-emerald-500 border-2 border-zinc-50" role="img" aria-label="Complete" />;
+    return <span className="absolute right-1 -top-1 h-4 w-4 rounded-full bg-emerald-500 border-4 border-white" role="img" aria-label="Complete" />;
   }
   if (emphasis === "attention") {
     return <span className="absolute right-0 -top-2 h-3 w-3 rounded-full bg-red-500 border-2 border-zinc-50" role="img" aria-label="Needs attention" />;
@@ -272,11 +272,18 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
          <Link href="/water/sedapal" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
           <div className="flex items-start justify-between gap-4 ">
 
-            <div>
-              <Drop size={20} weight="regular" aria-hidden="true" />
+             <div className="relative bg-gray-100 p-3 rounded-full">
+              <Drop size={32} weight="regular" aria-hidden="true" />
+              <UtilityStatusIndicator emphasis={projection.water.billEmphasis} complete={projection.water.billPresent} />
             </div>
-            <UtilityStatusIndicator emphasis={projection.water.billEmphasis} complete={projection.water.billPresent} />
+            
           </div>
+
+           
+
+     
+
+
           <div className="mt-10 h-36 rounded-3xl   w-36 ">
               <p className="text-lg font-normal text-zinc-950">Sedapal Bill</p>
               <p className="mt-2 text-lg font-medium text-zinc-950">{waterBill ? "Present" : isOpen ? "Not received yet" : "Missing"}</p>
@@ -289,7 +296,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         <div className="  flex items-start justify-between gap-4 ">
 
             <div>
-              <Flame size={20} weight="regular" aria-hidden="true" />
+              <Flame size={32} weight="regular" aria-hidden="true" />
               
 
             </div>
