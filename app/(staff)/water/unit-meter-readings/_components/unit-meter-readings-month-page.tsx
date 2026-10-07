@@ -29,10 +29,9 @@ type Props = {
   historicalEditingAvailable: boolean;
   /** Source month is editable under the canonical source-editability rule. */
   sourceMonthOpen: boolean;
-  startOverAvailable: boolean;
 };
 
-export async function UnitMeterReadingsMonthPage({ month, query, deleted, historicalEditingAvailable, sourceMonthOpen, startOverAvailable }: Props) {
+export async function UnitMeterReadingsMonthPage({ month, query, deleted, historicalEditingAvailable, sourceMonthOpen }: Props) {
   const activeMonth = await getOperatingReadingMonth();
   // An open source month gets the intake workspace even with zero readings;
   // finalized source months stay a read-only history view.
@@ -102,7 +101,6 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
         deleted={deleted}
         historicalEditingAvailable={historicalEditingAvailable}
         packageCorrectionAvailable={packageCorrectionAvailable}
-        startOverAvailable={startOverAvailable}
       />
     );
   }
@@ -184,7 +182,6 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
           month={month}
           currentReadingCount={result.data.length}
           expectedReadingCount={units.data.length}
-          startOverAvailable={startOverAvailable}
         />
       ) : null}
     </section>

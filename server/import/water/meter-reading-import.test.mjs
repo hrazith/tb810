@@ -149,3 +149,29 @@ test("DEV import RPC qualifies canonical import result counts", async () => {
   assert.match(migration, /select result\.inserted_count, result\.updated_count, result\.processed_count/);
   assert.doesNotMatch(migration, /select inserted_count, updated_count, processed_count\s+into v_inserted_count/);
 });
+
+test("bulk import asserts the canonical source freeze in the database before touching readings", () => {
+  const sqlFunction = (source, name) => {
+    const start = source.indexOf(`create or replace function public.${name}(`);
+    assert.notEqual(start, -1, `missing ${name}`);
+    return source.slice(start, source.indexOf("\n$$;", start) + 4);
+  };
+  const deployed = sqlFunction(readFileSync("supabase/migrations/20260924120000_unit_water_primary_intake.sql", "utf8"), "tb810_sync_meter_reading_import");
+  const frozen = sqlFunction(readFileSync("supabase/migrations/20261007120000_unit_water_start_over_source_freeze.sql", "utf8"), "tb810_sync_meter_reading_import");
+  const lockBlock = `
+  -- Canonical source freeze, serialized against handoff/approval of S+1,
+  -- before any reading of the month is read or written.
+  perform public.tb810_lock_source_month_open(v_building_id, v_month_start, 'Unit Water month');
+
+`;
+
+  assert.equal(frozen.split(lockBlock).length, 2, "exactly one shared freeze check");
+  assert.equal(frozen.replace(lockBlock, ""), deployed, "import semantics are otherwise byte-identical to the deployed function");
+  const lock = frozen.indexOf("tb810_lock_source_month_open");
+  assert.ok(frozen.indexOf("v_month_start := make_date") < lock, "the source month is resolved first");
+  assert.ok(lock < frozen.indexOf("for v_row in"), "the freeze is asserted before any row is read or written");
+
+  const devImport = sqlFunction(readFileSync("supabase/migrations/20260924130000_fix_unit_water_import_rpc.sql", "utf8"), "tb810_sync_dev_meter_reading_import");
+  assert.match(devImport, /from public\.tb810_sync_meter_reading_import\(p_month_key, p_rows\) as result/, "DEV import writes through the frozen import");
+  assert.doesNotMatch(devImport, /insert into public\.tb810_meter_readings|update public\.tb810_meter_readings/, "DEV import has no direct reading writes");
+});

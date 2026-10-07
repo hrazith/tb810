@@ -27,8 +27,6 @@ type Props = {
   month: string;
   currentReadingCount: number;
   expectedReadingCount: number;
-  /** Start over follows source editability and the database start-over contract. */
-  startOverAvailable?: boolean;
   className?: string;
 };
 
@@ -44,7 +42,7 @@ export function DownloadTemplateLink() {
   );
 }
 
-export function UploadCompletedTemplateButton({ month, currentReadingCount, expectedReadingCount, startOverAvailable = true, className }: Props) {
+export function UploadCompletedTemplateButton({ month, currentReadingCount, expectedReadingCount, className }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [startOverOpen, setStartOverOpen] = useState(false);
@@ -90,7 +88,6 @@ export function UploadCompletedTemplateButton({ month, currentReadingCount, expe
     <>
       <div className={className ?? "fixed bottom-4 right-4 z-40 flex items-center gap-3 sm:bottom-6 sm:right-6"}>
         {currentMonthComplete ? (
-          startOverAvailable ? (
           <StartOverButton
             month={month}
             readingCount={currentReadingCount}
@@ -98,7 +95,6 @@ export function UploadCompletedTemplateButton({ month, currentReadingCount, expe
             onOpenChange={setStartOverOpen}
             formRef={startOverFormRef}
           />
-          ) : null
         ) : (
           <Button type="button" variant="primary" shape="pill" className="shadow-lg" onClick={() => setOpen(true)}>
             + Upload readings
@@ -196,7 +192,7 @@ export function UploadCompletedTemplateButton({ month, currentReadingCount, expe
             ) : null}
             {validation.existingRowCount > 0 ? (
               <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
-                {validation.existingRowCount} current-month readings will be updated after confirmation.
+                {validation.existingRowCount} existing {monthLabel(month)} readings will be updated after confirmation.
               </p>
             ) : null}
             {validation.rejectedRows.length ? (
@@ -226,7 +222,7 @@ export function UploadCompletedTemplateButton({ month, currentReadingCount, expe
             <input type="hidden" name="preview_rows" value={JSON.stringify(previewRows)} />
             {currentReadingCount > 0 ? (
               <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                This will replace all {currentReadingCount} current-month readings. Your existing {monthLabel(month)} readings will be erased and replaced with the readings in this file.
+                This will replace all {currentReadingCount} existing {monthLabel(month)} readings with the readings in this file.
               </p>
             ) : null}
             {validation?.rowDateMode === "row" ? (

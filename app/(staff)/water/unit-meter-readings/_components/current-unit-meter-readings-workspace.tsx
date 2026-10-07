@@ -19,14 +19,13 @@ import { MonthLedgerSelector } from "./month-ledger-selector";
 
 type Props = {
   month: string;
-  monthOptions: Array<{ key: string; label: string }>;
+  monthOptions: Array<{ key: string; label: string; note?: string }>;
   units: UnitOption[];
   rows: UnitMeterReadingRow[];
   previousByUnitId: Record<string, { previous_reading: number | null; previous_reading_date: string | null }>;
   deleted?: string;
   historicalEditingAvailable: boolean;
   packageCorrectionAvailable: boolean;
-  startOverAvailable: boolean;
 };
 
 export function CurrentUnitMeterReadingsWorkspace({
@@ -38,7 +37,6 @@ export function CurrentUnitMeterReadingsWorkspace({
   deleted,
   historicalEditingAvailable,
   packageCorrectionAvailable,
-  startOverAvailable,
 }: Props) {
   const [query, setQuery] = useState("");
   const currentRowsByUnitId = new Map(rows.map((row) => [row.unit_id, row]));
@@ -118,7 +116,6 @@ export function CurrentUnitMeterReadingsWorkspace({
         month={month}
         currentReadingCount={rows.length}
         expectedReadingCount={units.length}
-        startOverAvailable={startOverAvailable}
       />
     </section>
   );

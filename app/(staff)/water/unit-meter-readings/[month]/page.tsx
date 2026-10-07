@@ -1,11 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { getBusinessNow } from "@/server/business-date";
-import {
-  canEditSourceMonth,
-  getActiveReadingMonth,
-  isUnitWaterStartOverAvailable,
-} from "@/server/water/unit-meter-readings";
+import { canEditSourceMonth } from "@/server/water/unit-meter-readings";
 import { parseWaterMonthKey } from "@/server/water/month";
 
 import { UnitMeterReadingsMonthPage } from "../_components/unit-meter-readings-month-page";
@@ -23,18 +19,16 @@ type PageProps = {
 export default async function UnitMeterReadingsMonthRoute({ params, searchParams }: PageProps) {
   const { month } = await params;
   const paramsResult = (await searchParams) ?? {};
-  const businessNow = await getBusinessNow();
-  const operatingMonth = getActiveReadingMonth(businessNow);
   const selectedMonth = parseWaterMonthKey(month);
   const historicalEditingAvailable =
     process.env.NODE_ENV === "development" &&
     process.env.TB810_ALLOW_HISTORICAL_READING_EDITS === "true";
 
   if (!selectedMonth) {
-    redirect(`/water/unit-meter-readings/${operatingMonth.key}`);
+    redirect("/water/unit-meter-readings");
   }
-  // Intake is governed by source-month editability, not by the calendar month.
-  const editability = await canEditSourceMonth(selectedMonth, businessNow);
+  // Intake and Start Over are governed by source-month editability, not by the calendar month.
+  const editability = await canEditSourceMonth(selectedMonth, await getBusinessNow());
   if (editability.error) throw new Error(editability.error);
 
   return (
@@ -44,7 +38,6 @@ export default async function UnitMeterReadingsMonthRoute({ params, searchParams
       deleted={paramsResult.deleted}
       historicalEditingAvailable={historicalEditingAvailable}
       sourceMonthOpen={editability.allowed}
-      startOverAvailable={isUnitWaterStartOverAvailable(selectedMonth, editability.allowed)}
     />
   );
 }

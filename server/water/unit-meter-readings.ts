@@ -6,8 +6,15 @@ import {
   isRecordCreatedByActiveDevTestSession,
   recordDevTestMutation,
 } from "@/server/dev-test-session";
+import { loadGiulianaPackageProgression } from "@/server/obligations/progression";
 import { getCurrentBuilding } from "@/server/units";
-import { FINALIZED_OBLIGATION_STATUSES, isSourceMonthEditable, sourceMonthCandidates } from "./source-editability";
+import {
+  FINALIZED_OBLIGATION_STATUSES,
+  isSourceMonthEditable,
+  primaryUnitWaterSourceMonth,
+  sourceMonthCandidates,
+  unitWaterMonthNote,
+} from "./source-editability";
 
 export { isSourceMonthEditable } from "./source-editability";
 
@@ -112,6 +119,8 @@ type PopulationUnit = {
 export type UnitMeterReadingMonthOption = {
   key: string;
   label: string;
+  /** Quiet operational orientation, e.g. "Current work" for the primary source month. */
+  note?: string;
 };
 
 export type MeterReadingCompletenessSummary = {
@@ -255,20 +264,33 @@ export async function listOpenUnitWaterSourceMonths(referenceDate?: Date): Promi
 }
 
 /**
- * Start over is offered for an open source month. The database function
- * tb810_clear_current_unit_water_month still accepts only its own calendar
- * month (current_date), so that remains an additional limit until the
- * database contract is changed.
+ * Unit Water's primary working month, derived from canonical K6 progression:
+ * the source month consumed by Giuliana's active package. Other open source
+ * months remain available as secondary work.
  */
-export function isUnitWaterStartOverAvailable(monthKey: string, sourceMonthOpen: boolean, now = new Date()) {
-  return sourceMonthOpen && monthKey === getActiveReadingMonth(now).key;
+export async function getPrimaryUnitWaterSourceMonth(referenceDate?: Date): Promise<QueryResult<UnitMeterReadingMonthOption | null>> {
+  const buildingResult = await getCurrentBuilding();
+  if (buildingResult.error) return { data: null, error: buildingResult.error };
+  if (!buildingResult.data) return { data: null, error: null };
+
+  const operatingMonth = getActiveReadingMonth(referenceDate ?? await getBusinessNow()).key;
+  const progression = await loadGiulianaPackageProgression({ buildingId: buildingResult.data.id, startMonth: operatingMonth });
+  if (progression.error || !progression.data) return { data: null, error: progression.error ?? "Giuliana package progression unavailable." };
+
+  const key = primaryUnitWaterSourceMonth({
+    activeObligationMonth: progression.data.activePackage.obligationMonth,
+    operatingMonth,
+  });
+  return { data: { key, label: monthLabelFromKey(key), note: "Current work" }, error: null };
 }
 
+// Start Over is a bulk correction of an editable source month. The database
+// function enforces the same source freeze under the K6 package lock.
 export async function clearCurrentUnitWaterMonth(monthKey: string) {
   const editability = await canEditSourceMonth(monthKey, await getBusinessNow());
   if (editability.error) return { data: null as never, error: editability.error };
-  if (!isUnitWaterStartOverAvailable(monthKey, editability.allowed)) {
-    return { data: null as never, error: "Only the current editable Unit Water month can be started over." };
+  if (!editability.allowed) {
+    return { data: null as never, error: "This Unit Water month is not available for editing." };
   }
 
   const supabase = await createClient();
@@ -339,8 +361,13 @@ export async function listUnitMeterReadingMonths(): Promise<QueryResult<UnitMete
   });
   if (error) return { data: [], error: error.message };
 
-  const openMonths = await listOpenUnitWaterSourceMonths();
+  const businessNow = await getBusinessNow();
+  const [openMonths, primary] = await Promise.all([
+    listOpenUnitWaterSourceMonths(businessNow),
+    getPrimaryUnitWaterSourceMonth(businessNow),
+  ]);
   if (openMonths.error) return { data: [], error: openMonths.error };
+  if (primary.error) return { data: [], error: primary.error };
 
   // Months holding readings stay navigable for inspection; open source months
   // are listed even with zero readings because they are actionable.
@@ -351,7 +378,13 @@ export async function listUnitMeterReadingMonths(): Promise<QueryResult<UnitMete
   );
   for (const key of openMonths.data) keys.add(key);
 
-  const months = [...keys].map((key) => ({ key, label: monthLabelFromKey(key) }));
+  const openSet = new Set(openMonths.data);
+  const months = [...keys].map((key) => {
+    const note = primary.data
+      ? unitWaterMonthNote({ month: key, primaryMonth: primary.data.key, sourceMonthOpen: openSet.has(key) })
+      : undefined;
+    return { key, label: monthLabelFromKey(key), ...(note ? { note } : {}) };
+  });
   return { data: months.sort((a, b) => b.key.localeCompare(a.key)), error: null };
 }
 
@@ -989,7 +1022,7 @@ export async function deleteUnitMeterReading(
       monthKeyFromDate(reading.reading_date) ?? "",
     );
     if (correction.error) return { data: null as never, error: correction.error };
-    if (!correction.allowed) return { data: null as never, error: "Only current-month meter readings can be deleted." };
+    if (!correction.allowed) return { data: null as never, error: "This Unit Water month is not available for editing." };
   }
 
   const unitsResult = await getCondoUnits();

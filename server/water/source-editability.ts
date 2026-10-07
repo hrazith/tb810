@@ -22,6 +22,44 @@ function nextMonthKey(monthKey: string) {
   return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, "0")}`;
 }
 
+function previousMonthKey(monthKey: string) {
+  const year = Number(monthKey.slice(0, 4));
+  const month = Number(monthKey.slice(5, 7));
+  return month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, "0")}`;
+}
+
+/**
+ * Unit Water's primary working month: the source month consumed by
+ * Giuliana's active K6 package (activePackage - 1). Source work never runs
+ * ahead of the operating month, so early handoffs clamp to it. Editability is
+ * still decided by isSourceMonthEditable; this only orients the workspace.
+ */
+export function primaryUnitWaterSourceMonth({
+  activeObligationMonth,
+  operatingMonth,
+}: {
+  activeObligationMonth: string;
+  operatingMonth: string;
+}) {
+  const sourceMonth = previousMonthKey(activeObligationMonth);
+  return sourceMonth > operatingMonth ? operatingMonth : sourceMonth;
+}
+
+/** Orientation label for an open source month relative to the primary month. */
+export function unitWaterMonthNote({
+  month,
+  primaryMonth,
+  sourceMonthOpen,
+}: {
+  month: string;
+  primaryMonth: string;
+  sourceMonthOpen: boolean;
+}) {
+  if (!sourceMonthOpen) return undefined;
+  if (month === primaryMonth) return "Current work";
+  return month > primaryMonth ? "Next source work" : "Open for corrections";
+}
+
 /**
  * Source months that can still hold unconsumed source work, to be evaluated
  * with isSourceMonthEditable.

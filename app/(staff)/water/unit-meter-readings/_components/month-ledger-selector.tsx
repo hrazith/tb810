@@ -14,6 +14,8 @@ type Props = {
 type MonthOption = {
   key: string;
   label: string;
+  /** Optional quiet orientation, e.g. "Current work". */
+  note?: string;
 };
 
 function routeForMonth(monthKey: string, searchQuery: string, routeBase: string) {
@@ -31,6 +33,7 @@ export function MonthLedgerSelector({ activeMonthKey, searchQuery, monthOptions,
   const [open, setOpen] = useState(false);
 
   const selectedIndex = useMemo(() => monthOptions.findIndex((item) => item.key === activeMonthKey), [activeMonthKey, monthOptions]);
+  const selectedNote = selectedIndex >= 0 ? monthOptions[selectedIndex].note : undefined;
 
   useEffect(() => {
     if (!open) return;
@@ -89,6 +92,7 @@ export function MonthLedgerSelector({ activeMonthKey, searchQuery, monthOptions,
           <span>{monthOptions.find((item) => item.key === activeMonthKey)?.label ?? activeMonthKey}</span>
           <CaretDown size={22} className="transition-transform" />
         </button>
+        {selectedNote ? <p className="mt-1 text-sm text-zinc-500">{selectedNote}</p> : null}
 
         <div
           ref={menuRef}
@@ -119,7 +123,10 @@ export function MonthLedgerSelector({ activeMonthKey, searchQuery, monthOptions,
                   ].join(" ")}
                   onClick={() => selectMonth(option.key)}
                 >
-                  <span>{option.label}</span>
+                  <span className="flex flex-col">
+                    <span>{option.label}</span>
+                    {option.note ? <span className="text-xs font-normal text-zinc-500">{option.note}</span> : null}
+                  </span>
                   {selected ? <span className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Selected</span> : null}
                 </button>
               );

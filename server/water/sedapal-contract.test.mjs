@@ -23,9 +23,33 @@ function indexOf(body, pattern, label) {
   return index;
 }
 
-test("the Sedapal contract is the newest forward migration", () => {
+test("only the shared source-freeze extraction follows the Sedapal contract", () => {
   const migrations = fs.readdirSync("supabase/migrations").filter((name) => name.endsWith(".sql")).sort();
-  assert.equal(migrations.at(-1), "20261006120000_sedapal_source_freeze_contract.sql");
+  const later = migrations.slice(migrations.indexOf("20261006120000_sedapal_source_freeze_contract.sql") + 1);
+  assert.deepEqual(later, ["20261007120000_unit_water_start_over_source_freeze.sql"]);
+
+  // That migration may re-point the Sedapal source lock at the shared helper,
+  // and must not redefine any other Sedapal contract function.
+  const extraction = fs.readFileSync(`supabase/migrations/${later[0]}`, "utf8");
+  const redefined = [...extraction.matchAll(/create or replace function public\.(\w+)\(/g)].map((match) => match[1]).sort();
+  assert.deepEqual(redefined, [
+    "tb810_clear_current_unit_water_month",
+    "tb810_lock_common_water_source_periods",
+    "tb810_lock_source_month_open",
+    "tb810_sync_meter_reading_import",
+  ]);
+
+  const sedapalLock = functionBody(extraction, "tb810_lock_common_water_source_periods");
+  assert.match(sedapalLock, /order by source_month[\s\S]*perform public\.tb810_lock_source_month_open\(p_building_id, v_source\.source_month, 'Sedapal source'\)/);
+  assert.match(sedapalLock, /Common water bills must remain attached to a source Billing Period\./);
+  assert.match(sedapalLock, /Common water source Billing Period was not found for this building\./);
+
+  const shared = functionBody(extraction, "tb810_lock_source_month_open");
+  const sharedLock = indexOf(shared, /pg_advisory_xact_lock_shared\(public\.tb810_monthly_obligation_package_lock_key/, "shared package lock");
+  const statusRead = indexOf(shared, /select bp\.status into v_status/, "status read");
+  assert.ok(sharedLock < statusRead, "status is read only after the lock");
+  assert.match(shared, /v_status in \('approved', 'invoices_generated', 'closed'\)/);
+  assert.doesNotMatch(shared, /'ready_for_review'/);
 });
 
 test("package lock key is identical to the K6 handoff advisory key", () => {
