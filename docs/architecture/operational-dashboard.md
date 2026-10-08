@@ -251,6 +251,10 @@ For example:
 
 Incomplete does not mean late. Calendar passage alone must not create Attention; a real business expectation or blocking rule is required.
 
+Giuliana's status vocabulary is frozen: **Late** applies to source inputs after their collection deadline; **Blocking** means a source problem prevents an obligation package from progressing; a package that passes its financial readiness deadline (the last day of the preceding month) without being ready is **Blocked**; **Approval overdue** belongs to Carlos after handoff and after his approval target. There is no separate "late obligations" or "overdue obligations" package state.
+
+Delayed-cycle example: on October 8, September is approved and Ready for Dispatch, but October has not been handed off and 58 September Gas readings are missing. October's obligation month has begun and its readiness deadline (September 30) has passed, so the top region reports "October obligations are Blocked"; the missing Gas readings are Late source work and Blocking, surfaced through Needs attention; completed Water compresses; and the prior September approval moves to the quiet completed line instead of dominating the top region. The same rule applies at every month boundary: once the active package's obligation month begins, the active package owns the top region until it is handed off.
+
 Month-turn is a real calendar/business-date event, but there is no single master
 month clock. Calendar/business date drives boundaries and pulse attempts;
 financial readiness drives handoff eligibility; Carlos approval creates the
@@ -361,6 +365,8 @@ Examples:
 - Add expense
 
 Add Expense is a future action only until the Expenses domain has been designed and built.
+
+In Giuliana's dashboard, Quick Actions are implemented as the single Upload menu in the top-right corner, not as a separate panel.
 
 Quick Actions must not carry fake pending or needs-attention state merely because they exist.
 

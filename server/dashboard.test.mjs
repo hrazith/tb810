@@ -1563,3 +1563,122 @@ test("future Gas calculation blockers become attention after the source deadline
   }]);
   assert.equal(projection.gas.readingsEmphasis, "attention");
 });
+
+// ---------------------------------------------------------------------------
+// Delayed cycle: the active package owns the top region once its obligation
+// month has begun. An earlier handoff becomes quiet completed history.
+
+const GAS_MISSING = "Required gas readings are missing. Total gas consumption is zero.";
+
+function delayedOctoberFacts({ businessDate, context, lifecycle, gasReadings = 0, supplierBills = 1 } = {}) {
+  const base = buildProjectionFacts().upcoming;
+  const october = {
+    ...base,
+    sourceReadingMonth: "2026-09",
+    commonWaterBill: { id: "sedapal-sep", amount: "2760.50", bill_date: "2026-09-05", status: "received" },
+    obligationLifecycle: lifecycle ?? { mode: "live", billingPeriodId: null, billingPeriodStatus: null },
+    obligations: {
+      ...base.obligations,
+      obligationMonth: "2026-10",
+      total: null,
+      components: {
+        ...base.obligations.components,
+        fixed_assessment: { state: "available", amount: "20051.80", reason: null },
+        metered_water: { state: "available", amount: "2709.46", reason: null },
+        common_water: { state: "available", amount: "51.20", reason: null },
+        gas: gasReadings >= 58 ? { state: "available", amount: "1840.03", reason: null } : { state: "blocked", amount: null, reason: GAS_MISSING },
+      },
+    },
+  };
+  return buildProjectionFacts({
+    businessDate,
+    context,
+    operatingMonth: businessDate.slice(0, 7),
+    upcomingObligationMonth: "2026-11",
+    mostRecentHandoff: { obligationMonth: "2026-09", status: "approved" },
+    sourceWork: {
+      water: { commonWaterBillPresent: true, meterReadingCount: 64, meterReadingExpectedCount: 64, meterReadingCompleteCount: 64 },
+      gas: { supplierBillCount: supplierBills, gasReadingCount: gasReadings, gasUnitCount: 58 },
+    },
+    current: october,
+    upcoming: { ...base, sourceReadingMonth: "2026-10", obligations: { ...base.obligations, obligationMonth: "2026-11" } },
+  });
+}
+
+test("Oct 1: the unresolved October package owns the top region, Blocked, with September as history", () => {
+  const projection = projectGulianaDashboard(delayedOctoberFacts({ businessDate: "2026-10-01", context: "open" }));
+
+  assert.equal(projection.financialFocus, "current");
+  assert.deepEqual(projection.activeResponsibility, { obligationMonth: "2026-10", state: "blocked" });
+  assert.equal(projection.obligations.packageState, "blocked");
+  assert.equal(projection.obligations.statusLabel, "Blocked");
+  assert.deepEqual(projection.handoff, { obligationMonth: "2026-09", status: "approved_ready_for_dispatch" }, "the handoff fact stays available");
+  assert.deepEqual(
+    projection.completed.find((item) => item.key === "prior_obligations"),
+    { key: "prior_obligations", state: "compressed", obligationMonth: "2026-09", status: "approved_ready_for_dispatch" },
+  );
+  assert.deepEqual(projection.attentions.map((attention) => attention.happened), [GAS_MISSING], "the blocker surfaces as a notice");
+});
+
+test("Oct 8: October stays Blocked by late September Gas readings; Water complete and quiet", () => {
+  const projection = projectGulianaDashboard(delayedOctoberFacts({ businessDate: "2026-10-08" }));
+
+  assert.deepEqual(projection.activeResponsibility, { obligationMonth: "2026-10", state: "blocked" });
+  assert.equal(projection.obligations.statusLabel, "Blocked");
+  assert.deepEqual(projection.attentions, [{
+    source: "gas",
+    happened: "58 September Gas readings are still missing for October obligations.",
+    impact: "October gas obligations cannot be completed.",
+  }], "Gas is the only notice: no Water attention");
+
+  assert.equal(projection.water.domainState, "complete");
+  assert.equal(projection.water.emphasis, "compressed");
+  assert.equal(projection.water.meterReadingsComplete, true);
+  assert.equal(projection.water.billPresent, true);
+  assert.equal(projection.gas.domainState, "blocked");
+  assert.equal(projection.gas.readingsEmphasis, "attention");
+  assert.equal(projection.gas.supplierBillsPresent, true, "a supplier bill exists but does not complete Gas");
+
+  assert.deepEqual(projection.completed.map((item) => item.key), ["water", "prior_obligations"]);
+});
+
+test("pre-deadline: an incomplete package is Not ready, not Blocked, and does not take the top region", () => {
+  for (const businessDate of ["2026-09-08", "2026-09-29"]) {
+    const projection = projectGulianaDashboard(delayedOctoberFacts({ businessDate }));
+    assert.equal(projection.obligations.packageState, "not_ready", businessDate);
+    assert.equal(projection.obligations.statusLabel, "Not ready", businessDate);
+    assert.equal(projection.activeResponsibility, null, "October has not begun; the September handoff keeps the top line");
+    assert.equal(projection.gas.domainState, "incomplete", "missing readings are not Blocking before the package boundary");
+    assert.ok(!projection.completed.some((item) => item.key === "prior_obligations"));
+  }
+  const onDeadline = projectGulianaDashboard(delayedOctoberFacts({ businessDate: "2026-09-30" }));
+  assert.equal(onDeadline.obligations.statusLabel, "Blocked", "Blocked from the readiness deadline, matching Carlos");
+});
+
+test("ready_for_review moves Giuliana's focus forward; the calendar alone does not", () => {
+  const handedOff = projectGulianaDashboard(delayedOctoberFacts({
+    businessDate: "2026-10-08",
+    gasReadings: 58,
+    lifecycle: { mode: "snapshotted", billingPeriodId: "period-oct", billingPeriodStatus: "ready_for_review" },
+  }));
+  assert.equal(handedOff.financialFocus, "upcoming");
+  assert.equal(handedOff.obligations.statusLabel, "Live preview");
+  assert.equal(handedOff.activeResponsibility, null, "November has not begun");
+
+  const live = projectGulianaDashboard(delayedOctoberFacts({ businessDate: "2026-10-31" }));
+  assert.equal(live.financialFocus, "current", "late in October the unresolved October package still holds focus");
+  assert.equal(live.activeResponsibility?.obligationMonth, "2026-10");
+});
+
+test("two domain cards: Gas completes on readings, not on supplier-bill presence", () => {
+  const readingsComplete = projectGulianaDashboard(delayedOctoberFacts({ businessDate: "2026-10-08", gasReadings: 58, supplierBills: 0 }));
+  assert.equal(readingsComplete.gas.domainState, "complete", "an empty supplier pool is valid");
+  assert.equal(readingsComplete.water.domainState, "complete");
+
+  const page = fs.readFileSync(new URL("../app/(staff)/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /title="Water" state=\{projection\.water\.domainState\}/);
+  assert.match(page, /title="Gas" state=\{projection\.gas\.domainState\}/);
+  assert.doesNotMatch(page, /xl:grid-cols-4/, "the four separate source cards are gone");
+  assert.match(page, /projection\.obligations\.statusLabel/);
+  assert.match(page, /projection\.completed\.map/);
+});

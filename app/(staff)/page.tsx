@@ -103,6 +103,28 @@ function UtilityStatusIndicator({ emphasis, complete }: { emphasis: string; comp
   return null;
 }
 
+// Domain cards: a completed domain is quieter than one that still needs work.
+function domainCardClass(state: "complete" | "incomplete" | "blocked") {
+  return state === "complete"
+    ? "relative rounded-3xl border border-zinc-100 bg-zinc-50 p-8"
+    : "relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)]";
+}
+
+function DomainHeader({ icon, title, state, quiet }: { icon: React.ReactNode; title: string; state: "complete" | "incomplete" | "blocked"; quiet: boolean }) {
+  const label = state === "complete" ? "Complete" : state === "blocked" ? "Blocked" : "Incomplete";
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <div className="relative bg-gray-100 p-3 rounded-full">{icon}</div>
+        <p className="text-lg font-normal text-zinc-950">{title}</p>
+      </div>
+      {state !== "incomplete" || !quiet ? (
+        <p className={`text-md font-semibold ${state === "blocked" ? "text-red-700" : state === "complete" ? "text-zinc-500" : "text-zinc-950"}`}>{label}</p>
+      ) : null}
+    </div>
+  );
+}
+
 async function CarlosDashboardPage({ firstName, error }: { firstName: string; error?: string }) {
   const result = await getCarlosDashboardFacts();
   if (result.error) throw new Error(result.error);
@@ -201,6 +223,16 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const handoffMonthLabel = projection.handoff
     ? formatMonthLabel(projection.handoff.obligationMonth)
     : financialMonthLabel;
+  // The active package owns the top region once its obligation month has begun;
+  // an earlier handoff then moves to the quiet completed line.
+  const activeResponsibility = projection.activeResponsibility;
+  const completedItems = projection.completed.map((item) => {
+    if (item.key === "prior_obligations" && item.obligationMonth) {
+      return `${formatMonthLabel(item.obligationMonth)} obligations ${item.status === "approved_ready_for_dispatch" ? "approved · ready for dispatch" : "awaiting Carlos approval"}`;
+    }
+    if (item.key === "obligations") return `${financialMonthLabel} obligations calculated`;
+    return item.key === "water" ? "Water" : "Gas";
+  });
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col space-y-6 px-6 py-6 sm:py-8">
@@ -208,7 +240,15 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         <div className="space-y-4 ">
           <p className="text-md  text-zinc-800">{formatDateLabel(result.data.businessDate)}</p>
             <DashboardGreeting firstName={firstName} />
-          {handoffStatus ? (
+          {activeResponsibility ? (
+            <p className="flex flex-wrap items-center gap-2 text-lg text-zinc-950">
+              <span>{formatMonthLabel(activeResponsibility.obligationMonth)} obligations are</span>
+              <span className={`inline-flex items-center gap-2 font-medium ${activeResponsibility.state === "blocked" ? "text-red-700" : ""}`}>
+                <FileText size={20} weight="regular" aria-hidden="true" />
+                {projection.obligations.statusLabel}
+              </span>
+            </p>
+          ) : handoffStatus ? (
             <p className="flex flex-wrap items-center gap-2 text-lg text-zinc-950">
               <span>{handoffMonthLabel} obligations {projection.handoff ? "are now" : "are"}</span>
               <span className="inline-flex items-center gap-2 font-medium">
@@ -247,106 +287,63 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
 
       </div>
 
-      <div className={`grid gap-8 sm:grid-cols-2 xl:grid-cols-4 ${isOpen ? "order-3" : "order-2"}`}>
+      <div className={`grid gap-8 lg:grid-cols-2 ${isOpen ? "order-3" : "order-2"}`}>
 
-{/*   Water insights */}
-        <Link href="/water/unit-meter-readings" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
-          <div className="flex items-start justify-between gap-4 ">
-
-            <div>
-              <Drop size={32} weight="regular" aria-hidden="true" />
-
-
-            </div>
-            <UtilityStatusIndicator emphasis={projection.water.meterReadingsEmphasis} complete={projection.water.meterReadingsComplete} />
-          </div>
+{/*   Water domain: meter readings + Sedapal */}
+        <div className={domainCardClass(projection.water.domainState)}>
+          <DomainHeader icon={<Drop size={28} weight="regular" aria-hidden="true" />} title="Water" state={projection.water.domainState} quiet={isOpen} />
           <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-            <div className="flex flex-col items-center gap-3 sm:items-start">
-              <p className="text-lg font-normal text-zinc-950">Water meter reading</p>
+            <Link href="/water/unit-meter-readings" className="flex flex-col items-center gap-3 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 sm:items-start">
+              <span className="relative pr-5 text-lg font-normal text-zinc-950">
+                Meter readings
+                <UtilityStatusIndicator emphasis={projection.water.meterReadingsEmphasis} complete={projection.water.meterReadingsComplete} />
+              </span>
               <MeterProgress complete={waterComplete} expected={waterExpected} label="Water meter readings" />
-            </div>
-
-          </div>
-        </Link>
-
-         <Link href="/water/sedapal" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
-          <div className="flex items-start justify-between gap-4 ">
-
-             <div className="relative bg-gray-100 p-3 rounded-full">
-              <Drop size={32} weight="regular" aria-hidden="true" />
-              <UtilityStatusIndicator emphasis={projection.water.billEmphasis} complete={projection.water.billPresent} />
-            </div>
-            
-          </div>
-
-           
-
-     
-
-
-          <div className="mt-10 h-36 rounded-3xl   w-36 ">
-              <p className="text-lg font-normal text-zinc-950">Sedapal Bill</p>
+            </Link>
+            <div className="hidden h-36 w-px bg-zinc-200 sm:block" />
+            <Link href="/water/sedapal" className="rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+              <span className="relative pr-5 text-lg font-normal text-zinc-950">
+                Sedapal Bill
+                <UtilityStatusIndicator emphasis={projection.water.billEmphasis} complete={projection.water.billPresent} />
+              </span>
               <p className="mt-2 text-lg font-medium text-zinc-950">{waterBill ? "Present" : isOpen ? "Not received yet" : "Missing"}</p>
+              {waterBill ? <p className="mt-1 text-sm text-zinc-600">{formatMoney(waterBill.amount)}</p> : null}
+            </Link>
           </div>
-        </Link>
+        </div>
 
-{/*   Gas insights */}
-        <Link href="/gas" className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
-
-        <div className="  flex items-start justify-between gap-4 ">
-
-            <div>
-              <Flame size={32} weight="regular" aria-hidden="true" />
-              
-
-            </div>
-            <div>
-
-              <UtilityStatusIndicator emphasis={projection.gas.readingsEmphasis} complete={projection.gas.readingsComplete} />
-
-            </div>
-          </div>
-
-
-
-          <div className="mt-10  ">
-            <div className="flex flex-col items-center gap-3 sm:items-start">
-              <p className="text-lg text-center font-normal text-zinc-950 ">Gas Meter Readings</p>
+{/*   Gas domain: meter readings + supplier bills */}
+        <div className={domainCardClass(projection.gas.domainState)}>
+          <DomainHeader icon={<Flame size={28} weight="regular" aria-hidden="true" />} title="Gas" state={projection.gas.domainState} quiet={isOpen} />
+          <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <Link href="/gas/unit-gas-readings" className="flex flex-col items-center gap-3 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 sm:items-start">
+              <span className="relative pr-5 text-lg font-normal text-zinc-950">
+                Meter readings
+                <UtilityStatusIndicator emphasis={projection.gas.readingsEmphasis} complete={projection.gas.readingsComplete} />
+              </span>
               <MeterProgress complete={gasComplete} expected={gasExpected} label="Gas meter readings" />
-            </div>
-           
-          </div>
-        </Link>
-
-        <Link href="/gas" className="group  rounded-3xl border border-zinc-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2">
-
-        <div className="flex items-start justify-between gap-4  ">
-
-            <div className="relative">
-              <Flame size={32} weight="regular" aria-hidden="true" />
-              <UtilityStatusIndicator emphasis={projection.gas.supplierBillsEmphasis} complete={projection.gas.supplierBillsPresent} />
-            </div>
-          </div>
-
-
-
-          <div className="mt-10  gap-8 ">
-            <div className="flex flex-col items-center gap-3 sm:items-start">
-              <p className="text-lg font-normal text-zinc-950">Gas Supplier Bills</p>
-              <p className="mt-2 text-lg font-semibold text-zinc-950">{financialFacts.gas.supplierBillCount} bills</p>
+            </Link>
+            <div className="hidden h-36 w-px bg-zinc-200 sm:block" />
+            <Link href="/gas" className="rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+              <span className="text-lg font-normal text-zinc-950">Supplier Bills</span>
+              <p className="mt-2 text-lg font-semibold text-zinc-950">{financialFacts.gas.supplierBillCount} {financialFacts.gas.supplierBillCount === 1 ? "bill" : "bills"}</p>
               <p className="mt-1 text-sm text-zinc-600">{formatMoney(financialFacts.gas.supplierBillTotal)}</p>
-            </div>
-           
+            </Link>
           </div>
-        </Link>
+        </div>
       </div>
+
+{/*   Completed work compresses into one quiet confirmation line */}
+      {completedItems.length > 0 ? (
+        <p className="order-4 text-sm text-zinc-500">Completed · {completedItems.join(" · ")}</p>
+      ) : null}
 
       <details className="fixed bottom-6 right-6 z-40 max-sm:bottom-4 max-sm:right-4">
         <summary className="flex cursor-pointer list-none items-center gap-4 rounded-full border border-zinc-200 bg-white px-5 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:border-zinc-950 [&::-webkit-details-marker]:hidden">
           <span className="text-sm font-semibold text-zinc-950">Obligations</span>
           <span className="text-sm text-zinc-600">{shortMonthLabel(financialFacts.obligations.obligationMonth)}</span>
           <span className="text-xs font-semibold tracking-[0.12em] text-zinc-500">
-            {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for handoff" : "Not ready"}
+            {projection.obligations.statusLabel}
           </span>
           <CaretDown size={16} aria-hidden="true" />
         </summary>
@@ -355,7 +352,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{financialMonthLabel} obligations</p>
               <p className="mt-1 text-lg font-semibold text-zinc-950">
-                {projection.financialFocus === "upcoming" ? "Live preview" : projection.obligations.readiness === "awaiting_approval" ? "Awaiting approval" : projection.obligations.readiness === "ready_for_carlos" ? "Ready for handoff" : "Not ready"}
+                {projection.obligations.statusLabel}
               </p>
             </div>
             <Link href="/obligations" className="text-sm font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-950">Open obligations →</Link>

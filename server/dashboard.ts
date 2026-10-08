@@ -104,6 +104,10 @@ export type DashboardWorthNoting = {
   reason: string;
 };
 
+export type DashboardDomainState = "complete" | "incomplete" | "blocked";
+
+export type DashboardPackageState = "ready" | "not_ready" | "blocked" | "handed_off";
+
 export type GulianaDashboardProjection = {
   businessDate: string;
   operatingMonth: string;
@@ -117,6 +121,8 @@ export type GulianaDashboardProjection = {
     billEmphasis: "normal" | "compressed" | "attention";
     billPresent: boolean;
     meterReadingsComplete: boolean;
+    /** Water domain card: meter readings + Sedapal, for the active package. */
+    domainState: DashboardDomainState;
   };
   gas: {
     state: DashboardSectionState;
@@ -126,6 +132,8 @@ export type GulianaDashboardProjection = {
     supplierBillsEmphasis: "normal" | "compressed" | "attention";
     supplierBillsPresent: boolean;
     readingsComplete: boolean;
+    /** Gas domain card: meter readings + supplier bills, for the active package. */
+    domainState: DashboardDomainState;
   };
   obligations: {
     state: DashboardSectionState;
@@ -133,7 +141,18 @@ export type GulianaDashboardProjection = {
     ready: boolean;
     blocked: boolean;
     readiness: "ready_for_carlos" | "awaiting_approval" | "not_ready";
+    /** Package vocabulary: Blocked once its financial readiness deadline passes without being ready. */
+    packageState: DashboardPackageState;
+    statusLabel: string;
   };
+  /**
+   * The active package once its obligation month has begun and it has not been
+   * handed off: it owns the top region, ahead of any earlier handoff.
+   */
+  activeResponsibility: {
+    obligationMonth: string;
+    state: Exclude<DashboardPackageState, "handed_off">;
+  } | null;
   handoff: {
     obligationMonth: string;
     status: "awaiting_carlos_approval" | "approved_ready_for_dispatch";
@@ -141,8 +160,10 @@ export type GulianaDashboardProjection = {
   attentions: DashboardAttention[];
   worthNoting: DashboardWorthNoting[];
   completed: Array<{
-    key: "water" | "gas" | "obligations";
+    key: "water" | "gas" | "obligations" | "prior_obligations";
     state: "complete" | "compressed";
+    obligationMonth?: string;
+    status?: "awaiting_carlos_approval" | "approved_ready_for_dispatch";
   }>;
   quickActions: DashboardQuickActionKey[];
 };
@@ -471,7 +492,7 @@ function deriveWaterState(
   sourceReadingMonth: string,
   sourceWorkActionable: boolean,
   businessDate: string,
-): GulianaDashboardProjection["water"] {
+): Omit<GulianaDashboardProjection["water"], "domainState"> {
   const complete = sourceWork.water.commonWaterBillPresent && sourceWork.water.meterReadingCompleteCount >= sourceWork.water.meterReadingExpectedCount;
   const active = sourceWork.water.commonWaterBillPresent || sourceWork.water.meterReadingCount > 0;
   const blocked = sourceWorkActionable && (obligations.components.common_water.state === "blocked" || obligations.components.metered_water.state === "blocked");
@@ -505,7 +526,7 @@ function deriveGasState(
   sourceReadingMonth: string,
   sourceWorkActionable: boolean,
   businessDate: string,
-): GulianaDashboardProjection["gas"] {
+): Omit<GulianaDashboardProjection["gas"], "domainState"> {
   const complete = sourceWork.gas.supplierBillCount > 0 && sourceWork.gas.gasReadingCount >= sourceWork.gas.gasUnitCount;
   const active = sourceWork.gas.supplierBillCount > 0 || sourceWork.gas.gasReadingCount > 0;
   const blocked = sourceWorkActionable && obligations.components.gas.state === "blocked";
@@ -530,7 +551,7 @@ function deriveObligationState(
   obligations: UpcomingFacts["obligations"],
   lifecycle: UpcomingFacts["obligationLifecycle"],
   businessDate: string,
-): GulianaDashboardProjection["obligations"] {
+): Omit<GulianaDashboardProjection["obligations"], "packageState" | "statusLabel"> {
   const blocked = obligations.components.fixed_assessment.state === "blocked"
     || obligations.components.metered_water.state === "blocked"
     || obligations.components.common_water.state === "blocked"
@@ -545,6 +566,40 @@ function deriveObligationState(
     blocked,
     readiness: ready ? lifecycleVisible && lifecycle?.billingPeriodStatus === "ready_for_review" ? "awaiting_approval" : "ready_for_carlos" : "not_ready",
   };
+}
+
+/**
+ * Package vocabulary for Giuliana. A package not yet handed off is Blocked once
+ * its financial readiness deadline (last day of the preceding month) passes
+ * without it being ready; the same boundary Carlos's journey uses.
+ */
+export function deriveGulianaPackageState(
+  facts: Pick<UpcomingFacts, "obligations" | "obligationLifecycle">,
+  ready: boolean,
+  businessDate: string,
+): DashboardPackageState {
+  if (isHandedOffPackage({ mode: facts.obligationLifecycle.mode, status: facts.obligationLifecycle.billingPeriodStatus })) return "handed_off";
+  if (ready) return "ready";
+  const deadline = financialReadinessDeadline(facts.obligations.obligationMonth);
+  return deadline !== null && businessDate >= deadline ? "blocked" : "not_ready";
+}
+
+function obligationStatusLabel(
+  financialFocus: DashboardFinancialFocus,
+  readiness: GulianaDashboardProjection["obligations"]["readiness"],
+  packageState: DashboardPackageState,
+) {
+  if (financialFocus === "upcoming") return "Live preview";
+  if (readiness === "awaiting_approval") return "Awaiting approval";
+  if (readiness === "ready_for_carlos") return "Ready for handoff";
+  return packageState === "blocked" ? "Blocked" : "Not ready";
+}
+
+// A domain card is Blocked only when the package itself is Blocked and that
+// domain's component prevents it; missing source work before then is Incomplete.
+function deriveDomainState(complete: boolean, componentBlocked: boolean, packageState: DashboardPackageState): DashboardDomainState {
+  if (complete && !componentBlocked) return "complete";
+  return packageState === "blocked" && componentBlocked ? "blocked" : "incomplete";
 }
 
 function deriveCompleted(
@@ -573,9 +628,29 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
     mode: monthFacts.current.obligationLifecycle.mode,
     status: monthFacts.current.obligationLifecycle.billingPeriodStatus,
   });
-  const obligations = deriveObligationState(financialFacts.obligations, financialFacts.obligationLifecycle, monthFacts.businessDate);
-  const water = deriveWaterState(sourceWork, financialFacts.obligations, financialFacts.sourceReadingMonth, sourceWorkActionable, monthFacts.businessDate);
-  const gas = deriveGasState(sourceWork, financialFacts.obligations, financialFacts.sourceReadingMonth, sourceWorkActionable, monthFacts.businessDate);
+  const obligationState = deriveObligationState(financialFacts.obligations, financialFacts.obligationLifecycle, monthFacts.businessDate);
+  const packageState = deriveGulianaPackageState(financialFacts, obligationState.ready, monthFacts.businessDate);
+  const obligations = {
+    ...obligationState,
+    packageState,
+    statusLabel: obligationStatusLabel(financialFocus, obligationState.readiness, packageState),
+  };
+  const components = financialFacts.obligations.components;
+  const waterState = deriveWaterState(sourceWork, financialFacts.obligations, financialFacts.sourceReadingMonth, sourceWorkActionable, monthFacts.businessDate);
+  const water = {
+    ...waterState,
+    domainState: deriveDomainState(
+      waterState.completion === "complete",
+      components.metered_water.state === "blocked" || components.common_water.state === "blocked",
+      packageState,
+    ),
+  };
+  const gasState = deriveGasState(sourceWork, financialFacts.obligations, financialFacts.sourceReadingMonth, sourceWorkActionable, monthFacts.businessDate);
+  const gas = {
+    ...gasState,
+    // Supplier-bill presence never completes Gas: an empty pool is valid, missing readings are not.
+    domainState: deriveDomainState(gasState.readingsComplete, components.gas.state === "blocked", packageState),
+  };
   const currentLifecycle = monthFacts.current.obligationLifecycle;
   const currentObligationMonth = monthFacts.current.obligations.obligationMonth;
   const handoffSource = monthFacts.mostRecentHandoff ?? (
@@ -591,6 +666,16 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
           : "awaiting_carlos_approval" as const,
       }
     : null;
+  // Once the active package's own obligation month has begun and it is still
+  // Giuliana's (not handed off), it is the active operational responsibility.
+  const activeObligationMonth = financialFacts.obligations.obligationMonth;
+  const activeResponsibility = packageState !== "handed_off" && monthFacts.businessDate.slice(0, 7) >= activeObligationMonth
+    ? { obligationMonth: activeObligationMonth, state: packageState }
+    : null;
+  const completed = deriveCompleted(sourceWork, financialFacts.obligations);
+  if (activeResponsibility && handoff && handoff.obligationMonth < activeObligationMonth) {
+    completed.push({ key: "prior_obligations", state: "compressed", obligationMonth: handoff.obligationMonth, status: handoff.status });
+  }
 
   return {
     businessDate: monthFacts.businessDate,
@@ -600,10 +685,11 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
     water,
     gas,
     obligations,
+    activeResponsibility,
     handoff,
     attentions: deriveAttentions(sourceWork, financialFacts, financialFocus, sourceWorkActionable, monthFacts.businessDate),
     worthNoting: operationalWorthNoting,
-    completed: deriveCompleted(sourceWork, financialFacts.obligations),
+    completed,
     quickActions: [
       "upload_sedapal_bill",
       "upload_water_meter_readings",
