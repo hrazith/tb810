@@ -109,6 +109,7 @@ September legacy obligations consume the August source cycle:
 - Rounded per-condo Common Water: PEN 1.67.
 - Rounded aggregate Common Water: PEN 106.88.
 - Displayed combined Water: PEN 3,041.95, a PEN 0.05 difference from the supplier invoice.
+  This approved package predates WATER-012 and keeps its historical Common Water rounding variance: owner allocation PEN 106.88 - source pool PEN 106.93 = -PEN 0.05. The current WATER-012 policy rounds the share up and would not produce a negative variance; the approved package is not recalculated.
 
 The legacy and native values are both explained, but they use different policies. Legacy applies the rounded PEN 4.28 rate per condo; current TB810 applies the precise PEN 3,042 / 711 rate. The difference is PEN 1.01. No residual-cent redistribution is introduced. The October native Water policy remains an explicit open product/financial decision.
 

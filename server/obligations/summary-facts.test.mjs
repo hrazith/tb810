@@ -33,6 +33,8 @@ test("building Common Water summary sums each participating unit obligation", ()
 
   assert.equal(summary.components.common_water.amount, "3.34");
   assert.equal(summary.total, "1020.00");
+  assert.equal(summary.components.common_water.sourcePool, "3.34");
+  assert.equal(summary.components.common_water.roundingVariance, "0.00", "exact division has no rounding variance");
 });
 
 test("snapshotted building summary uses persisted component totals", () => {

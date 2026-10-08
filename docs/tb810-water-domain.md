@@ -452,20 +452,47 @@ Canonical rule:
 - Divide the remaining cost equally among the 64 residential condominiums.
 - Every residential condominium receives exactly the same AGUA COMUN amount for that billing cycle.
 
-Amounts are calculated in cents. Individual metered allocations are rounded to cents first; the remaining Common Water pool is then divided equally and each per-unit Common Water obligation is rounded to cents. Consequently, the aggregate of persisted/displayed per-unit obligations is not required to equal the Sedapal invoice exactly. The exact reconciliation invariant is the metered total plus the unrounded Common Water pool.
+Amounts are calculated in cents. Individual metered allocations are rounded to cents first; the remaining Common Water pool is then divided equally and each per-unit Common Water obligation is rounded up to the céntimo (WATER-012).
 
-Accepted October 2026 Water example:
+#### Common Water rounding variance
+
+✅ Frozen current policy (WATER-012, MVP; Carlos may later change it)
+
+Three distinct facts describe Common Water for an obligation month:
+
+- **Source Common Water pool** = Sedapal invoice amount - total Metered Water. This is the factual residual and is never rewritten.
+- **Owner Common Water allocation** = equal share x eligible condo units. The exact equal share (pool / eligible units) is rounded **up** to the next céntimo whenever it has a fractional céntimo (ceiling to currency precision, not nearest-céntimo rounding); an exact céntimo share is unchanged. Every eligible unit is charged the same share.
+- **Common Water rounding variance** = owner allocation - source pool.
+
+Under the current policy the variance is always zero or positive and smaller than one céntimo per eligible unit (for 64 units, at most PEN 0.63): `0 <= variance < eligible units x PEN 0.01`. TB810 therefore never under-recovers the Common Water pool because of currency rounding. No remainder céntimos are assigned to selected owners, and the source pool is not adjusted to hide the variance. The exact reconciliation invariant is Metered Water + source Common Water pool = Sedapal invoice; the owner allocation exceeds the source pool by exactly the rounding variance.
+
+The canonical Water calculation exposes `commonWaterPool` (source pool), `exactUnitCommonWaterShare`, `unitCommonWaterCharge` (rounded-up share), `eligibleUnitCount`, `allocatedCommonWaterTotal`, `commonWaterRoundingVariance` and `allocationBasis`. The Monthly Obligation summary reports the Common Water component amount as the owner allocation together with `sourcePool`, `roundingVariance` and `allocationBasis`. No separate variance record is persisted.
+
+October 2026 obligations (September 2026 source), current policy:
 
 ```text
-Sedapal invoice:              PEN 3,100.00
-Metered Water:                PEN 2,254.14
-Exact Common Water pool:      PEN   845.86
-Rounded Common Water total:   PEN   846.08
-Displayed combined total:     PEN 3,100.22
-Rounding variance:            +PEN 0.22
+Sedapal invoice:                   PEN 2,760.50   (649 m3)
+Metered Water (637 m3):            PEN 2,709.46
+Source Common Water pool (12 m3):  PEN    51.04
+Exact equal share:                 PEN 51.04 / 64 = 0.7975
+Share rounded up:                  PEN     0.80
+Owner Common Water allocation:     PEN    51.20   (64 x 0.80)
+Common Water rounding variance:    +PEN    0.16
 ```
 
-This is compatible with the legacy convention. Historical legacy examples show small positive and negative differences, with observed examples up to PEN 2.96. Do not introduce residual-cent redistribution unless the business rule is deliberately changed.
+The September 2026 figures under the current policy (policy proof, not the approved package):
+
+```text
+Source Common Water pool:          PEN   106.93
+Exact equal share:                 PEN 106.93 / 64 = 1.67078125
+Share rounded up:                  PEN     1.68
+Owner Common Water allocation:     PEN   107.52   (64 x 1.68)
+Common Water rounding variance:    +PEN    0.59
+```
+
+**Approved history is not recalculated.** The September 2026 package was approved before WATER-012 under nearest-céntimo rounding and persists PEN 1.67 per condo, PEN 106.88 allocated against the PEN 106.93 source pool: a historical variance of -PEN 0.05. That package is immutable. For any package with persisted obligation rows, TB810 describes Common Water as it was actually charged: the source pool from its frozen Sedapal bill and persisted Metered Water, and the allocation and per-unit share from its persisted Common Water rows (`allocationBasis: "persisted"`). A historical negative variance is therefore explainable but is not valid behavior under the current policy.
+
+Legacy history also shows small positive and negative differences (observed up to PEN 2.96). Do not introduce residual-cent redistribution unless the business rule is deliberately changed.
 
 Historical note:
 

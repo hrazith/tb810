@@ -1,5 +1,6 @@
 import { calculateFixedMonthlyAssessmentAmount } from "@/server/budget-plans";
 import { calculateGasCharges } from "@/server/gas/calculation";
+import { describeCommonWaterRounding } from "@/server/water";
 import { buildWaterPreviewFromFacts, type BuildingMonthFinancialFacts } from "./owner-facts";
 import { buildMonthlyObligationSummary, type MonthlyObligationSummary } from "./summary";
 import { isChargeEligibleForMonth } from "@/server/charges/month";
@@ -96,15 +97,18 @@ function buildWaterSummaryFromFacts(financialFacts: BuildingMonthFinancialFacts,
   }
 
   const meteredAmount = previews.reduce((sum, preview) => sum + Number(preview.meteredWater.status === "available" ? preview.meteredWater.data.amount : "0.00"), 0);
-  const commonWaterAmount = formatAmount(
-    previews.reduce(
-      (sum, preview) => sum + Number(preview.commonWater.status === "available" ? preview.commonWater.data.unitCommonWaterCharge : "0.00"),
-      0,
-    ),
-  );
+  // Common Water is building-level: every condo carries the same allocation facts.
+  const commonWater = previews.find((preview) => preview.commonWater.status === "available")?.commonWater;
+  const commonWaterData = commonWater?.status === "available" ? commonWater.data : null;
   return {
     metered_water: { state: "available" as const, amount: formatAmount(meteredAmount) },
-    common_water: { state: "available" as const, amount: commonWaterAmount },
+    common_water: {
+      state: "available" as const,
+      amount: commonWaterData?.allocatedCommonWaterTotal ?? "0.00",
+      sourcePool: commonWaterData?.commonWaterPool ?? null,
+      roundingVariance: commonWaterData?.commonWaterRoundingVariance ?? null,
+      allocationBasis: commonWaterData?.allocationBasis ?? "calculated",
+    },
     eligibleUnitCount: eligibleUnits.length,
   };
 }
@@ -181,12 +185,28 @@ export function buildMonthlyObligationSummaryFromSnapshot(
 ): MonthlyObligationSummary {
   const ownerDirectCharges = buildOwnerDirectChargeSummaryFromFacts(financialFacts, obligationMonth);
   const components = snapshot.components;
+  // The source Sedapal bill is frozen once its consuming package is approved,
+  // so the persisted package still explains its Common Water rounding exactly
+  // as it was charged, even if a later policy would round differently.
+  const commonWaterRounding = financialFacts.commonWaterBill
+    ? describeCommonWaterRounding({
+        supplierAmount: financialFacts.commonWaterBill.amount,
+        meteredTotal: components.water_consumption.amount,
+        allocatedTotal: components.common_water.amount,
+      })
+    : null;
   return buildMonthlyObligationSummary({
     obligationMonth,
     eligibleUnitCount: financialFacts.unitRows.filter((unit) => unit.unit_type_code === "condo").length,
     fixedAssessment: { state: "available", amount: String(components.fixed_assessment.amount) },
     meteredWater: { state: "available", amount: String(components.water_consumption.amount) },
-    commonWater: { state: "available", amount: String(components.common_water.amount) },
+    commonWater: {
+      state: "available",
+      amount: String(components.common_water.amount),
+      sourcePool: commonWaterRounding?.sourcePool ?? null,
+      roundingVariance: commonWaterRounding?.roundingVariance ?? null,
+      allocationBasis: "persisted",
+    },
     gas: { state: "available", amount: String(components.gas_consumption.amount) },
     otherChargeAmount: String(components.other_charge.amount),
     otherChargeCount: components.other_charge.count,

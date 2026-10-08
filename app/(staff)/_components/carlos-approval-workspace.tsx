@@ -46,6 +46,20 @@ function amountText(value: string | null) {
     : "Unavailable";
 }
 
+function signedAmountText(value: string) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric)
+    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "PEN", minimumFractionDigits: 2, signDisplay: "exceptZero" }).format(numeric)
+    : "Unavailable";
+}
+
+// Common Water is charged as an equal share rounded up to the céntimo; the source pool is kept and the difference shown.
+function commonWaterRoundingText(component: { state: "available" | "blocked"; sourcePool?: string | null; roundingVariance?: string | null; allocationBasis?: string }) {
+  if (component.state !== "available" || component.sourcePool == null || component.roundingVariance == null) return null;
+  const label = component.allocationBasis === "persisted" ? "Approved rounding variance" : "Rounding variance";
+  return `Source pool ${amountText(component.sourcePool)} · ${label} ${signedAmountText(component.roundingVariance)}`;
+}
+
 function componentText(component: { state: "available" | "blocked"; amount: string | null; count?: number | null }) {
   if (component.state === "blocked") return "Blocked";
   return `${amountText(component.amount)}${component.count == null ? "" : ` · ${component.count} ${component.count === 1 ? "charge" : "charges"}`}`;
@@ -161,12 +175,18 @@ export function CarlosApprovalWorkspace({ projection, initialDetail, attentionPa
           <div className="space-y-5">
             {approvalError ? <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{approvalError}</p> : null}
             <div className="space-y-3 text-sm">
-              {Object.entries(selectedDetail.components).map(([key, component]) => (
-                <div key={key} className="flex items-center justify-between gap-6">
-                  <span className="text-zinc-600">{componentLabels[key] ?? key}</span>
-                  <span className="font-medium text-zinc-950">{componentText(component)}</span>
-                </div>
-              ))}
+              {Object.entries(selectedDetail.components).map(([key, component]) => {
+                const roundingText = key === "common_water" ? commonWaterRoundingText(component) : null;
+                return (
+                  <div key={key} className="space-y-1">
+                    <div className="flex items-center justify-between gap-6">
+                      <span className="text-zinc-600">{componentLabels[key] ?? key}</span>
+                      <span className="font-medium text-zinc-950">{componentText(component)}</span>
+                    </div>
+                    {roundingText ? <p className="text-right text-xs text-zinc-500">{roundingText}</p> : null}
+                  </div>
+                );
+              })}
             </div>
             <div className="flex items-center justify-between gap-6 border-t border-zinc-200 pt-4 text-base">
               <span className="font-semibold text-zinc-950">Total</span>

@@ -320,6 +320,34 @@ For example:
 The Monthly Obligation is the composition layer that aligns those facts into one month-level result.
 Source month and obligation month must remain distinct, especially when the dashboard is previewing the next obligation cycle at month close.
 
+### Common Water rounding variance (WATER-012)
+
+Common Water is composed from Water facts without changing their allocation
+rule. The obligation summary keeps three Common Water facts distinct:
+
+- the source Common Water pool (Sedapal invoice - Metered Water), which is
+  never rewritten;
+- the owner allocation, which is the Common Water component amount: the same
+  equal share, rounded up to the next céntimo when it has a fractional
+  céntimo, charged to every eligible condo unit;
+- the rounding variance (owner allocation - source pool), which under the
+  current policy is always zero or positive and below one céntimo per eligible
+  unit, so rounding never under-recovers the pool.
+
+No remainder céntimos are assigned to selected owners. The package total uses
+the owner allocation. October 2026: pool PEN 51.04, allocation PEN 51.20
+(64 x 0.80), variance +PEN 0.16.
+
+Approved packages are never recalculated with a later policy. A package with
+persisted obligation rows reports Common Water as it was actually charged: the
+source pool from its frozen Sedapal bill and persisted Metered Water, and the
+allocation from its persisted Common Water rows. The September 2026 package was
+approved under earlier nearest-céntimo rounding and keeps PEN 1.67 per condo,
+PEN 106.88 against a PEN 106.93 pool: a historical variance of -PEN 0.05, which
+the current policy would not produce (it would charge 64 x 1.68 = PEN 107.52,
++PEN 0.59). Monthly variances stay explainable from frozen facts, so they can
+be tallied later without a separate ledger.
+
 ## 7. Source-Domain Boundaries
 
 The Obligations domain composes upstream facts and must not duplicate or reimplement upstream formulas.

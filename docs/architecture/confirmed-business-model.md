@@ -191,6 +191,7 @@ Water calculations include the canonical common-water rule:
 - total metered water charges are subtracted from the Sedapal invoice amount
 - the remaining common water cost is divided equally among the 64 residential condominiums
 - every residential condominium receives the same AGUA COMUN amount for that billing cycle
+- each condominium's equal share is rounded up to the next céntimo when it has a fractional céntimo, so the owner total is never below the remaining Sedapal cost; the small difference is reported as the Common Water rounding variance rather than redistributed (WATER-012)
 
 Future edits to budgets, ownership percentages or rates must never silently rewrite previous months.
 

@@ -4,13 +4,26 @@ export type MonthlyObligationSummaryComponent = {
   reason?: string;
 };
 
+/**
+ * Common Water amount is what owners are collectively charged (equal share,
+ * rounded up to the céntimo, × eligible units). The source pool is never
+ * rewritten; the difference is the rounding variance (amount - sourcePool),
+ * zero or positive under the current policy. An approved package reports what
+ * it actually persisted ("persisted"), which may predate the current policy.
+ */
+export type CommonWaterSummaryComponent = MonthlyObligationSummaryComponent & {
+  sourcePool?: string | null;
+  roundingVariance?: string | null;
+  allocationBasis?: "calculated" | "persisted";
+};
+
 export type MonthlyObligationSummary = {
   obligationMonth: string;
   eligibleUnitCount: number;
   components: {
     fixed_assessment: MonthlyObligationSummaryComponent;
     metered_water: MonthlyObligationSummaryComponent;
-    common_water: MonthlyObligationSummaryComponent;
+    common_water: CommonWaterSummaryComponent;
     gas: MonthlyObligationSummaryComponent;
     other_charge: MonthlyObligationSummaryComponent & { count: number | null };
     owner_direct_charge: MonthlyObligationSummaryComponent & { count: number | null };
@@ -23,7 +36,7 @@ export function buildMonthlyObligationSummary(input: {
   eligibleUnitCount: number;
   fixedAssessment: MonthlyObligationSummaryComponent;
   meteredWater: MonthlyObligationSummaryComponent;
-  commonWater: MonthlyObligationSummaryComponent;
+  commonWater: CommonWaterSummaryComponent;
   gas: MonthlyObligationSummaryComponent;
   otherChargeAmount: string;
   otherChargeCount: number;

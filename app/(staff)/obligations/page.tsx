@@ -47,6 +47,15 @@ function formatMoney(value: string | number | null) {
   }).format(numeric);
 }
 
+// Common Water is charged as an equal share rounded up to the céntimo; the source pool is kept and the difference shown.
+function formatCommonWaterRounding(component: { state: string; sourcePool?: string | null; roundingVariance?: string | null; allocationBasis?: string } | undefined) {
+  if (!component || component.state !== "available" || component.sourcePool == null || component.roundingVariance == null) return null;
+  const variance = Number(component.roundingVariance);
+  const signed = new Intl.NumberFormat("en-US", { style: "currency", currency: "PEN", minimumFractionDigits: 2, signDisplay: "exceptZero" }).format(variance);
+  const label = component.allocationBasis === "persisted" ? "Approved rounding variance" : "Rounding variance";
+  return `Source pool ${formatMoney(component.sourcePool)} · ${label} ${signed}`;
+}
+
 function formatComponentValue(status: string, amount: string | null) {
   return status === "available" ? formatMoney(amount) : status === "not_applicable" ? "—" : status;
 }
@@ -310,6 +319,9 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                       <span>Common water</span>
                       <span>{formatComponentValue(monthlySummary?.data?.components.common_water.state ?? "available", monthlySummary?.data?.components.common_water.amount ?? null)}</span>
                     </div>
+                    {formatCommonWaterRounding(monthlySummary?.data?.components.common_water) ? (
+                      <p className="text-right text-xs text-zinc-500">{formatCommonWaterRounding(monthlySummary?.data?.components.common_water)}</p>
+                    ) : null}
                     <div className="flex items-center justify-between gap-4">
                       <span>Gas</span>
                       <span>{formatComponentValue(monthlySummary?.data?.components.gas.state ?? "available", monthlySummary?.data?.components.gas.amount ?? null)}</span>

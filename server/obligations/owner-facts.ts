@@ -6,7 +6,7 @@ import type { UnitFixedMonthlyAssessmentState } from "@/server/budget-plans/type
 import { nextMonthKey, isChargeEligibleForMonth } from "@/server/charges/month";
 import type { ChargeRecord } from "@/server/charges/types";
 import { type GasCalculationInput } from "@/server/gas/calculation";
-import { calculateWaterChargePreviewsForUnit, type WaterChargePreviewBundle } from "@/server/water";
+import { calculateWaterChargePreviewsForUnit, persistedCommonWaterChargePreview, type WaterChargePreviewBundle } from "@/server/water";
 import { previousMonthKeyFromMonthKey } from "@/server/water/month-utils";
 import { classifyOwnershipRow } from "@/server/ownerships/classification";
 import type { OwnershipRecord } from "@/server/ownerships/types";
@@ -225,7 +225,7 @@ export function buildWaterPreviewFromFacts(
     }).length, 0),
   };
 
-  return calculateWaterChargePreviewsForUnit({
+  const preview = calculateWaterChargePreviewsForUnit({
     buildingId: "b7a8c3d4-7b4a-4d7a-8d53-5f18d0c6b810",
     supabase: {} as never,
     unit,
@@ -239,6 +239,13 @@ export function buildWaterPreviewFromFacts(
     readingsByUnit,
     bill: financialFacts.commonWaterBill,
   });
+
+  // A package with persisted rows describes what owners were actually charged;
+  // it is never recalculated with a later Common Water policy.
+  const persistedCommonWater = financialFacts.obligationSnapshot?.components.common_water;
+  return persistedCommonWater
+    ? { ...preview, commonWater: persistedCommonWaterChargePreview(preview.commonWater, persistedCommonWater) }
+    : preview;
 }
 
 export function buildGasCalculationInputFromFacts(

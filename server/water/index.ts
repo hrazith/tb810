@@ -76,8 +76,19 @@ export type CommonWaterChargePreviewState =
         expectedCount: number;
         supplierAmount: string;
         summedMeteredCharges: string;
+        /** Source Common Water pool: supplier amount minus summed metered charges. Never rewritten. */
         commonWaterPool: string;
+        /** Equal share before rounding (six decimals). */
+        exactUnitCommonWaterShare: string;
+        /** Equal share rounded to céntimos; every eligible unit is charged this amount. */
         unitCommonWaterCharge: string;
+        eligibleUnitCount: number;
+        /** Rounded share × eligible units: what owners are collectively charged. */
+        allocatedCommonWaterTotal: string;
+        /** Allocated total minus source pool. Zero or positive under the current policy. */
+        commonWaterRoundingVariance: string;
+        /** "calculated" under the current policy, or "persisted" from an approved package's rows. */
+        allocationBasis: "calculated" | "persisted";
       };
     }
   | {
@@ -250,6 +261,90 @@ export function calculateWaterAllocationCents(input: {
     unitConsumptionMilli,
     meteredCents,
     commonCents: input.amountCents - meteredCents,
+  };
+}
+
+/**
+ * Common Water equal-share allocation (WATER-012, frozen MVP policy). Every
+ * eligible unit is charged the same share, rounded UP to the next céntimo when
+ * the exact share has a fractional céntimo; no remainder céntimos are
+ * redistributed. The source pool is never rewritten, so the allocated total
+ * exceeds it by a rounding variance with 0 <= variance < eligible units (cents).
+ */
+export function calculateCommonWaterAllocationCents(input: { sourcePoolCents: bigint; eligibleUnitCount: bigint }) {
+  if (input.eligibleUnitCount <= BigInt(0) || input.sourcePoolCents < BigInt(0)) return null;
+  // Integer ceiling: ceil(pool / units) for a non-negative pool.
+  const unitShareCents = (input.sourcePoolCents + input.eligibleUnitCount - BigInt(1)) / input.eligibleUnitCount;
+  const allocatedCents = unitShareCents * input.eligibleUnitCount;
+  return {
+    sourcePoolCents: input.sourcePoolCents,
+    exactUnitShareMicros: roundToNearestInteger(input.sourcePoolCents * BigInt(10000), input.eligibleUnitCount),
+    unitShareCents,
+    allocatedCents,
+    roundingVarianceCents: allocatedCents - input.sourcePoolCents,
+  };
+}
+
+/**
+ * Explains an allocated Common Water total against its source pool, e.g. for a
+ * persisted package: source pool = supplier amount - metered total.
+ */
+export function describeCommonWaterRounding(input: {
+  supplierAmount: number | string;
+  meteredTotal: number | string;
+  allocatedTotal: number | string;
+}) {
+  const supplierCents = parseMoneyCents(input.supplierAmount);
+  const meteredCents = parseMoneyCents(input.meteredTotal);
+  const allocatedCents = parseMoneyCents(input.allocatedTotal);
+  if (supplierCents === null || meteredCents === null || allocatedCents === null) return null;
+  const sourcePoolCents = supplierCents - meteredCents;
+  return {
+    sourcePool: formatDecimal(sourcePoolCents, 2),
+    roundingVariance: formatDecimal(allocatedCents - sourcePoolCents, 2),
+  };
+}
+
+function commonWaterAllocationData(sourcePoolCents: bigint, eligibleUnitCount: number) {
+  const allocation = calculateCommonWaterAllocationCents({ sourcePoolCents, eligibleUnitCount: BigInt(eligibleUnitCount) });
+  if (!allocation) return null;
+  return {
+    commonWaterPool: formatDecimal(allocation.sourcePoolCents, 2),
+    exactUnitCommonWaterShare: formatDecimal(allocation.exactUnitShareMicros, 6),
+    unitCommonWaterCharge: formatDecimal(allocation.unitShareCents, 2),
+    eligibleUnitCount,
+    allocatedCommonWaterTotal: formatDecimal(allocation.allocatedCents, 2),
+    commonWaterRoundingVariance: formatDecimal(allocation.roundingVarianceCents, 2),
+    allocationBasis: "calculated" as const,
+  };
+}
+
+/**
+ * Common Water as actually charged by a persisted package. Approved history is
+ * never recalculated with the current policy: every owner was charged the same
+ * persisted share, so the share is the persisted total / persisted unit count.
+ */
+export function persistedCommonWaterChargePreview(
+  state: CommonWaterChargePreviewState,
+  persisted: { amount: number | string; count: number },
+): CommonWaterChargePreviewState {
+  if (state.status !== "available") return state;
+  const allocatedCents = parseMoneyCents(persisted.amount);
+  const sourcePoolCents = parseMoneyCents(state.data.commonWaterPool);
+  const count = BigInt(persisted.count);
+  if (allocatedCents === null || sourcePoolCents === null || count <= BigInt(0) || allocatedCents % count !== BigInt(0)) {
+    return { status: "unavailable", message: "Persisted Common Water is not an equal share per unit." };
+  }
+  return {
+    status: "available",
+    data: {
+      ...state.data,
+      unitCommonWaterCharge: formatDecimal(allocatedCents / count, 2),
+      eligibleUnitCount: persisted.count,
+      allocatedCommonWaterTotal: formatDecimal(allocatedCents, 2),
+      commonWaterRoundingVariance: formatDecimal(allocatedCents - sourcePoolCents, 2),
+      allocationBasis: "persisted",
+    },
   };
 }
 
@@ -814,12 +909,10 @@ async function getCommonWaterChargeForUnitPreview(
     return { status: "unavailable", message: "Common Water pool would be negative." };
   }
 
-  const commonWaterPoolCents = amountCents - summedMeteredChargeCents;
-  const unitCount = BigInt(eligibleUnitIds.length);
-  if (unitCount <= BigInt(0)) {
+  const allocation = commonWaterAllocationData(amountCents - summedMeteredChargeCents, eligibleUnitIds.length);
+  if (!allocation) {
     return { status: "unavailable", message: "No eligible residential units are available." };
   }
-  const unitCommonWaterChargeCents = roundToNearestInteger(commonWaterPoolCents, unitCount);
 
   return {
     status: "available",
@@ -830,8 +923,7 @@ async function getCommonWaterChargeForUnitPreview(
       expectedCount: completenessResult.data.totalExpectedCount,
       supplierAmount: formatDecimal(amountCents, 2),
       summedMeteredCharges: formatDecimal(summedMeteredChargeCents, 2),
-      commonWaterPool: formatDecimal(commonWaterPoolCents, 2),
-      unitCommonWaterCharge: formatDecimal(unitCommonWaterChargeCents, 2),
+      ...allocation,
     },
   };
 }
@@ -1625,12 +1717,10 @@ export async function getCommonWaterChargePreviewForUnit(
     return { status: "unavailable", message: "Common Water pool would be negative." };
   }
 
-  const commonWaterPoolCents = amountCents - summedMeteredChargeCents;
-  const unitCount = BigInt(eligibleUnitIds.length);
-  if (unitCount <= BigInt(0)) {
+  const allocation = commonWaterAllocationData(amountCents - summedMeteredChargeCents, eligibleUnitIds.length);
+  if (!allocation) {
     return { status: "unavailable", message: "No eligible residential units are available." };
   }
-  const unitCommonWaterChargeCents = roundToNearestInteger(commonWaterPoolCents, unitCount);
 
   return {
     status: "available",
@@ -1641,8 +1731,7 @@ export async function getCommonWaterChargePreviewForUnit(
       expectedCount: context.completeness.totalExpectedCount,
       supplierAmount: formatDecimal(amountCents, 2),
       summedMeteredCharges: formatDecimal(summedMeteredChargeCents, 2),
-      commonWaterPool: formatDecimal(commonWaterPoolCents, 2),
-      unitCommonWaterCharge: formatDecimal(unitCommonWaterChargeCents, 2),
+      ...allocation,
     },
   };
 }
@@ -1800,12 +1889,10 @@ export function calculateWaterChargePreviewsForUnit(
       return { status: "unavailable", message: "Common Water pool would be negative." };
     }
 
-    const commonWaterPoolCents = allocation.commonCents;
-    const unitCount = BigInt(eligibleUnitIds.length);
-    if (unitCount <= BigInt(0)) {
+    const commonWaterAllocation = commonWaterAllocationData(allocation.commonCents, eligibleUnitIds.length);
+    if (!commonWaterAllocation) {
       return { status: "unavailable", message: "No eligible residential units are available." };
     }
-    const unitCommonWaterChargeCents = roundToNearestInteger(commonWaterPoolCents, unitCount);
 
     return {
       status: "available",
@@ -1816,8 +1903,7 @@ export function calculateWaterChargePreviewsForUnit(
         expectedCount: context.completeness.totalExpectedCount,
         supplierAmount: formatDecimal(amountCents, 2),
         summedMeteredCharges: formatDecimal(allocation.meteredCents, 2),
-        commonWaterPool: formatDecimal(commonWaterPoolCents, 2),
-        unitCommonWaterCharge: formatDecimal(unitCommonWaterChargeCents, 2),
+        ...commonWaterAllocation,
       },
     };
   })();
@@ -1991,8 +2077,11 @@ export async function getMonthlyWaterObligationSummary({
     };
   }
 
-  const unitCount = BigInt(eligibleUnits.length);
-  if (unitCount <= BigInt(0)) {
+  const commonWaterAllocation = calculateCommonWaterAllocationCents({
+    sourcePoolCents: commonWaterPoolCents,
+    eligibleUnitCount: BigInt(eligibleUnits.length),
+  });
+  if (!commonWaterAllocation) {
     const reason = "No eligible residential units are available.";
     return {
       metered_water: { state: "blocked", amount: null, reason },
@@ -2003,9 +2092,10 @@ export async function getMonthlyWaterObligationSummary({
 
   return {
     metered_water: { state: "available", amount: formatDecimal(meteredTotalCents, 2) },
+    // Building-level component: the total allocated to owners, like the package summary.
     common_water: {
       state: "available",
-      amount: formatDecimal(roundToNearestInteger(commonWaterPoolCents, unitCount), 2),
+      amount: formatDecimal(commonWaterAllocation.allocatedCents, 2),
     },
     eligibleUnitCount: eligibleUnits.length,
   };

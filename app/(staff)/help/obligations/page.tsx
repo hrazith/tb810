@@ -16,7 +16,7 @@ const components = [
   {
     title: "Common Water",
     source: "The Sedapal/Common Water bill and the total of the applicable unit Water readings.",
-    formula: "Supplier bill amount allocated by unit consumption; the unallocated remainder is Common Water.",
+    formula: "Sedapal bill - Metered Water = Common Water amount, shared equally by every condo unit and rounded up to the céntimo.",
     month: "The bill and readings belong to the source month immediately before the obligation month.",
     missing: "Without one valid bill and a complete valid reading set, Common Water cannot be calculated.",
   },
@@ -136,6 +136,33 @@ export default function ObligationsHelpPage() {
             </section>
           ))}
         </div>
+      </section>
+
+      <section className="space-y-5" aria-labelledby="common-water-rounding">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Common Water</p>
+          <h2 id="common-water-rounding" className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950">Why Common Water can differ by a few céntimos</h2>
+        </div>
+        <p className="max-w-3xl text-lg leading-8 text-zinc-700">
+          After Metered Water is charged, the rest of the Sedapal bill is the Common Water amount. It is shared equally among the condo units. When a unit&apos;s share comes out to a fraction of a céntimo, it is rounded up to the next céntimo. Because every unit pays exactly the same rounded share, the total charged to owners can be a few céntimos above the Common Water amount, but never below it.
+        </p>
+        <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white">
+          <div className="border-b border-zinc-200 bg-zinc-50 px-5 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">October 2026 example</div>
+          {[
+            ["Sedapal bill", "PEN 2,760.50"],
+            ["Metered Water charged to units", "PEN 2,709.46"],
+            ["Common Water amount", "PEN 51.04"],
+            ["Equal share: PEN 51.04 / 64 units = PEN 0.7975, rounded up", "PEN 0.80 per unit"],
+            ["Charged to owners: 64 x PEN 0.80", "PEN 51.20"],
+            ["Rounding variance", "+PEN 0.16"],
+          ].map(([label, value]) => <div key={label} className="grid grid-cols-[1fr_auto] gap-6 border-b border-zinc-100 px-5 py-4 text-sm last:border-0"><span className="text-zinc-700">{label}</span><span className="font-medium text-zinc-950">{value}</span></div>)}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5"><p className="font-semibold text-zinc-950">Owners are treated equally</p><p className="mt-2 text-sm leading-6 text-zinc-600">No owner is charged an extra or missing céntimo to make the total match.</p></div>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5"><p className="font-semibold text-zinc-950">The Common Water amount is kept</p><p className="mt-2 text-sm leading-6 text-zinc-600">TB810 does not change the Common Water amount to hide the difference. It shows the difference separately as the rounding variance.</p></div>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5"><p className="font-semibold text-zinc-950">Never short</p><p className="mt-2 text-sm leading-6 text-zinc-600">Rounding up means owners always cover the full Common Water amount. The extra is less than one céntimo per unit.</p></div>
+        </div>
+        <p className="text-sm leading-6 text-zinc-500">This is the current TB810 policy; it can be changed later. Each month&apos;s variance stays explainable after approval, so the variances can be totalled over time. Approved months keep the amounts they were approved with: September 2026 was approved under the earlier rounding (PEN 1.67 per unit, PEN 0.05 below its Common Water amount) and does not change.</p>
       </section>
 
       <section className="space-y-5" aria-labelledby="month-relationship">
