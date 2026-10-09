@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { assertDevelopmentOnly } from "@/server/dev-only";
 
 import {
   createOwnerDirectCharge,
@@ -213,6 +214,7 @@ export async function stopFutureChargeAction(formData: FormData): Promise<void> 
 }
 
 export async function addUnitChargeAction(formData: FormData): Promise<void> {
+  assertDevelopmentOnly();
   const returnTo = pickString(formData, "return_to") || "/";
   const targetMonth = pickString(formData, "target_month") || undefined;
   const result = await addUnitChargeForCurrentBusinessMonth(targetMonth);

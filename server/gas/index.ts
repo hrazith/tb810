@@ -625,10 +625,8 @@ export async function clearCurrentGasMonth(monthKey: string) {
   }
 
   const supabase = await createClient();
-  const sessionId = await getActiveDevTestSessionId();
   const { data, error } = await supabase.rpc("tb810_clear_current_gas_reading_month", {
     p_month_key: monthKey,
-    p_dev_session_id: sessionId,
   });
   if (error) return { data: null as never, error: error.message };
   return { data: { deletedCount: Number(data ?? 0) }, error: null };

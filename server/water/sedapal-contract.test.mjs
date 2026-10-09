@@ -26,7 +26,17 @@ function indexOf(body, pattern, label) {
 test("only the shared source-freeze extraction follows the Sedapal contract", () => {
   const migrations = fs.readdirSync("supabase/migrations").filter((name) => name.endsWith(".sql")).sort();
   const later = migrations.slice(migrations.indexOf("20261006120000_sedapal_source_freeze_contract.sql") + 1);
-  assert.deepEqual(later, ["20261007120000_unit_water_start_over_source_freeze.sql"]);
+  assert.deepEqual(later, [
+    "20261007120000_unit_water_start_over_source_freeze.sql",
+    "20261008140000_production_dev_isolation.sql",
+  ]);
+
+  // DEV isolation only wraps production signatures; it does not redefine a
+  // Sedapal source-freeze function.
+  const devIsolation = fs.readFileSync(`supabase/migrations/${later[1]}`, "utf8");
+  for (const sedapalFunction of ["tb810_assert_sedapal_provenance", "tb810_lock_common_water_source_periods", "tb810_lock_source_month_open", "tb810_approve_monthly_obligation"]) {
+    assert.doesNotMatch(devIsolation, new RegExp(`create (?:or replace )?function public\\.${sedapalFunction}\\(`));
+  }
 
   // That migration may re-point the Sedapal source lock at the shared helper,
   // and must not redefine any other Sedapal contract function.

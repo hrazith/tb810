@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { assertDevelopmentOnly } from "@/server/dev-only";
 
 import { addCommonWaterBillForCurrentBusinessMonth } from "./dev-bill";
 import { completeMissingWaterReadingsForCurrentBusinessMonth } from "./dev-completion";
@@ -17,6 +18,7 @@ function returnToValue(formData: FormData) {
 }
 
 export async function completeWaterReadingsAction(formData: FormData): Promise<void> {
+  assertDevelopmentOnly();
   const returnTo = returnToValue(formData);
   const sourceReadingMonth = String(formData.get("source_reading_month") ?? "").trim();
   const result = await completeMissingWaterReadingsForCurrentBusinessMonth(sourceReadingMonth);
@@ -28,6 +30,7 @@ export async function completeWaterReadingsAction(formData: FormData): Promise<v
 }
 
 export async function addCommonWaterBillAction(formData: FormData): Promise<void> {
+  assertDevelopmentOnly();
   const returnTo = returnToValue(formData);
   const obligationMonth = String(formData.get("obligation_month") ?? "").trim();
   const sourceBillingMonth = String(formData.get("source_billing_month") ?? "").trim();

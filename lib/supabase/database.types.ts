@@ -2308,11 +2308,11 @@ export type Database = {
         Returns: { reading_month: string | null }[]
       }
       tb810_clear_current_unit_water_month: {
-        Args: { p_dev_session_id?: string | null; p_month_key: string }
+        Args: { p_month_key: string }
         Returns: number
       }
       tb810_clear_current_gas_reading_month: {
-        Args: { p_dev_session_id?: string | null; p_month_key: string }
+        Args: { p_month_key: string }
         Returns: number
       }
       tb810_reset_dev_test_session: {

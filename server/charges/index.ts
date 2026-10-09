@@ -483,7 +483,6 @@ export async function createBulkCharge(input: {
   }, allowReadyForReviewCorrection);
   if (validated.error) return { data: null as never, error: validated.error };
 
-  const sessionId = await getActiveDevTestSessionId();
   const supabase = await createClient();
   const { data, error } = await (supabase as unknown as {
     rpc: (name: "tb810_create_bulk_charge", args: Record<string, unknown>) => Promise<{
@@ -497,7 +496,6 @@ export async function createBulkCharge(input: {
     p_schedule: input.schedule,
     p_starts_month: input.starts_month,
     p_ends_month: input.ends_month ?? null,
-    p_dev_session_id: sessionId,
   });
   if (error) return { data: null as never, error: error.message };
   const result = data?.[0];

@@ -9,6 +9,7 @@ import { resetCurrentMonthlyObligationApprovalForDev } from "@/server/obligation
 import { runMonthlyObligationPulse } from "@/server/obligations/pulse";
 import type { HandoffPersistence } from "@/server/obligations/snapshot";
 import { SEDAPAL_SOURCE_PDF_BUCKET } from "@/server/water";
+import { assertDevelopmentOnly } from "@/server/dev-only";
 
 import { getActiveDevTestSessionSummary, getDevTestSessionCookieName, startDevTestSession } from "../dev-test-session";
 
@@ -17,6 +18,7 @@ function returnToValue(formData: FormData) {
 }
 
 export async function startDevTestSessionAction(formData: FormData) {
+  assertDevelopmentOnly();
   const returnTo = returnToValue(formData);
   const result = await startDevTestSession();
   if (result.error) {
@@ -27,6 +29,7 @@ export async function startDevTestSessionAction(formData: FormData) {
 }
 
 export async function resetDevTestSessionAction(formData: FormData) {
+  assertDevelopmentOnly();
   const returnTo = returnToValue(formData);
   const sessionId = String(formData.get("session_id") ?? "").trim();
   const supabase = await createClient();
@@ -99,6 +102,7 @@ export async function resetDevTestSessionAction(formData: FormData) {
 }
 
 export async function resetDevMonthlyObligationApprovalAction(formData: FormData) {
+  assertDevelopmentOnly();
   const returnTo = returnToValue(formData);
   const result = await resetCurrentMonthlyObligationApprovalForDev();
   if (result.error) {
@@ -110,10 +114,8 @@ export async function resetDevMonthlyObligationApprovalAction(formData: FormData
 }
 
 export async function runMonthlyObligationPulseAction(formData: FormData) {
+  assertDevelopmentOnly();
   const returnTo = returnToValue(formData);
-  if (process.env.NODE_ENV !== "development") {
-    redirect(`${returnTo}?error=${encodeURIComponent("DEV obligation pulse is development-only.")}`);
-  }
   const session = await getActiveDevTestSessionSummary();
   if (!session) redirect(`${returnTo}?error=${encodeURIComponent("Start a DEV test session first.")}`);
 

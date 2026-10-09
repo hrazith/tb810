@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { assertDevelopmentOnly } from "@/server/dev-only";
 
 import {
   completeMissingGasReadingsForCurrentBusinessMonth,
@@ -228,6 +229,7 @@ export async function importGasWorkbookAction(_prev: GasFormState, formData: For
 }
 
 export async function completeGasReadingsAction(formData: FormData): Promise<void> {
+  assertDevelopmentOnly();
   const returnTo = String(formData.get("return_to") ?? "/").trim() || "/";
   const sourceReadingMonth = String(formData.get("source_reading_month") ?? "").trim();
   const result = await completeMissingGasReadingsForCurrentBusinessMonth(sourceReadingMonth);
@@ -239,6 +241,7 @@ export async function completeGasReadingsAction(formData: FormData): Promise<voi
 }
 
 export async function addGasSupplierBillAction(formData: FormData): Promise<void> {
+  assertDevelopmentOnly();
   const returnTo = String(formData.get("return_to") ?? "/").trim() || "/";
   const obligationMonth = String(formData.get("obligation_month") ?? "").trim();
   const result = await addGasSupplierBillForCurrentBusinessMonth(obligationMonth);

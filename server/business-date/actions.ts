@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { assertDevelopmentOnly } from "@/server/dev-only";
 
 import { getBusinessDateCookieName } from "../business-date";
 
@@ -16,14 +17,11 @@ function returnToValue(formData: FormData) {
 }
 
 export async function setDevBusinessDateAction(formData: FormData) {
+  assertDevelopmentOnly();
   const returnTo = returnToValue(formData);
   const rawDate = String(formData.get("business_date") ?? "").trim();
   const parsed = businessDateSchema.safeParse(rawDate);
   const cookieStore = await cookies();
-
-  if (process.env.NODE_ENV !== "development") {
-    redirect(returnTo);
-  }
 
   if (!parsed.success) {
     cookieStore.set(getBusinessDateCookieName(), "", {
@@ -43,6 +41,7 @@ export async function setDevBusinessDateAction(formData: FormData) {
 }
 
 export async function clearDevBusinessDateAction(formData: FormData) {
+  assertDevelopmentOnly();
   const returnTo = returnToValue(formData);
   const cookieStore = await cookies();
   cookieStore.set(getBusinessDateCookieName(), "", {
