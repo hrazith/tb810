@@ -71,6 +71,10 @@ not missing data or an unexplained parity failure.
 the legacy convention of rounding the building unit price before per-unit
 allocation. No decision or code change is made by this record.
 
+**Resolved October 9, 2026:** TB810 keeps the precise rate from November 2026
+onward; the legacy rounded rate is not adopted. See the AGUA rule in
+[`tb810-water-domain.md`](../tb810-water-domain.md).
+
 No residual-cent redistribution is used.
 
 ## Others

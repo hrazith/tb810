@@ -276,6 +276,14 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
         },
       ]
     : [];
+  const ownerUnitChargeLines = selectedOwnerObligation?.data
+    ? selectedOwnerObligation.data.obligation.units.flatMap((unit) =>
+        (unit.components.find((item) => item.key === "other_charge")?.lineItems ?? []).map((item) => ({
+          unitNumber: unit.unitNumber,
+          ...item,
+        })),
+      )
+    : [];
 
   return (
     <ObligationsNavigationShell
@@ -385,7 +393,8 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                 <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500"> Obligations {monthLabel(monthKey)} </h3>
                 {ownerComponentRows.map((component) => {
                   const value = component.state === "available" ? formatMoney(component.amount) : formatStatusLabel(component.state);
-                  if (component.key !== "fixed_assessment") {
+                  const showsUnitChargeLines = component.key === "other_charge" && ownerUnitChargeLines.length > 0;
+                  if (component.key !== "fixed_assessment" && !showsUnitChargeLines) {
                     return (
                       <div key={component.key} className="flex items-baseline justify-between gap-4 py-3 text-base text-zinc-600">
                         <span className="min-w-0 break-words">{componentLabel(component.key)}</span>
@@ -405,7 +414,17 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                         </span>
                       </summary>
                       <div className="space-y-1 pl-6 pb-2">
-                        {selectedOwnerObligation.data!.obligation.units.map((unit) => {
+                        {showsUnitChargeLines ? ownerUnitChargeLines.map((line) => (
+                          <div key={line.chargeId} className="flex items-baseline justify-between gap-4 py-2 text-sm text-zinc-600">
+                            <span className="min-w-0 break-words">
+                              <Link href={`/units/${line.unitNumber}`} className="font-medium text-zinc-950 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950">
+                                {line.unitNumber}
+                              </Link>
+                              {" · "}{line.description}
+                            </span>
+                            <span className="min-w-0 wrap-anywhere text-right">{formatMoney(line.amount)}</span>
+                          </div>
+                        )) : selectedOwnerObligation.data!.obligation.units.map((unit) => {
                           const unitFixedAssessment = unit.components.find((item) => item.key === "fixed_assessment");
                           const unitValue = unitFixedAssessment?.status === "available"
                             ? formatMoney(unitFixedAssessment.amount)
@@ -423,14 +442,35 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                     </details>
                   );
                 })}
-                <div className="flex items-baseline justify-between gap-4 py-3 text-base text-zinc-600">
-                  <span className="min-w-0 break-words">Owner-direct charges</span>
-                  <span className="min-w-0 wrap-anywhere text-right font-medium">
-                    {selectedOwnerObligation.data.ownerDirectCharges.state === "available"
-                      ? formatMoney(selectedOwnerObligation.data.ownerDirectCharges.amount)
-                      : formatStatusLabel(selectedOwnerObligation.data.ownerDirectCharges.state)}
-                  </span>
-                </div>
+                {selectedOwnerObligation.data.ownerDirectCharges.state === "available" && selectedOwnerObligation.data.ownerDirectCharges.lineItems.length > 0 ? (
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-3 text-left text-base text-zinc-600">
+                      <span className="min-w-0 break-words">Owner-direct charges</span>
+                      <span className="flex min-w-0 items-center gap-2 text-right font-medium">
+                        <span className="wrap-anywhere">{formatMoney(selectedOwnerObligation.data.ownerDirectCharges.amount)}</span>
+                        <CaretRight className="shrink-0 group-open:hidden" size={16} aria-hidden="true" />
+                        <CaretDown className="hidden shrink-0 group-open:block" size={16} aria-hidden="true" />
+                      </span>
+                    </summary>
+                    <div className="space-y-1 pl-6 pb-2">
+                      {selectedOwnerObligation.data.ownerDirectCharges.lineItems.map((item) => (
+                        <div key={item.chargeId} className="flex items-baseline justify-between gap-4 py-2 text-sm text-zinc-600">
+                          <span className="min-w-0 break-words">{item.description}</span>
+                          <span className="min-w-0 wrap-anywhere text-right">{formatMoney(item.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : (
+                  <div className="flex items-baseline justify-between gap-4 py-3 text-base text-zinc-600">
+                    <span className="min-w-0 break-words">Owner-direct charges</span>
+                    <span className="min-w-0 wrap-anywhere text-right font-medium">
+                      {selectedOwnerObligation.data.ownerDirectCharges.state === "available"
+                        ? formatMoney(selectedOwnerObligation.data.ownerDirectCharges.amount)
+                        : formatStatusLabel(selectedOwnerObligation.data.ownerDirectCharges.state)}
+                    </span>
+                  </div>
+                )}
                 <div className="mt-2 flex items-baseline justify-between gap-4 border-t border-zinc-200 pt-4 font-semibold text-zinc-950">
                   <span>Total</span>
                   <span className="min-w-0 wrap-anywhere text-right">
@@ -469,7 +509,26 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
               <div>
                 <div className="mb-8 text-4xl font-semibold tracking-tight text-zinc-950">{monthLabel(monthKey)}</div>
                 <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Obligations</h3>
-                {selectedUnitPanel.obligation.components.map((component) => (
+                {selectedUnitPanel.obligation.components.map((component) => component.key === "other_charge" && component.lineItems?.length ? (
+                  <details key={component.key} className="group">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-3 text-left text-base text-zinc-600">
+                      <span className="min-w-0 break-words">{component.label}</span>
+                      <span className="flex min-w-0 items-center gap-2 text-right font-medium">
+                        <span className="wrap-anywhere">{component.status === "available" ? formatMoney(component.amount) : formatStatusLabel(component.status)}</span>
+                        <CaretRight className="shrink-0 group-open:hidden" size={16} aria-hidden="true" />
+                        <CaretDown className="hidden shrink-0 group-open:block" size={16} aria-hidden="true" />
+                      </span>
+                    </summary>
+                    <div className="space-y-1 pl-6 pb-2">
+                      {component.lineItems.map((item) => (
+                        <div key={item.chargeId} className="flex items-baseline justify-between gap-4 py-2 text-sm text-zinc-600">
+                          <span className="min-w-0 break-words">{item.description}</span>
+                          <span className="min-w-0 wrap-anywhere text-right">{formatMoney(item.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : (
                   <div key={component.key} className="flex items-baseline justify-between gap-4 py-3 text-base text-zinc-600">
                     <span className="min-w-0 break-words">{component.label}</span>
                     <span className="min-w-0 wrap-anywhere text-right font-medium">

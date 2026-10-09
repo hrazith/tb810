@@ -1,8 +1,15 @@
+import { redirect } from "next/navigation";
+
 import { UnitForm } from "../_components/unit-form";
 import { createUnitAction } from "../actions";
 import { getUnitFormDefaults } from "@/server/units";
+import { canManageUnits } from "@/server/units/authorization";
 
 export default async function NewUnitPage() {
+  // Only units.manage may create Units.
+  if (!(await canManageUnits())) {
+    redirect("/units");
+  }
   const defaults = await getUnitFormDefaults();
 
   if (defaults.error) {

@@ -9,7 +9,7 @@ type QueryResult<T> = {
 };
 
 export type GasSupplierBillHistoryRow = {
-  supplier_name: string;
+  supplier_name: string | null;
   invoice_date: string;
   amount: number | string;
   created_at: string;
@@ -140,6 +140,15 @@ export async function addGasSupplierBillForCurrentBusinessMonth(
   if (journalResult.error) {
     await supabase.from("tb810_gas_bills").delete().eq("id", data.id);
     return { data: null as never, error: journalResult.error };
+  }
+
+  // Package membership is explicit: the DEV bill joins this package's pool.
+  const { error: selectionError } = await supabase.rpc("tb810_set_gas_bill_selection", {
+    p_bill_id: data.id,
+    p_obligation_month: `${obligationMonth}-01`,
+  });
+  if (selectionError) {
+    return { data: null as never, error: selectionError.message };
   }
 
   return { data: { insertedCount: 1, billId: data.id }, error: null };

@@ -22,8 +22,8 @@ const facts = {
     current_reading: 12846,
     total_consumption: 700,
   },
-  gasBills: [{ id: "gas-bill-1", processed_at: null }],
-  gasReadings: [{ id: "gas-reading-1" }],
+  gasBills: [{ id: "gas-bill-1", processed_at: null, amount: 460 }],
+  gasReadings: [{ id: "gas-reading-1", unit_id: "unit-1", reading_month: "2026-08-01", consumption: 12.5 }],
 };
 
 const completeComposition = {
@@ -186,6 +186,50 @@ test("Sedapal-dependent rows persist the exact bill values used for calculation"
   for (const type of ["fixed_assessment", "gas_consumption", "other_charge"]) {
     assert.equal(byType[type].sedapalBill, undefined, `${type} must not claim Sedapal provenance`);
   }
+});
+
+test("Gas rows declare the readings, consumption and supplier pool used for calculation", () => {
+  const result = buildSnapshotPayload(
+    completeComposition,
+    {
+      ...facts,
+      gasBills: [
+        { id: "gas-bill-b", processed_at: null, amount: "460.00" },
+        { id: "gas-bill-a", processed_at: null, amount: 459.99 },
+      ],
+    },
+    accounts,
+    "budget-plan-1",
+    new Map([["unit-1", "water-reading-1"]]),
+  );
+
+  assert.equal(result.error, null);
+  const gas = result.data.rows.find((row) => row.obligation_type === "gas_consumption");
+  assert.deepEqual(gas.calculation_snapshot.gasProvenance, {
+    sourceMonth: "2026-08",
+    readingId: "gas-reading-1",
+    unitConsumption: "12.5",
+    billIds: ["gas-bill-a", "gas-bill-b"],
+    poolTotal: "919.99",
+  });
+  for (const type of ["fixed_assessment", "water_consumption", "common_water", "other_charge"]) {
+    const row = result.data.rows.find((candidate) => candidate.obligation_type === type);
+    assert.equal(row.calculation_snapshot.gasProvenance, undefined, `${type} must not claim Gas provenance`);
+  }
+});
+
+test("an empty supplier pool still declares Gas provenance", () => {
+  const result = buildSnapshotPayload(completeComposition, { ...facts, gasBills: [] }, accounts, "budget-plan-1", new Map([["unit-1", "water-reading-1"]]));
+  assert.equal(result.error, null);
+  const gas = result.data.rows.find((row) => row.obligation_type === "gas_consumption");
+  assert.deepEqual(gas.calculation_snapshot.gasProvenance.billIds, []);
+  assert.equal(gas.calculation_snapshot.gasProvenance.poolTotal, "0.00");
+});
+
+test("a Gas row without its source reading refuses materialization", () => {
+  const result = buildSnapshotPayload(completeComposition, { ...facts, gasReadings: [] }, accounts, "budget-plan-1", new Map([["unit-1", "water-reading-1"]]));
+  assert.equal(result.data, null);
+  assert.equal(result.error, "Missing Gas provenance for 101.");
 });
 
 test("Sedapal provenance preserves string values from the facts read", () => {

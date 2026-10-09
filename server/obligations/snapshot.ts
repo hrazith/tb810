@@ -133,6 +133,42 @@ export function sedapalProvenanceFromBill(bill: unknown): SedapalBillProvenance 
   return Object.values(provenance).every((value) => value !== null) ? provenance as SedapalBillProvenance : null;
 }
 
+export type GasProvenance = {
+  sourceMonth: string;
+  readingId: string;
+  unitConsumption: string;
+  billIds: string[];
+  poolTotal: string;
+};
+
+// The supplier pool the Gas calculation used: reserved purchase IDs and their
+// total. Approval persistence compares both with the database.
+export function gasPoolProvenanceFromBills(bills: BuildingMonthFinancialFacts["gasBills"]) {
+  const billIds = bills.map((bill) => bill.id).sort();
+  const cents = bills.reduce((total, bill) => total + Math.round(Number(bill.amount) * 100), 0);
+  return { billIds, poolTotal: (cents / 100).toFixed(2) };
+}
+
+// Per-unit Gas inputs: the source-month reading and its consumption.
+export function gasProvenanceForUnit(
+  sourceMonth: string,
+  reading: unknown,
+  pool: { billIds: string[]; poolTotal: string },
+): GasProvenance | null {
+  if (!reading) return null;
+  const record = asRecord(reading);
+  const consumption = record.consumption;
+  if (typeof record.id !== "string") return null;
+  if (typeof consumption !== "number" && typeof consumption !== "string") return null;
+  return {
+    sourceMonth,
+    readingId: record.id,
+    unitConsumption: String(consumption),
+    billIds: pool.billIds,
+    poolTotal: pool.poolTotal,
+  };
+}
+
 function buildSnapshotPayload(
   composed: MonthlyObligationResult,
   facts: BuildingMonthFinancialFacts,
@@ -144,12 +180,15 @@ function buildSnapshotPayload(
     return { data: null, error: composed.blockers.join(" ") || "Monthly obligation package is incomplete.", failureKind: "not_ready" };
   }
 
-  const gasBillIds = facts.gasBills.filter((bill) => !bill.processed_at).map((bill) => bill.id);
+  const gasPoolBills = facts.gasBills.filter((bill) => !bill.processed_at);
+  const gasBillIds = gasPoolBills.map((bill) => bill.id);
   const gasReadingIdByUnitId = new Map(
     facts.gasReadings
       .map((reading) => [reading.unit_id, asRecord(reading).id] as const)
       .filter((entry): entry is [string, string] => typeof entry[1] === "string"),
   );
+  const gasReadingByUnitId = new Map(facts.gasReadings.map((reading) => [reading.unit_id, reading]));
+  const gasPoolProvenance = gasPoolProvenanceFromBills(gasPoolBills);
   const commonWaterBillId = sourceIdFromBill(facts.commonWaterBill);
   const sedapalBill = sedapalProvenanceFromBill(facts.commonWaterBill);
   const rows: SnapshotRow[] = [];
@@ -204,6 +243,14 @@ function buildSnapshotPayload(
       }
 
       const sourceMonth = component.sourceMonth ?? facts.sourceReadingMonth;
+      let gasProvenance: GasProvenance | null = null;
+      if (component.key === "gas") {
+        const reading = gasReadingByUnitId.get(unit.unitId);
+        gasProvenance = gasProvenanceForUnit(facts.sourceReadingMonth, reading, gasPoolProvenance);
+        if (!gasProvenance) {
+          return { data: null, error: `Missing Gas provenance for ${unit.unitNumber}.`, failureKind: "not_ready" };
+        }
+      }
       rows.push({
         unit_id: unit.unitId,
         unit_account_id: account.id,
@@ -219,6 +266,7 @@ function buildSnapshotPayload(
           sourceIds,
           amount: component.amount,
           ...(dependsOnSedapal ? { sedapalBill } : {}),
+          ...(gasProvenance ? { gasProvenance } : {}),
         },
       });
     }

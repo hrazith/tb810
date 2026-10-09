@@ -14,6 +14,42 @@ Current live behavior:
 - per-unit capability overrides exist only for genuine exceptions;
 - Units feed Ownerships and Unit Accounts downstream.
 
+### Unit configuration and change history (October 8, 2026)
+
+The Unit row is the **current truth**:
+- `has_meter` (individual Water meter) and `has_gas_service` are simple current booleans, with no history of their own.
+- Changing them can change how historical operational screens (for example the Gas reading ledger) group past readings.
+- Persisted approved obligations are not affected.
+
+Editing an existing Unit goes through the transactional `tb810_update_unit` function (migration `20261008130000_unit_change_events`). One save does the following in a single transaction:
+- checks the `units.manage` permission;
+- locks the Unit;
+- applies the rule that only condo Units may have a Water meter or Gas service;
+- computes the meaningful field differences on the server. Numeric values are compared by value, so 1.556 equals 1.5560. Blank and NULL text are treated as equal.
+- if anything changed, requires a **reason for change**;
+- writes the Unit and one `tb810_unit_change_events` row.
+
+A change event records:
+- the changes as `[{field, before, after}]`, using stable field keys: `unit_type`, `unit_number`, `floor`, `registered_area_m2`, `participation_percentage`, `has_meter`, `has_gas_service`, `notes`;
+- the actor, taken from `auth.uid()` and the active staff profile;
+- the reason;
+- the time.
+
+A save with no meaningful change writes nothing and needs no reason.
+
+Change history is read-only and append-only:
+- staff can read it;
+- clients cannot insert, update or delete events;
+- a trigger rejects any update, delete or truncate.
+
+The Unit detail page lists it newest first, under **Change history**.
+
+`units.manage` remains `super_admin` only. Building managers can view Units, but are not offered Edit or Add, and are redirected away from the edit and new routes. The database refuses their writes, and the app reports "You are not authorized to manage Units."
+
+Deferred hardening: `scripts/import-units.js` and `scripts/backfill-gas-service-units.js` still write `tb810_units` directly, without history. Blocking direct updates of tracked fields outside `tb810_update_unit` is a future step. Creating a Unit records no history event.
+
+Future product rule, not built: when ownership changes, the Unit's current Water and Gas participation should be shown to the operator for confirmation.
+
 ## Frozen Canonical Architecture
 
 ### Purpose
@@ -183,11 +219,14 @@ Flag indicating whether the Unit can have a meter.
 
 ### `notes`
 
-Freeform operational notes about the Unit.
+Legacy notes (imported).
 
-- Purpose: capture non-structured staff context
-- Why it exists: legacy records and day-to-day operations often need reminders or clarifications
-- Business meaning: flexible notes, not transactional state
+- Purpose: preserve historical comments imported from the legacy `units.comments`.
+- Live data: all 66 non-empty values equal the legacy comment exactly. They describe billing adjustments, mostly the May 2026 PEN 22 "Bono empleados" and older "ajuste para mantener cuota" adjustments, not intrinsic Unit facts.
+- Not the provenance mechanism: why a Unit changed is recorded in Unit change history, not in `notes`.
+- Shown as "Legacy notes (imported)"; the stored values are unchanged.
+
+Open financial follow-up, not solved here: the legacy PEN 22 "Bono empleados" fixed-assessment adjustment (legacy `bill_adjustment`, billed from May 2026) is not represented by any live Unit Charge (`tb810_charges` has 0 rows), although the decided native representation is a grouped PEN 22 Unit Charge for October–December 2026. That needs a separate financial operation. The approved rules are in [`unit-charges.md`](unit-charges.md).
 
 ### `legacy_table`
 

@@ -33,10 +33,6 @@ export function nextMonthKey(monthKey: string) {
   return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-export function defaultStartMonthForNewCharge(referenceMonth: string) {
-  return nextMonthKey(referenceMonth) ?? referenceMonth;
-}
-
 export function isChargeEligibleForMonth(args: {
   schedule: "one_off" | "recurring";
   effectiveFromMonth: string;

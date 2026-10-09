@@ -3,12 +3,14 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessNow } from "@/server/business-date";
 import { getActiveDevTestSessionId, getActiveDevTestSessionSummary, recordDevTestMutation } from "@/server/dev-test-session";
+import { loadGiulianaPackageProgression } from "@/server/obligations/progression";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 import { getStaffContext } from "@/server/staff-context";
 import { canEditSourceMonth, getActiveReadingMonth } from "@/server/water/unit-meter-readings";
 import { parseGasWorkbook, type GasImportPreflight } from "./import";
 import { buildMissingGasReadingDrafts, gasReadingDateForSourceMonth } from "./dev-completion";
 import { isGasReadingDateInMonth } from "./date";
+import { groupHistoricalGasBills, isGasTestRecord } from "./processed-groups";
 
 import type {
   GasBillInput,
@@ -49,7 +51,7 @@ type ConfirmedGasReading = {
 };
 
 const GAS_BILL_SELECT =
-  "id, building_id, supplier_name, invoice_number, invoice_date, amount, notes, processed_at, legacy_table, legacy_id, legacy_metadata, created_at, updated_at" as const;
+  "id, building_id, supplier_name, invoice_number, invoice_date, amount, notes, processed_at, reserved_billing_period_id, selected_obligation_month, legacy_table, legacy_id, legacy_metadata, created_at, updated_at" as const;
 const GAS_READING_SELECT =
   "id, building_id, unit_id, reading_month, reading_date, previous_reading, current_reading, consumption, notes, legacy_table, legacy_id, legacy_metadata, created_at, updated_at" as const;
 
@@ -70,7 +72,8 @@ async function gasBillMutationAuthorization() {
 
 export function classifyGasBillMutationFailure(bill: GasBillSummary | null) {
   if (!bill) return "Bill not found or unavailable.";
-  return bill.processed_at ? "Processed bills are read-only." : "Bill could not be changed.";
+  if (bill.processed_at) return "Processed bills are read-only.";
+  return bill.reserved_billing_period_id ? "Reserved bills are read-only." : "Bill could not be changed.";
 }
 
 function preflightFromConfirmedRows(value: unknown): GasImportPreflight {
@@ -224,11 +227,40 @@ type GenericQuery = {
   then<TResult>(onfulfilled?: (value: GenericQueryResult) => TResult | PromiseLike<TResult>, onrejected?: (reason: unknown) => TResult | PromiseLike<TResult>): PromiseLike<TResult>;
 };
 
+type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+// The supplier pool being assembled belongs to the next package Giuliana has
+// not handed off yet. New purchases join this pool by default.
+async function getOpenGasPoolMonth(supabase: ServerSupabaseClient, buildingId: string): Promise<QueryResult<string>> {
+  const operatingMonth = getActiveReadingMonth(await getBusinessNow()).key;
+  const progression = await loadGiulianaPackageProgression({ buildingId, startMonth: operatingMonth, client: supabase });
+  if (progression.error || !progression.data) {
+    return { data: null as never, error: progression.error ?? "Giuliana package progression unavailable." };
+  }
+  return { data: progression.data.activePackage.obligationMonth, error: null };
+}
+
+// Include a newly recorded purchase in the open pool. If inclusion fails the
+// purchase is removed again, so a new purchase is never silently excluded.
+async function includeNewGasBillInOpenPool(supabase: ServerSupabaseClient, buildingId: string, billId: string): Promise<string | null> {
+  const poolMonth = await getOpenGasPoolMonth(supabase, buildingId);
+  const selection = poolMonth.error
+    ? { error: { message: poolMonth.error } }
+    : await supabase.rpc("tb810_set_gas_bill_selection", { p_bill_id: billId, p_obligation_month: `${poolMonth.data}-01` });
+  if (!selection.error) return null;
+  await supabase.from("tb810_gas_bills").delete().eq("id", billId).eq("building_id", buildingId);
+  return selection.error.message;
+}
+
 export async function loadGasBillsWorkspace(): Promise<QueryResult<GasBillsWorkspaceData>> {
   const building = await getCurrentBuilding();
   if (building.error) return { data: null as never, error: building.error };
   if (!building.data) return { data: null as never, error: "Building not found." };
   const supabase = await createClient();
+
+  const poolMonth = await getOpenGasPoolMonth(supabase, building.data.id);
+  if (poolMonth.error) return { data: null as never, error: poolMonth.error };
+  const poolMonthKey = poolMonth.data;
 
   const [pendingResult, periodsResult, processedResult] = await Promise.all([
     supabase
@@ -286,12 +318,16 @@ export async function loadGasBillsWorkspace(): Promise<QueryResult<GasBillsWorks
     : { data: [], error: null };
   if (referencedBillsResult.error) return { data: null as never, error: referencedBillsResult.error.message };
   const billsById = new Map((referencedBillsResult.data ?? []).map(asGasBillSummary).map((bill) => [bill.id, bill]));
+  const testRecords: GasBillsWorkspaceData["testRecords"] = [];
   const bundles: GasProcessedBundle[] = periods.flatMap((period) => {
     const ids = sourceIdsByPeriod.get(period.id);
     if (!ids?.size) return [];
-    const bills = Array.from(ids).map((id) => billsById.get(id)).filter((bill): bill is GasBillSummary => Boolean(bill));
-    if (!bills.length) return [];
     const monthKey = `${period.period_year}-${String(period.period_month).padStart(2, "0")}`;
+    const linked = Array.from(ids).map((id) => billsById.get(id)).filter((bill): bill is GasBillSummary => Boolean(bill));
+    // Test supplier records stay linked to their package but are shown apart.
+    for (const bill of linked.filter(isGasTestRecord)) testRecords.push({ bill, packageLabel: monthLabel(monthKey) });
+    const bills = linked.filter((bill) => !isGasTestRecord(bill));
+    if (!bills.length) return [];
     return [{
       billingPeriodId: period.id,
       monthKey,
@@ -300,13 +336,18 @@ export async function loadGasBillsWorkspace(): Promise<QueryResult<GasBillsWorks
       bills,
     }];
   });
-  const legacyProcessedBills = processedBills.filter((bill) => !nativeSourceIds.has(bill.id));
+  const outsideTb810 = processedBills.filter((bill) => !nativeSourceIds.has(bill.id));
+  for (const bill of outsideTb810.filter(isGasTestRecord)) testRecords.push({ bill, packageLabel: null });
+  const historicalGroups = groupHistoricalGasBills(outsideTb810.filter((bill) => !isGasTestRecord(bill)));
 
   return {
     data: {
+      poolMonthKey,
+      poolMonthLabel: monthLabel(poolMonthKey),
       pendingBills: (pendingResult.data ?? []).map(asGasBillSummary),
       processedBundles: bundles,
-      legacyProcessedBills,
+      historicalGroups,
+      testRecords,
     },
     error: null,
   };
@@ -341,6 +382,8 @@ export async function createGasBill(input: GasBillInput): Promise<QueryResult<Ga
     .select(GAS_BILL_SELECT)
     .single();
   if (error) return { data: null as never, error: error.message };
+  const inclusionError = await includeNewGasBillInOpenPool(supabase, building.data.id, data.id);
+  if (inclusionError) return { data: null as never, error: inclusionError };
   return { data, error: null };
 }
 
@@ -357,6 +400,7 @@ export async function updateGasBill(id: string, input: GasBillInput): Promise<Qu
     .eq("id", id)
     .eq("building_id", building.data.id)
     .is("processed_at", null)
+    .is("reserved_billing_period_id", null)
     .select(GAS_BILL_SELECT)
     .maybeSingle();
   if (error) return { data: null as never, error: error.message };
@@ -381,6 +425,7 @@ export async function deleteGasBill(id: string): Promise<QueryResult<{ id: strin
     .eq("id", id)
     .eq("building_id", building.data.id)
     .is("processed_at", null)
+    .is("reserved_billing_period_id", null)
     .select("id")
     .maybeSingle();
   if (error) return { data: null as never, error: error.message };
@@ -389,6 +434,24 @@ export async function deleteGasBill(id: string): Promise<QueryResult<{ id: strin
     if (bill.error) return { data: null as never, error: bill.error };
     return { data: null as never, error: classifyGasBillMutationFailure(bill.data) };
   }
+  return { data: { id }, error: null };
+}
+
+// Select a purchase into an obligation month's supplier pool, or return it to
+// the available pool with null. The database serializes this against handoff
+// and rejects reserved or processed purchases.
+export async function setGasBillSelection(id: string, obligationMonth: string | null): Promise<QueryResult<{ id: string }>> {
+  const authorizationError = await gasBillMutationAuthorization();
+  if (authorizationError) return { data: null as never, error: authorizationError };
+  if (obligationMonth !== null && !/^\d{4}-(0[1-9]|1[0-2])$/.test(obligationMonth)) {
+    return { data: null as never, error: "Gas obligation month is invalid." };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("tb810_set_gas_bill_selection", {
+    p_bill_id: id,
+    p_obligation_month: obligationMonth ? `${obligationMonth}-01` : null,
+  });
+  if (error) return { data: null as never, error: error.message };
   return { data: { id }, error: null };
 }
 
@@ -618,10 +681,13 @@ export async function deleteGasReading(id: string): Promise<QueryResult<{ id: st
   return { data: { id }, error: null };
 }
 
+// Start Over follows the source lifecycle, not the calendar: a Gas source
+// month is open until its consuming package is finalized. The database
+// function enforces the same freeze under the K6 package lock.
 export async function clearCurrentGasMonth(monthKey: string) {
-  const activeMonth = getActiveReadingMonth();
-  if (monthKey !== activeMonth.key) {
-    return { data: null as never, error: "Only the current editable Gas month can be started over." };
+  const editError = await gasReadingMonthEditError(monthKey, await getBusinessNow());
+  if (editError) {
+    return { data: null as never, error: editError === "Only the current editable Gas reading month can be changed." ? "This Gas month is not available for editing." : editError };
   }
 
   const supabase = await createClient();
@@ -757,13 +823,22 @@ export async function importGasWorkbook(
     const invoice_number = normalizeText(row.data["Invoice Number"] ?? row.data["Invoice"] ?? row.data["Nro Factura"]);
     const invoice_date = normalizeText(row.data["Invoice Date"] ?? row.data["Date"] ?? row.data["Fecha"]);
     const amount = Number(normalizeText(row.data["Amount"] ?? row.data["Importe"] ?? row.data["Monto"]));
-    if (!supplier_name || !invoice_number || !invoice_date || !Number.isFinite(amount)) {
+    // Workbook rows are idempotent by invoice number, so the import requires
+    // one; purchases without a reference are entered individually.
+    if (!invoice_number || !invoice_date || !Number.isFinite(amount)) {
       return { data: null as never, error: `Bill row ${row.sourceRowNumber} is invalid after preflight review.`, imported: false, review };
     }
-    const { error } = await supabase.from("tb810_gas_bills").upsert(
+    const existing = await supabase
+      .from("tb810_gas_bills")
+      .select("id")
+      .eq("building_id", building.data.id)
+      .eq("invoice_number", invoice_number)
+      .maybeSingle();
+    if (existing.error) return { data: null as never, error: existing.error.message, imported: false, review };
+    const { data: upserted, error } = await supabase.from("tb810_gas_bills").upsert(
       {
         building_id: building.data.id,
-        supplier_name,
+        supplier_name: supplier_name || null,
         invoice_number,
         invoice_date,
         amount,
@@ -773,8 +848,14 @@ export async function importGasWorkbook(
         legacy_metadata: { source_row_number: row.sourceRowNumber, worksheet_row: row.data },
       },
       { onConflict: "building_id,invoice_number" },
-    );
+    ).select("id").single();
     if (error) return { data: null as never, error: error.message, imported: false, review };
+    // Newly recorded purchases join the open pool; re-imported ones keep the
+    // operator's existing inclusion/exclusion.
+    if (!existing.data) {
+      const inclusionError = await includeNewGasBillInOpenPool(supabase, building.data.id, upserted.id);
+      if (inclusionError) return { data: null as never, error: inclusionError, imported: false, review };
+    }
     importedBillCount += 1;
   }
 

@@ -5,6 +5,9 @@ import { UserSwitchIcon } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { loadUnitWorkspace } from "@/server/unit-workspace";
+import { listUnitChangeEvents } from "@/server/units";
+import { canManageUnits } from "@/server/units/authorization";
+import { describeUnitChange, formatUnitChangeTimestamp } from "@/server/units/change-history";
 
 type PageProps = {
   params: Promise<{
@@ -68,6 +71,8 @@ export default async function UnitDetailPage({ params }: PageProps) {
   if (!workspaceResult.data) notFound();
 
   const { unit, ownershipSnapshot, monthlyObligation } = workspaceResult.data!;
+  const [canEdit, changeHistory] = await Promise.all([canManageUnits(), listUnitChangeEvents(unit.id)]);
+  if (changeHistory.error) throw new Error(changeHistory.error);
   const unitObligation = monthlyObligation?.units[0];
   const fixedAssessment = unitObligation?.components.find((component) => component.key === "fixed_assessment");
 
@@ -95,14 +100,16 @@ export default async function UnitDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href={`/units/${unit.unit_number}/edit`}
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800"
-          >
-            Edit
-          </Link>
-        </div>
+        {canEdit ? (
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href={`/units/${unit.unit_number}/edit`}
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800"
+            >
+              Edit
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <Panel as="section" className="space-y-6">
@@ -256,9 +263,44 @@ export default async function UnitDetailPage({ params }: PageProps) {
         </div>
       </Panel>
 
+      <Panel as="section" className="space-y-4">
+        <h2 className="text-lg font-semibold text-zinc-950">Change history</h2>
+        {changeHistory.data.length ? (
+          <ol className="space-y-4">
+            {changeHistory.data.map((event) => (
+              <li key={event.id} className="space-y-3 rounded-xl border border-zinc-200 px-4 py-3">
+                <p className="text-sm font-medium text-zinc-950">
+                  {formatUnitChangeTimestamp(event.created_at)} · {event.actor_display_name}
+                </p>
+                <dl className="space-y-2 text-sm">
+                  {event.changes.map((change) => {
+                    const described = describeUnitChange(change);
+                    return (
+                      <div key={change.field}>
+                        <dt className="text-zinc-600">{described.label}</dt>
+                        <dd className="text-zinc-950">
+                          {described.before} → {described.after}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+                <div className="text-sm">
+                  <p className="text-zinc-600">Reason</p>
+                  <p className="whitespace-pre-line text-zinc-950">{event.reason}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-sm text-zinc-600">No changes recorded.</p>
+        )}
+      </Panel>
+
       <Panel as="section">
-        <h2 className="text-lg font-semibold text-zinc-950">Notes</h2>
-        <p className="mt-3 text-sm text-zinc-600">{unit.notes ?? "No notes added."}</p>
+        <h2 className="text-lg font-semibold text-zinc-950">Legacy notes (imported)</h2>
+        <p className="mt-1 text-sm text-zinc-500">Historical comments imported from the previous system.</p>
+        <p className="mt-3 text-sm text-zinc-600">{unit.notes ?? "No legacy notes."}</p>
       </Panel>
     </section>
   );

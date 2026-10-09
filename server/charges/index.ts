@@ -4,6 +4,7 @@ import {
   isRecordCreatedByActiveDevTestSession,
   recordDevTestMutation,
 } from "@/server/dev-test-session";
+import { loadGiulianaPackageProgression, type GiulianaPackageProgression } from "@/server/obligations/progression";
 import { isPerfLoggingEnabled } from "@/server/perf";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 import { getOwnerById } from "@/server/owners";
@@ -11,7 +12,6 @@ import { getOwnerUnitsForBillingMonth } from "@/server/ownerships";
 
 import {
   currentMonthKey,
-  defaultStartMonthForNewCharge,
   firstDayOfMonth,
   isChargeEligibleForMonth,
   monthLabel,
@@ -33,24 +33,38 @@ function isUnitCharge(row: ChargeRecord) {
   return row.unit_id != null && row.owner_id == null;
 }
 
-async function isLatestReadyForReviewUnitChargeMonth(
+// Charge editability follows the obligation package lifecycle, not the
+// calendar. Charges may change from Giuliana's active package (the first one
+// not yet handed off) onward; Unit Charges may also correct the latest
+// ready_for_review package. Approved packages are never editable.
+export type ChargeEditWindow = {
+  activePackageMonth: string;
+  correctionMonth: string | null;
+};
+
+export function isChargeMonthEditable(month: string, window: ChargeEditWindow, isUnitTarget: boolean) {
+  return month >= window.activePackageMonth || (isUnitTarget && month === window.correctionMonth);
+}
+
+export function chargeEditWindowFromProgression(progression: GiulianaPackageProgression): ChargeEditWindow {
+  return {
+    activePackageMonth: progression.activePackage.obligationMonth,
+    // pendingReviews are the ready_for_review packages, oldest first.
+    correctionMonth: progression.pendingReviews.at(-1)?.obligationMonth ?? null,
+  };
+}
+
+// One canonical progression read per charge operation, started from the same
+// operating month as the Obligations workspace.
+async function loadChargeEditWindow(
   supabase: Awaited<ReturnType<typeof createClient>>,
   buildingId: string,
-  month: string,
-) {
-  const { data, error } = await supabase
-    .from("tb810_billing_periods")
-    .select("period_year, period_month")
-    .eq("building_id", buildingId)
-    .eq("status", "ready_for_review")
-    .order("period_year", { ascending: false })
-    .order("period_month", { ascending: false })
-    .limit(1);
-  if (error) return { allowed: false, error: error.message };
-  const latestReadyMonth = data?.[0]
-    ? `${data[0].period_year}-${String(data[0].period_month).padStart(2, "0")}`
-    : null;
-  return { allowed: latestReadyMonth === month, error: null };
+): Promise<QueryResult<ChargeEditWindow | null>> {
+  const progression = await loadGiulianaPackageProgression({ buildingId, startMonth: await currentMonthKey(), client: supabase });
+  if (progression.error || !progression.data) {
+    return { data: null, error: progression.error ?? "Giuliana package progression unavailable." };
+  }
+  return { data: chargeEditWindowFromProgression(progression.data), error: null };
 }
 
 async function summarizeState(row: ChargeRecord) {
@@ -104,54 +118,27 @@ function chargeMonthKey(charge: ChargeRecord) {
   return monthKeyFromDate(charge.effective_from_month);
 }
 
-export function isFutureEffectiveCharge(charge: ChargeRecord, currentMonth: string) {
-  return chargeMonthKey(charge) > currentMonth;
-}
-
-export function validateFutureChargeInput(input: {
-  schedule: "one_off" | "recurring";
-  starts_month: string;
-  ends_month?: string | null;
-  currentMonth: string;
-}, allowReadyForReviewCorrection = false): ChargeLifecycleValidationResult {
-  const defaultStartMonth = defaultStartMonthForNewCharge(input.currentMonth);
-  if (input.starts_month < defaultStartMonth && !allowReadyForReviewCorrection) {
-    return { error: `Start month cannot be before ${defaultStartMonth}.` };
-  }
-  if (input.schedule === "one_off" && input.ends_month) {
-    return { error: "One-off charges cannot have an end month." };
-  }
-  if (input.schedule === "recurring" && input.ends_month && input.ends_month < input.starts_month) {
-    return { error: "End month cannot be before the start month." };
-  }
-  const effectiveFromMonth = firstDayOfMonth(input.starts_month);
-  if (!effectiveFromMonth) return { error: "Invalid start month." };
-  const effectiveToMonth = input.ends_month ? firstDayOfMonth(input.ends_month) : null;
-  if (input.ends_month && !effectiveToMonth) return { error: "Invalid end month." };
-  return {
-    error: null,
-    effectiveFromMonth,
-    effectiveToMonth,
-  };
+export function isChargeEditable(charge: ChargeRecord, window: ChargeEditWindow) {
+  return isChargeMonthEditable(chargeMonthKey(charge), window, isUnitCharge(charge));
 }
 
 export function canStopCharge(charge: ChargeRecord) {
   return charge.schedule === "recurring";
 }
 
-export function canDeleteFutureChargeSeries(seriesRows: ChargeRecord[], currentMonth: string) {
-  return seriesRows.length > 0 && seriesRows.every((row) => isFutureEffectiveCharge(row, currentMonth));
+// A whole series is removable only when every row is in the active package or
+// later; correction deletes are limited to single-month series by the caller.
+export function canDeleteChargeSeries(seriesRows: ChargeRecord[], window: ChargeEditWindow) {
+  return seriesRows.length > 0 && seriesRows.every((row) => chargeMonthKey(row) >= window.activePackageMonth);
 }
 
 export function validateChargeLifecycleInput(input: {
   schedule: "one_off" | "recurring";
   starts_month: string;
   ends_month?: string | null;
-  currentMonth: string;
-}, allowReadyForReviewCorrection = false): ChargeLifecycleValidationResult {
-  const defaultStartMonth = defaultStartMonthForNewCharge(input.currentMonth);
-  if (input.starts_month < defaultStartMonth && !allowReadyForReviewCorrection) {
-    return { error: `Start month cannot be before ${defaultStartMonth}.` };
+}, window: ChargeEditWindow, isUnitTarget: boolean): ChargeLifecycleValidationResult {
+  if (!isChargeMonthEditable(input.starts_month, window, isUnitTarget)) {
+    return { error: `Start month cannot be before ${window.activePackageMonth}.` };
   }
   if (input.schedule === "one_off" && input.ends_month) {
     return { error: "One-off charges cannot have an end month." };
@@ -184,28 +171,25 @@ export async function editFutureCharge(
   if (chargeResult.error) return { data: null as never, error: chargeResult.error };
   if (!chargeResult.data) return { data: null as never, error: "Charge not found." };
 
-  const currentMonth = await currentMonthKey();
   const current = chargeResult.data;
-  const isCorrection = isUnitCharge(current) && !isFutureEffectiveCharge(current, currentMonth)
-    ? await isLatestReadyForReviewUnitChargeMonth(await createClient(), current.building_id, monthKeyFromDate(current.effective_from_month))
-    : { allowed: false, error: null };
-  if (isCorrection.error) return { data: null as never, error: isCorrection.error };
-  if (!isFutureEffectiveCharge(current, currentMonth) && !isCorrection.allowed) {
+  const supabase = await createClient();
+  const window = await loadChargeEditWindow(supabase, current.building_id);
+  if (window.error || !window.data) return { data: null as never, error: window.error ?? "Giuliana package progression unavailable." };
+  if (!isChargeEditable(current, window.data)) {
     return { data: null as never, error: "Future charges only can be edited." };
   }
-  if (isCorrection.allowed && input.starts_month !== monthKeyFromDate(current.effective_from_month)) {
+  const isCorrection = chargeMonthKey(current) < window.data.activePackageMonth;
+  if (isCorrection && input.starts_month !== chargeMonthKey(current)) {
     return { data: null as never, error: "A handed-off charge must remain in its obligation month." };
   }
 
-  const validated = validateFutureChargeInput({
+  const validated = validateChargeLifecycleInput({
     schedule: input.schedule,
     starts_month: input.starts_month,
     ends_month: input.ends_month ?? null,
-    currentMonth,
-  }, isCorrection.allowed);
+  }, window.data, isUnitCharge(current));
   if (validated.error) return { data: null as never, error: validated.error };
 
-  const supabase = await createClient();
   const { data, error } = await supabase
     .from("tb810_charges")
     .update({
@@ -229,22 +213,20 @@ export async function deleteFutureCharge(chargeId: string): Promise<QueryResult<
   if (chargeResult.error) return { data: null as never, error: chargeResult.error };
   if (!chargeResult.data) return { data: null as never, error: "Charge not found." };
 
-  const currentMonth = await currentMonthKey();
   const current = chargeResult.data;
-  const isCorrection = isUnitCharge(current) && !isFutureEffectiveCharge(current, currentMonth)
-    ? await isLatestReadyForReviewUnitChargeMonth(await createClient(), current.building_id, monthKeyFromDate(current.effective_from_month))
-    : { allowed: false, error: null };
-  if (isCorrection.error) return { data: null as never, error: isCorrection.error };
-  if (!isFutureEffectiveCharge(current, currentMonth) && !isCorrection.allowed) {
-    return { data: null as never, error: "Future charges only can be deleted." };
-  }
-
   const buildingResult = await getCurrentBuildingId();
   if (buildingResult.error) return { data: null as never, error: buildingResult.error };
 
   const supabase = await createClient();
   const buildingId = buildingResult.data;
   if (!buildingId) return { data: null as never, error: "Current building not found." };
+
+  const window = await loadChargeEditWindow(supabase, buildingId);
+  if (window.error || !window.data) return { data: null as never, error: window.error ?? "Giuliana package progression unavailable." };
+  if (!isChargeEditable(current, window.data)) {
+    return { data: null as never, error: "Future charges only can be deleted." };
+  }
+  const isCorrection = chargeMonthKey(current) < window.data.activePackageMonth;
 
   const { data: seriesRows, error: seriesError } = await supabase
     .from("tb810_charges")
@@ -254,10 +236,10 @@ export async function deleteFutureCharge(chargeId: string): Promise<QueryResult<
   if (seriesError) return { data: null as never, error: seriesError.message };
 
   const rows = (seriesRows ?? []) as ChargeRecord[];
-  if (isCorrection.allowed && rows.some((row) => monthKeyFromDate(row.effective_from_month) !== monthKeyFromDate(current.effective_from_month))) {
+  if (isCorrection && rows.some((row) => chargeMonthKey(row) !== chargeMonthKey(current))) {
     return { data: null as never, error: "Only a single-month charge can be removed from a handed-off package." };
   }
-  if (!isCorrection.allowed && !canDeleteFutureChargeSeries(rows, currentMonth)) {
+  if (!isCorrection && !canDeleteChargeSeries(rows, window.data)) {
     return { data: null as never, error: "Future charges only can be deleted." };
   }
 
@@ -378,20 +360,13 @@ async function createTargetCharge(input: {
     }
   }
 
-  const startMonth = input.starts_month;
-  const currentMonth = await currentMonthKey();
-  let allowReadyForReviewCorrection = false;
-  if (input.unitId && startMonth < (defaultStartMonthForNewCharge(currentMonth) ?? currentMonth)) {
-    const correction = await isLatestReadyForReviewUnitChargeMonth(supabase, buildingId, startMonth);
-    if (correction.error) return { data: null as never, error: correction.error };
-    allowReadyForReviewCorrection = correction.allowed;
-  }
+  const window = await loadChargeEditWindow(supabase, buildingId);
+  if (window.error || !window.data) return { data: null as never, error: window.error ?? "Giuliana package progression unavailable." };
   const validated = validateChargeLifecycleInput({
     schedule: input.schedule,
-    starts_month: startMonth,
+    starts_month: input.starts_month,
     ends_month: input.ends_month ?? null,
-    currentMonth,
-  }, allowReadyForReviewCorrection);
+  }, window.data, Boolean(input.unitId));
   if (validated.error) return { data: null as never, error: validated.error };
   const successValidated = validated as Extract<ChargeLifecycleValidationResult, { error: null }>;
   const effectiveFromMonth = successValidated.effectiveFromMonth;
@@ -460,30 +435,20 @@ export async function createBulkCharge(input: {
   starts_month: string;
   ends_month?: string | null;
 }): Promise<QueryResult<{ series_id: string | null; inserted_count: number; total_amount: number }>> {
-  const currentMonth = await currentMonthKey();
-  let allowReadyForReviewCorrection = false;
-  if (input.target_kind === "all_units" && input.starts_month < (defaultStartMonthForNewCharge(currentMonth) ?? currentMonth)) {
-    const buildingResult = await getCurrentBuildingId();
-    if (buildingResult.error) return { data: null as never, error: buildingResult.error };
-    if (!buildingResult.data) return { data: null as never, error: "Current building not found." };
-    const correction = await isLatestReadyForReviewUnitChargeMonth(
-      await createClient(),
-      buildingResult.data,
-      input.starts_month,
-    );
-    if (correction.error) return { data: null as never, error: correction.error };
-    allowReadyForReviewCorrection = correction.allowed;
-  }
+  const buildingResult = await getCurrentBuildingId();
+  if (buildingResult.error) return { data: null as never, error: buildingResult.error };
+  if (!buildingResult.data) return { data: null as never, error: "Current building not found." };
+  const supabase = await createClient();
+  const window = await loadChargeEditWindow(supabase, buildingResult.data);
+  if (window.error || !window.data) return { data: null as never, error: window.error ?? "Giuliana package progression unavailable." };
 
   const validated = validateChargeLifecycleInput({
     schedule: input.schedule,
     starts_month: input.starts_month,
     ends_month: input.ends_month ?? null,
-    currentMonth,
-  }, allowReadyForReviewCorrection);
+  }, window.data, input.target_kind === "all_units");
   if (validated.error) return { data: null as never, error: validated.error };
 
-  const supabase = await createClient();
   const { data, error } = await (supabase as unknown as {
     rpc: (name: "tb810_create_bulk_charge", args: Record<string, unknown>) => Promise<{
       data: Array<{ series_id: string | null; inserted_count: number; total_amount: number }> | null;
@@ -526,8 +491,12 @@ export async function changeFutureChargeEconomics(
     }
   }
   const effectiveMonth = input.effective_month;
-  const currentMonth = await currentMonthKey();
-  if (effectiveMonth < currentMonth) return { data: null as never, error: "Effective month cannot be in the past." };
+  const supabase = await createClient();
+  const window = await loadChargeEditWindow(supabase, current.building_id);
+  if (window.error || !window.data) return { data: null as never, error: window.error ?? "Giuliana package progression unavailable." };
+  if (!isChargeMonthEditable(effectiveMonth, window.data, isUnitCharge(current))) {
+    return { data: null as never, error: "Effective month cannot be in the past." };
+  }
   if (effectiveMonth <= monthKeyFromDate(current.effective_from_month)) {
     return { data: null as never, error: "Effective month must be after the current charge start month." };
   }
@@ -535,7 +504,6 @@ export async function changeFutureChargeEconomics(
   const nextEffectiveToMonthDate = nextEffectiveToMonth ? firstDayOfMonth(nextEffectiveToMonth) : null;
   const effectiveFromMonthDate = firstDayOfMonth(effectiveMonth);
   if (!effectiveFromMonthDate) return { data: null as never, error: "Invalid effective month." };
-  const supabase = await createClient();
   if (!nextEffectiveToMonthDate) return { data: null as never, error: "Invalid effective month." };
   const updateResult = await supabase
     .from("tb810_charges")
@@ -589,6 +557,11 @@ export async function stopFutureCharge(
     return { data: null as never, error: "Stop month must be after the start month." };
   }
   const supabase = await createClient();
+  const window = await loadChargeEditWindow(supabase, current.building_id);
+  if (window.error || !window.data) return { data: null as never, error: window.error ?? "Giuliana package progression unavailable." };
+  if (!isChargeMonthEditable(stopMonth, window.data, isUnitCharge(current))) {
+    return { data: null as never, error: `Stop month cannot be before ${window.data.activePackageMonth}.` };
+  }
   const stopMonthBefore = monthBefore(stopMonth);
   const stopMonthBeforeDate = stopMonthBefore ? firstDayOfMonth(stopMonthBefore) : null;
   if (!stopMonthBeforeDate) return { data: null as never, error: "Invalid stop month." };

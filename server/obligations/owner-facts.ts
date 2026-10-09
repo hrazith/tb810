@@ -48,6 +48,7 @@ export type BuildingMonthFinancialFacts = {
     processed_at: string | null;
     invoice_date: string;
     reserved_billing_period_id?: string | null;
+    selected_obligation_month?: string | null;
   }>;
   gasReadings: Array<{
     unit_id: string;
@@ -168,17 +169,33 @@ function monthLabelFromKey(monthKey: string) {
   }).format(parsed);
 }
 
-function selectChargeRows(charges: ChargeRecord[], obligationMonth: string) {
-  return charges.filter((row) => {
-    if (row.owner_id != null || row.unit_id == null) return false;
-    const effectiveFromMonth = row.effective_from_month.slice(0, 7);
-    const effectiveToMonth = row.effective_to_month ? row.effective_to_month.slice(0, 7) : null;
-    const eligible =
-      row.schedule === "one_off"
-        ? effectiveFromMonth === obligationMonth
-        : effectiveFromMonth <= obligationMonth && (effectiveToMonth === null || effectiveToMonth >= obligationMonth);
-    return eligible;
-  });
+// Owner direct charges for one owner and month, selected with the same rule as
+// the building summary (owner-level rows with no Unit). Having none is a valid
+// S/ 0.00 result, not a blocker; a failed load is returned as an error before
+// this point and still blocks the owner.
+export function buildOwnerDirectCharges(charges: ChargeRecord[], obligationMonth: string): OwnerMonthResponsibility["ownerDirectCharges"] {
+  const lineItems = charges
+    .filter((row) => row.owner_id != null && row.unit_id == null && isChargeEligibleForMonth({
+      schedule: row.schedule,
+      effectiveFromMonth: row.effective_from_month.slice(0, 7),
+      effectiveToMonth: row.effective_to_month ? row.effective_to_month.slice(0, 7) : null,
+      obligationMonth,
+    }))
+    .map((row) => ({
+      chargeId: row.id,
+      description: row.description,
+      amount: row.amount.toFixed(2),
+      effectiveFromMonth: row.effective_from_month.slice(0, 7),
+      effectiveToMonth: row.effective_to_month ? row.effective_to_month.slice(0, 7) : null,
+    }));
+  const cents = lineItems.reduce((sum, item) => sum + Math.round(Number(item.amount) * 100), 0);
+  return {
+    state: "available",
+    amount: (cents / 100).toFixed(2),
+    count: lineItems.length,
+    reason: null,
+    lineItems,
+  };
 }
 
 export function monthKeyToDate(monthKey: string) {
@@ -326,6 +343,25 @@ export function buildChargeMap(
   return map;
 }
 
+// The Gas supplier pool of a package. Handed off: the purchases reserved to the
+// package. Live: the purchases included in this obligation month's pool (new
+// purchases are included by default; an excluded purchase has no selection).
+export function selectGasBillsForLifecycle(
+  bills: BuildingMonthFinancialFacts["gasBills"],
+  lifecycle: Partial<BuildingMonthFinancialFacts["obligationLifecycle"]> | undefined,
+  packageMonth: string,
+) {
+  const isHandedOff = lifecycle?.billingPeriodStatus
+    && ["ready_for_review", "approved", "invoices_generated", "closed"].includes(lifecycle.billingPeriodStatus);
+  if (isHandedOff && lifecycle?.gasReservationState === "native_reserved" && lifecycle.billingPeriodId) {
+    return bills.filter((bill) => bill.reserved_billing_period_id === lifecycle.billingPeriodId);
+  }
+  if (isHandedOff) return [];
+  return bills.filter((bill) => bill.processed_at === null
+    && !bill.reserved_billing_period_id
+    && bill.selected_obligation_month?.slice(0, 7) === packageMonth);
+}
+
 export async function loadBuildingMonthFinancialFacts({
   buildingId,
   obligationMonth,
@@ -366,18 +402,6 @@ export async function loadBuildingMonthFinancialFacts({
 
   const payload = rpc.data as BuildingMonthFinancialFactsRpcPayload;
   const upcomingMonth = nextMonthKey(obligationMonth) ?? obligationMonth;
-  const selectGasBillsForLifecycle = (
-    bills: BuildingMonthFinancialFacts["gasBills"],
-    lifecycle: BuildingMonthFinancialFacts["obligationLifecycle"] | undefined,
-  ) => {
-    const isHandedOff = lifecycle?.billingPeriodStatus
-      && ["ready_for_review", "approved", "invoices_generated", "closed"].includes(lifecycle.billingPeriodStatus);
-    if (isHandedOff && lifecycle?.gasReservationState === "native_reserved" && lifecycle.billingPeriodId) {
-      return bills.filter((bill) => bill.reserved_billing_period_id === lifecycle.billingPeriodId);
-    }
-    if (isHandedOff) return [];
-    return bills.filter((bill) => bill.processed_at === null && !bill.reserved_billing_period_id);
-  };
   const currentLifecycle = payload.current?.obligationLifecycle;
   const upcomingLifecycle = payload.upcoming?.obligationLifecycle;
   const normalizeLifecycle = (lifecycle: ObligationLifecycle | undefined): ObligationLifecycle => {
@@ -401,7 +425,7 @@ export async function loadBuildingMonthFinancialFacts({
     planYear: Number(obligationMonth.slice(0, 4)),
     plan: payload.currentPlan ? { currency: String(payload.currentPlan.currency), monthly_operating_budget: String(payload.currentPlan.monthly_operating_budget) } : null,
     ...sharedFacts,
-    gasBills: selectGasBillsForLifecycle(payload.gasBills ?? [], currentLifecycle),
+    gasBills: selectGasBillsForLifecycle(payload.gasBills ?? [], currentLifecycle, obligationMonth),
     commonWaterBill: payload.current?.commonWaterBill ?? null,
     waterReadings: payload.current?.waterReadings ?? [],
     gasReadings: payload.current?.gasReadings ?? [],
@@ -414,7 +438,7 @@ export async function loadBuildingMonthFinancialFacts({
     planYear: Number(upcomingMonth.slice(0, 4)),
     plan: payload.upcomingPlan ? { currency: String(payload.upcomingPlan.currency), monthly_operating_budget: String(payload.upcomingPlan.monthly_operating_budget) } : null,
     ...sharedFacts,
-    gasBills: selectGasBillsForLifecycle(payload.gasBills ?? [], upcomingLifecycle),
+    gasBills: selectGasBillsForLifecycle(payload.gasBills ?? [], upcomingLifecycle, upcomingMonth),
     commonWaterBill: payload.upcoming?.commonWaterBill ?? null,
     waterReadings: payload.upcoming?.waterReadings ?? [],
     gasReadings: payload.upcoming?.gasReadings ?? [],
@@ -495,16 +519,6 @@ export async function loadOwnerMonthResponsibility({
       participationPercentage: row.participation_percentage,
     }));
 
-  const lineItems = selectChargeRows((ownerDirectChargesResult.data ?? []) as ChargeRecord[], obligationMonth).map((row) => ({
-    chargeId: row.id,
-    description: row.description,
-    amount: row.amount.toFixed(2),
-    effectiveFromMonth: row.effective_from_month.slice(0, 7),
-    effectiveToMonth: row.effective_to_month ? row.effective_to_month.slice(0, 7) : null,
-  }));
-
-  const amount = lineItems.reduce((sum, item) => sum + Number(item.amount), 0).toFixed(2);
-
   return {
     data: {
       owner: {
@@ -513,13 +527,7 @@ export async function loadOwnerMonthResponsibility({
       },
       ownershipRows,
       responsibleUnits,
-      ownerDirectCharges: {
-        state: lineItems.length > 0 ? "available" : "blocked",
-        amount,
-        count: lineItems.length,
-        reason: lineItems.length > 0 ? null : "No owner direct charges are available for this month.",
-        lineItems,
-      },
+      ownerDirectCharges: buildOwnerDirectCharges((ownerDirectChargesResult.data ?? []) as ChargeRecord[], obligationMonth),
     },
     error: null,
     requestCount: 3,

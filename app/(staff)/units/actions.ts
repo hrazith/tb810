@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { createUnit, updateUnit } from "@/server/units";
+import { canManageUnits, UNIT_AUTHORIZATION_ERROR, UNIT_REASON_REQUIRED_ERROR } from "@/server/units/authorization";
 import type { UnitFormState } from "@/server/units/types";
 import { unitInputSchema } from "@/server/units/validation";
 
@@ -45,7 +46,7 @@ function mapFieldErrors(
 
 function toFormStateError(
   message: string,
-  values: ReturnType<typeof toUnitInput>,
+  values: ReturnType<typeof toUnitInput> & { reason?: string },
 ): UnitFormState {
   return { error: message, values };
 }
@@ -55,7 +56,10 @@ export async function updateUnitAction(
   _prev: UnitFormState,
   formData: FormData,
 ): Promise<UnitFormState> {
-  const values = toUnitInput(formData);
+  const reason = String(formData.get("reason") ?? "");
+  const values = { ...toUnitInput(formData), reason };
+  if (!(await canManageUnits())) return toFormStateError(UNIT_AUTHORIZATION_ERROR, values);
+
   const validation = unitInputSchema.safeParse(values);
   if (!validation.success) {
     return {
@@ -65,10 +69,19 @@ export async function updateUnitAction(
     };
   }
 
-  const result = await updateUnit(unitId, validation.data);
+  // The database decides whether anything meaningful changed; a reason is
+  // required only when it did.
+  const result = await updateUnit(unitId, validation.data, reason);
+  if (result.error === UNIT_REASON_REQUIRED_ERROR) {
+    return {
+      error: "Explain why this Unit information is changing.",
+      fieldErrors: { reason: UNIT_REASON_REQUIRED_ERROR },
+      values,
+    };
+  }
   if (result.error) return toFormStateError(result.error, values);
 
-  redirect(`/units/${validation.data.unit_number}`);
+  redirect(`/units/${result.data.unitNumber}`);
 }
 
 export async function createUnitAction(
@@ -76,6 +89,7 @@ export async function createUnitAction(
   formData: FormData,
 ): Promise<UnitFormState> {
   const values = toUnitInput(formData);
+  if (!(await canManageUnits())) return toFormStateError(UNIT_AUTHORIZATION_ERROR, values);
   const validation = unitInputSchema.safeParse(values);
   if (!validation.success) {
     return {

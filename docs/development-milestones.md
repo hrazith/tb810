@@ -119,7 +119,7 @@ TB810 charge semantics are frozen:
 - both require a mandatory explanatory comment, including bulk-created charges;
 - bulk operations must remain identifiable as grouped operations and support coherent review/edit/removal before approval.
 
-Carlos confirmed that the May PEN 22 pattern represents `Bono empleados`. For October-December 2026, the intended native representation is a separate grouped PEN 22 Unit Charge for every condo, including Unit 904. Unit 904's historical PEN 10, EST-13's PEN 8.40, and EST-42's PEN 8.00 remain open and must not be carried into October automatically.
+Carlos confirmed that the May PEN 22 pattern represents `Bono empleados`. For October-December 2026, the intended native representation is a separate grouped PEN 22 Unit Charge for every condo, including Unit 904. Unit 904's historical PEN 10, EST-13's PEN 8.40, and EST-42's PEN 8.00 remain open and must not be carried into October automatically. (Later decided: those three are discontinued in TB810 from October 2026; October 2026 is an Assisted Obligations month that includes the Bono for all 64 apartments; Bono empleados moves into the 2027 budget. See [`domain-models/unit-charges.md`](domain-models/unit-charges.md), the canonical Unit Charge rules.)
 
 The September 2026 legacy financial parity checkpoint is **PROVEN / CLOSED**. All 77 obligations are mathematically explained, with exact detail-level parity and a documented legacy-versus-native Water policy difference. The detailed ledger is [`docs/migrations/september-2026-legacy-parity.md`](migrations/september-2026-legacy-parity.md). Do not materialize native September obligations merely to make lifecycle state appear complete.
 
@@ -204,8 +204,8 @@ Water is now **CLOSED / ACCEPTED** for the Road to October checkpoint. Remaining
 The frozen Gas model is:
 
 ```text
-supplier purchases arrive
--> supplier bills accumulate in an unprocessed pool
+supplier purchases arrive (available)
+-> the operator explicitly selects purchases for the next package's pool
 -> Gas meter readings establish unit consumption
 -> accumulated supplier cost / aggregate consumption = blended Gas rate
 -> rate x unit consumption = unit Gas allocation
@@ -217,10 +217,10 @@ supplier purchases arrive
 
 Frozen semantics:
 
-- Draft Supplier Bills are the live unprocessed pool.
+- The live pool is the set of purchases explicitly selected for the package month (superseded October 8, 2026; see `docs/architecture/gas-domain.md`).
 - Multiple supplier bills may accumulate into one obligation.
 - Bills may cross invoice-date/calendar boundaries.
-- Invoice date is source metadata and an eligibility/cutoff fact, not the primary historical grouping model.
+- Purchase (invoice) date is source metadata only; it never assigns package membership.
 - No supplier-bill service month is introduced for the First Ride.
 - Native processed bills are grouped by the obligation package that consumed them.
 - Native snapshot `sourceIds` are canonical provenance.
@@ -323,6 +323,14 @@ DEV-owned reservations. Bill-pool curation remains an MVP2 decision. The
 immutable approved artifact is the approved Billing Period plus its persisted
 obligation rows carrying `calculation_snapshot` metadata; there is no
 standalone approval-snapshot table or fingerprint column.
+
+Gas production contract (October 8, 2026, `20261008120000_gas_production_contract`)
+supersedes "the complete available supplier-bill pool": handoff reserves exactly
+the purchases explicitly selected for the package month
+(`selected_obligation_month`), and unselected purchases stay available. Gas
+source months follow the shared source freeze on every write path, and approval
+proves per-unit Gas provenance inside the package lock. The canonical
+description is `docs/architecture/gas-domain.md`.
 
 ### K — September -> October REAL cycle — FIRST RIDE CHECKPOINT
 

@@ -427,6 +427,14 @@ AGUA is the private consumption component of the monthly water obligation.
 
 ✅ Frozen
 
+Canonical rule:
+
+- Rate per m³ = Sedapal invoice amount / Sedapal billed consumption (m³), kept at full precision. It is never rounded before allocation; the legacy system rounded it to two decimals.
+- Each condo's Metered Water = unit consumption x rate, rounded to the nearest céntimo.
+- Building consumption not recorded on unit meters stays in the Common Water pool.
+
+Confirmed October 9, 2026: the full-precision rate continues from November 2026. The legacy rounded rate is not adopted.
+
 ### Shared Water (AGUA COMUN)
 
 **Definition**

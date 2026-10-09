@@ -10,8 +10,14 @@ export function firstDayOfMonth(monthKey: string) {
   return Number.isNaN(parsed.getTime()) ? null : `${monthKey}-01`;
 }
 
-export function isEligibleGasBill(invoiceDate: string, processedAt: string | null, obligationMonth: string) {
-  const boundary = firstDayOfMonth(obligationMonth);
-  if (!boundary) return false;
-  return processedAt === null && invoiceDate < boundary;
+// A purchase belongs to an obligation month's live pool only when the operator
+// selected it for that month; the purchase date never assigns membership.
+export function isEligibleGasBill(
+  bill: { selected_obligation_month: string | null; processed_at: string | null; reserved_billing_period_id: string | null },
+  obligationMonth: string,
+) {
+  if (!firstDayOfMonth(obligationMonth)) return false;
+  return bill.processed_at === null
+    && bill.reserved_billing_period_id === null
+    && bill.selected_obligation_month?.slice(0, 7) === obligationMonth;
 }

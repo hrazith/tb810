@@ -6,17 +6,36 @@ export function isValidGasBillDate(value: string) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+// Lifecycle messages raised by the database contract are already user-facing.
+const GAS_PURCHASE_LIFECYCLE_ERRORS = [
+  /^Processed Gas purchases are read-only\.$/,
+  /^Gas purchases reserved to a Monthly Obligations package are read-only\.$/,
+  /^The \d{4}-\d{2} Gas supplier pool is locked because the Monthly Obligations package is [a-z_]+\.$/,
+  /^Gas purchase selection changed; review the pool again\.$/,
+  /^You are not authorized to manage Gas supplier purchases\.$/,
+];
+
 export function userFacingGasBillError(error: string) {
   if (error === "You are not authorized to manage Gas supplier bills.") return error;
   if (error === "Processed bills are read-only.") return error;
+  if (error === "Reserved bills are read-only.") return error;
   if (error === "Bill not found or unavailable.") return error;
-  if (/duplicate key|unique constraint|invoice_number/i.test(error)) return "Invoice / receipt number already exists.";
+  if (GAS_PURCHASE_LIFECYCLE_ERRORS.some((pattern) => pattern.test(error))) return error;
+  if (/duplicate key|unique constraint/i.test(error)) return "Invoice / receipt number already exists.";
   return "Unable to save this Gas supplier bill. Please try again.";
 }
 
+// Absent provenance is stored as NULL, never as a placeholder.
+const optionalProvenanceText = z
+  .string()
+  .trim()
+  .max(200)
+  .optional()
+  .transform((value) => (value ? value : null));
+
 export const gasBillInputSchema = z.object({
-  supplier_name: z.string().trim().min(1, "Supplier is required"),
-  invoice_number: z.string().trim().min(1, "Invoice number is required"),
+  supplier_name: optionalProvenanceText,
+  invoice_number: optionalProvenanceText,
   invoice_date: z.string().trim().min(1, "Invoice date is required").refine(isValidGasBillDate, "Invoice date must be a valid date"),
   amount: z.number().finite().min(0, "Amount must be non-negative").refine((value) => Number.isInteger(value * 100), "Amount must use at most 2 decimal places"),
   notes: z.string().trim().max(2000).optional().or(z.literal("")).transform((value) => (value ? value.trim() : null)),

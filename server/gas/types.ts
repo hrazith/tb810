@@ -1,14 +1,22 @@
+import type { GasHistoricalGroup } from "./processed-groups";
+
 export type GasBillStatus = "draft" | "processed";
 
+// A Gas supplier purchase. Package membership is explicit:
+// available -> selected (selected_obligation_month) -> reserved at handoff
+// (reserved_billing_period_id) -> processed at approval (processed_at).
+// The purchase date never assigns membership.
 export type GasBillRecord = {
   id: string;
   building_id: string;
-  supplier_name: string;
-  invoice_number: string;
+  supplier_name: string | null;
+  invoice_number: string | null;
   invoice_date: string;
   amount: number;
   notes: string | null;
   processed_at: string | null;
+  reserved_billing_period_id: string | null;
+  selected_obligation_month: string | null;
   legacy_table: string | null;
   legacy_id: string | null;
   legacy_metadata: unknown;
@@ -29,9 +37,16 @@ export type GasProcessedBundle = {
 };
 
 export type GasBillsWorkspaceData = {
+  // The next Monthly Obligations package whose supplier pool is still open.
+  poolMonthKey: string;
+  poolMonthLabel: string;
   pendingBills: GasBillSummary[];
+  // Purchases processed through TB810 approvals (test records excluded).
   processedBundles: GasProcessedBundle[];
-  legacyProcessedBills: GasBillSummary[];
+  // Purchases consumed outside TB810, grouped by recorded billing-group provenance.
+  historicalGroups: GasHistoricalGroup[];
+  // Test supplier records used by approved test packages; read-only.
+  testRecords: Array<{ bill: GasBillSummary; packageLabel: string | null }>;
 };
 
 export type GasReadingRecord = {
@@ -58,8 +73,8 @@ export type GasReadingSummary = GasReadingRecord & {
 };
 
 export type GasBillInput = {
-  supplier_name: string;
-  invoice_number: string;
+  supplier_name: string | null;
+  invoice_number: string | null;
   invoice_date: string;
   amount: number;
   notes?: string | null;

@@ -80,7 +80,7 @@ test("K6 Gas handoff reserves the available pool and package-scopes reads", () =
   assert.match(migration, /Gas bill set changed before handoff/);
   assert.match(migration, /tb810_assert_gas_bill_reservation/);
   assert.match(snapshot, /p_gas_bill_ids: gasBillIds/);
-  assert.match(facts, /bill\.processed_at === null && !bill\.reserved_billing_period_id/);
+  assert.match(facts, /bill\.processed_at === null\s*&& !bill\.reserved_billing_period_id\s*&& bill\.selected_obligation_month\?\.slice\(0, 7\) === packageMonth/);
   assert.match(facts, /bill\.reserved_billing_period_id === lifecycle\.billingPeriodId/);
   assert.match(migration, /requires Gas reservation reconciliation before approval/);
   assert.match(migration, /Gas bill approval set cannot contain NULL IDs/);

@@ -74,8 +74,13 @@ export type UnitInput = {
 export type UnitFormState = {
   success?: string;
   error?: string;
-  fieldErrors?: Partial<Record<keyof UnitInput | "status", string>>;
-  values?: Partial<UnitInput> & { active?: boolean };
+  fieldErrors?: Partial<Record<keyof UnitInput | "status" | "reason", string>>;
+  values?: Partial<UnitInput> & { active?: boolean; reason?: string };
+};
+
+export type UnitUpdateResult = {
+  status: "updated" | "unchanged";
+  unitNumber: string;
 };
 
 export type UnitFormDefaults = {

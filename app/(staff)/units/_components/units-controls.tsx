@@ -18,6 +18,7 @@ type Props = {
   initialQuery: string;
   initialUnitTypeId: string;
   unitTypes: UnitTypeOption[];
+  canManageUnits: boolean;
 };
 
 function buildQueryString(
@@ -42,6 +43,7 @@ export function UnitsControls({
   initialQuery,
   initialUnitTypeId,
   unitTypes,
+  canManageUnits,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -95,9 +97,11 @@ export function UnitsControls({
           })
         }
       />
-      <Button asChild variant="primary" shape="pill">
-        <Link href="/units/new">Add Unit</Link>
-      </Button>
+      {canManageUnits ? (
+        <Button asChild variant="primary" shape="pill">
+          <Link href="/units/new">Add Unit</Link>
+        </Button>
+      ) : null}
     </div>
   );
 }

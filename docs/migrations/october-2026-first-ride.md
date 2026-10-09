@@ -250,9 +250,9 @@ First Ride ends when September source facts are complete, October calculations a
 
 | Question | Status |
 | --- | --- |
-| Unit 904 PEN 10 | OPEN; do not carry automatically |
-| EST-13 PEN 8.40 | OPEN; do not carry automatically |
-| EST-42 PEN 8.00 | OPEN; do not carry automatically |
+| Unit 904 PEN 10 | OPEN at cutover; later decided: discontinued in TB810 from October 2026 (see [`unit-charges.md`](../domain-models/unit-charges.md)) |
+| EST-13 PEN 8.40 | OPEN at cutover; later decided: discontinued in TB810 from October 2026 (see [`unit-charges.md`](../domain-models/unit-charges.md)) |
+| EST-42 PEN 8.00 | OPEN at cutover; later decided: discontinued in TB810 from October 2026 (see [`unit-charges.md`](../domain-models/unit-charges.md)) |
 | Historical ownership/provenance discrepancies | OPEN migration follow-up |
 | September Others PEN 180.00 native mapping | OPEN |
 | Full September 77-obligation parity | PROVEN / CLOSED; see detailed parity ledger |

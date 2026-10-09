@@ -1209,13 +1209,15 @@ export type Database = {
           created_at: string
           id: string
           invoice_date: string
-          invoice_number: string
+          invoice_number: string | null
           legacy_id: string | null
           legacy_metadata: Json
           legacy_table: string | null
           notes: string | null
           processed_at: string | null
-          supplier_name: string
+          reserved_billing_period_id: string | null
+          selected_obligation_month: string | null
+          supplier_name: string | null
           updated_at: string
         }
         Insert: {
@@ -1224,13 +1226,15 @@ export type Database = {
           created_at?: string
           id?: string
           invoice_date: string
-          invoice_number: string
+          invoice_number?: string | null
           legacy_id?: string | null
           legacy_metadata?: Json
           legacy_table?: string | null
           notes?: string | null
           processed_at?: string | null
-          supplier_name: string
+          reserved_billing_period_id?: string | null
+          selected_obligation_month?: string | null
+          supplier_name?: string | null
           updated_at?: string
         }
         Update: {
@@ -1239,13 +1243,15 @@ export type Database = {
           created_at?: string
           id?: string
           invoice_date?: string
-          invoice_number?: string
+          invoice_number?: string | null
           legacy_id?: string | null
           legacy_metadata?: Json
           legacy_table?: string | null
           notes?: string | null
           processed_at?: string | null
-          supplier_name?: string
+          reserved_billing_period_id?: string | null
+          selected_obligation_month?: string | null
+          supplier_name?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1991,6 +1997,42 @@ export type Database = {
           },
         ]
       }
+      tb810_unit_change_events: {
+        Row: {
+          actor_display_name: string
+          actor_staff_profile_id: string
+          actor_user_id: string
+          building_id: string
+          changes: Json
+          created_at: string
+          id: string
+          reason: string
+          unit_id: string
+        }
+        Insert: {
+          actor_display_name: string
+          actor_staff_profile_id: string
+          actor_user_id: string
+          building_id: string
+          changes: Json
+          created_at?: string
+          id?: string
+          reason: string
+          unit_id: string
+        }
+        Update: {
+          actor_display_name?: string
+          actor_staff_profile_id?: string
+          actor_user_id?: string
+          building_id?: string
+          changes?: Json
+          created_at?: string
+          id?: string
+          reason?: string
+          unit_id?: string
+        }
+        Relationships: []
+      }
       tb810_unit_types: {
         Row: {
           code: Database["public"]["Enums"]["tb810_unit_type_code"]
@@ -2314,6 +2356,25 @@ export type Database = {
       tb810_clear_current_gas_reading_month: {
         Args: { p_month_key: string }
         Returns: number
+      }
+      tb810_update_unit: {
+        Args: {
+          p_floor: string | null
+          p_has_gas_service: boolean
+          p_has_meter: boolean
+          p_notes: string | null
+          p_participation_percentage: number
+          p_reason: string | null
+          p_registered_area_m2: number | null
+          p_unit_id: string
+          p_unit_number: string
+          p_unit_type_id: string
+        }
+        Returns: Json
+      }
+      tb810_set_gas_bill_selection: {
+        Args: { p_bill_id: string; p_obligation_month: string | null }
+        Returns: Json
       }
       tb810_reset_dev_test_session: {
         Args: { p_session_id: string }

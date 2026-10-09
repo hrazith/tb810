@@ -18,8 +18,12 @@ test("obligation month 2027-01 derives source reading month 2026-12", () => {
   assert.equal(previousMonthKeyFromMonthKey("2027-01"), "2026-12");
 });
 
-test("gas bills are eligible when unprocessed and before the obligation month boundary", () => {
-  assert.equal(isEligibleGasBill("2026-07-31", null, "2026-08"), true);
-  assert.equal(isEligibleGasBill("2026-08-01", null, "2026-08"), false);
-  assert.equal(isEligibleGasBill("2026-07-31", "2026-08-05", "2026-08"), false);
+test("gas bills are eligible only when explicitly selected for the obligation month", () => {
+  const available = { selected_obligation_month: null, processed_at: null, reserved_billing_period_id: null };
+  const selected = { ...available, selected_obligation_month: "2026-08-01" };
+  assert.equal(isEligibleGasBill(selected, "2026-08"), true);
+  assert.equal(isEligibleGasBill(available, "2026-08"), false);
+  assert.equal(isEligibleGasBill(selected, "2026-09"), false);
+  assert.equal(isEligibleGasBill({ ...selected, processed_at: "2026-08-05" }, "2026-08"), false);
+  assert.equal(isEligibleGasBill({ ...selected, reserved_billing_period_id: "period" }, "2026-08"), false);
 });

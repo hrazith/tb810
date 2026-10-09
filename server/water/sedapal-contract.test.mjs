@@ -28,15 +28,38 @@ test("only the shared source-freeze extraction follows the Sedapal contract", ()
   const later = migrations.slice(migrations.indexOf("20261006120000_sedapal_source_freeze_contract.sql") + 1);
   assert.deepEqual(later, [
     "20261007120000_unit_water_start_over_source_freeze.sql",
+    "20261008120000_gas_production_contract.sql",
+    "20261008130000_unit_change_events.sql",
     "20261008140000_production_dev_isolation.sql",
+  ]);
+  // The Unit change-event migration touches no Sedapal contract function.
+  const unitEvents = fs.readFileSync(`supabase/migrations/${later[2]}`, "utf8");
+  assert.deepEqual([...unitEvents.matchAll(/create or replace function public\.(\w+)\(/g)].map((match) => match[1]).sort(), [
+    "tb810_block_unit_change_event_mutation",
+    "tb810_update_unit",
   ]);
 
   // DEV isolation only wraps production signatures; it does not redefine a
   // Sedapal source-freeze function.
-  const devIsolation = fs.readFileSync(`supabase/migrations/${later[1]}`, "utf8");
+  const devIsolation = fs.readFileSync(`supabase/migrations/${later[3]}`, "utf8");
   for (const sedapalFunction of ["tb810_assert_sedapal_provenance", "tb810_lock_common_water_source_periods", "tb810_lock_source_month_open", "tb810_approve_monthly_obligation"]) {
     assert.doesNotMatch(devIsolation, new RegExp(`create (?:or replace )?function public\\.${sedapalFunction}\\(`));
   }
+
+  // The Gas production contract may redefine persistence only to add the Gas
+  // provenance check after the unchanged Sedapal check; it touches no other
+  // Sedapal contract function.
+  const gasContract = fs.readFileSync(`supabase/migrations/${later[1]}`, "utf8");
+  const gasRedefined = [...gasContract.matchAll(/create or replace function public\.(\w+)\(/g)].map((match) => match[1]);
+  for (const sedapalFunction of ["tb810_assert_sedapal_provenance", "tb810_lock_common_water_source_periods", "tb810_lock_source_month_open", "tb810_approve_monthly_obligation"]) {
+    assert.equal(gasRedefined.includes(sedapalFunction), false, `${sedapalFunction} must not be redefined by the Gas contract`);
+  }
+  const persist = functionBody(gasContract, "tb810_persist_monthly_obligation_snapshot");
+  const packageLock = indexOf(persist, /pg_advisory_xact_lock\(public\.tb810_monthly_obligation_package_lock_key/, "package lock");
+  const sedapalCheck = indexOf(persist, /perform public\.tb810_assert_sedapal_provenance\(p_building_id, p_period_year, p_period_month, p_rows\);/, "Sedapal check");
+  const gasCheck = indexOf(persist, /perform public\.tb810_assert_gas_provenance\(p_building_id, p_period_year, p_period_month, p_rows, p_gas_bill_ids\);/, "Gas check");
+  const rowInsert = indexOf(persist, /insert into public\.tb810_monthly_financial_obligations/, "row insert");
+  assert.ok(packageLock < sedapalCheck && sedapalCheck < gasCheck && gasCheck < rowInsert, "lock, Sedapal, Gas, then insert");
 
   // That migration may re-point the Sedapal source lock at the shared helper,
   // and must not redefine any other Sedapal contract function.

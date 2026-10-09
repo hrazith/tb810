@@ -77,7 +77,7 @@ export async function getGasChargePreviewsForUnit(
     listUnits(),
     supabase
       .from("tb810_gas_bills")
-      .select("id, amount, processed_at, invoice_date")
+      .select("id, amount, processed_at, invoice_date, reserved_billing_period_id, selected_obligation_month")
       .eq("building_id", buildingResult.data.id)
       .order("invoice_date", { ascending: false })
       .order("created_at", { ascending: false }),
@@ -106,7 +106,7 @@ export async function getGasChargePreviewsForUnit(
     return { status: "not-applicable", message: "Gas is not applicable for this Unit." };
   }
 
-  const gasBillsForMonth = (billResult.data ?? []).filter((bill) => isEligibleGasBill(bill.invoice_date, bill.processed_at, obligationMonth));
+  const gasBillsForMonth = (billResult.data ?? []).filter((bill) => isEligibleGasBill(bill, obligationMonth));
   const readingsForMonth = new Map<
     string,
     {
@@ -190,7 +190,7 @@ export async function getMonthlyGasObligationSummary({
     listUnits(),
     supabase
       .from("tb810_gas_bills")
-      .select("id, amount, processed_at, invoice_date")
+      .select("id, amount, processed_at, invoice_date, reserved_billing_period_id, selected_obligation_month")
       .eq("building_id", buildingResult.data.id)
       .order("invoice_date", { ascending: false })
       .order("created_at", { ascending: false }),
@@ -202,7 +202,7 @@ export async function getMonthlyGasObligationSummary({
   if (readingResult.error) return { state: "blocked", amount: null, reason: readingResult.error };
 
   const gasUnits = (unitsResult.data ?? []).filter((item) => item.unit_type_code === "condo" && item.has_gas_service);
-  const gasBillsForMonth = (billResult.data ?? []).filter((bill) => isEligibleGasBill(bill.invoice_date, bill.processed_at, obligationMonth));
+  const gasBillsForMonth = (billResult.data ?? []).filter((bill) => isEligibleGasBill(bill, obligationMonth));
 
   const readingsForMonth = new Map<string, { consumption: number | null }>();
   for (const row of readingResult.data ?? []) {

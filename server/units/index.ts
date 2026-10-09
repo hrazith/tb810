@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getFixedBuildingIdentity } from "@/server/building";
 import { isPerfLoggingEnabled } from "@/server/perf";
+import { canManageUnits, UNIT_AUTHORIZATION_ERROR, userFacingUnitWriteError } from "./authorization";
 import { getCachedUnitDirectory, invalidateUnitDirectoryCache, setCachedUnitDirectory } from "./cache";
 
+import type { UnitChangeEvent } from "./change-history";
 import type {
   BuildingRecord,
   UnitDirectoryItem,
@@ -13,6 +15,7 @@ import type {
   UnitListItem,
   UnitRecord,
   UnitTypeRecord,
+  UnitUpdateResult,
 } from "./types";
 
 type QueryResult<T> = {
@@ -389,44 +392,56 @@ export async function getUnitByNumberForCurrentBuilding(
   };
 }
 
+// Canonical edit of an existing Unit. tb810_update_unit checks units.manage,
+// applies the condo-only meter/Gas rule, computes the diff and writes the
+// Unit plus one reasoned change event in a single transaction.
 export async function updateUnit(
   unitId: string,
   input: UnitInput,
-): Promise<QueryResult<UnitRecord>> {
+  reason: string,
+): Promise<QueryResult<UnitUpdateResult>> {
   const supabase = await createClient();
-  const unitTypeResult = await getUnitTypeCodeById(supabase, input.unit_type_id);
-  if (unitTypeResult.error) return { data: null as never, error: unitTypeResult.error };
-  const isCondo = unitTypeResult.data === "condo";
-  const payload = {
-    ...input,
-    has_meter: isCondo ? input.has_meter : false,
-    has_gas_service: isCondo ? input.has_gas_service : false,
-  };
-  const { data, error } = await supabase
-    .from("tb810_units")
-    .update({
-      building_id: payload.building_id,
-      unit_type_id: payload.unit_type_id,
-      unit_number: payload.unit_number,
-      floor: payload.floor,
-      registered_area_m2: payload.registered_area_m2,
-      participation_percentage: payload.participation_percentage,
-      has_meter: payload.has_meter,
-      has_gas_service: payload.has_gas_service,
-      notes: payload.notes,
-    })
-    .eq("id", unitId)
-    .select(UNIT_SELECT)
-    .single();
+  const { data, error } = await supabase.rpc("tb810_update_unit", {
+    p_unit_id: unitId,
+    p_unit_type_id: input.unit_type_id,
+    p_unit_number: input.unit_number,
+    p_floor: input.floor ?? null,
+    p_registered_area_m2: input.registered_area_m2 ?? null,
+    p_participation_percentage: input.participation_percentage,
+    p_has_meter: input.has_meter,
+    p_has_gas_service: input.has_gas_service,
+    p_notes: input.notes ?? null,
+    p_reason: reason.trim() || null,
+  });
 
-  if (error) return { data: null as never, error: error.message };
-  invalidateUnitDirectoryCache(payload.building_id);
-  return { data, error: null };
+  if (error) return { data: null as never, error: userFacingUnitWriteError(error.message) };
+  const result = data as { status: UnitUpdateResult["status"]; unitNumber: string };
+  if (result.status === "updated") invalidateUnitDirectoryCache(input.building_id);
+  return { data: { status: result.status, unitNumber: result.unitNumber }, error: null };
+}
+
+export async function listUnitChangeEvents(unitId: string): Promise<QueryResult<UnitChangeEvent[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tb810_unit_change_events")
+    .select("id, actor_display_name, reason, changes, created_at")
+    .eq("unit_id", unitId)
+    .order("created_at", { ascending: false });
+
+  if (error) return { data: [], error: error.message };
+  return {
+    data: (data ?? []).map((row) => ({
+      ...row,
+      changes: Array.isArray(row.changes) ? (row.changes as UnitChangeEvent["changes"]) : [],
+    })),
+    error: null,
+  };
 }
 
 export async function createUnit(
   input: UnitInput,
 ): Promise<QueryResult<UnitRecord>> {
+  if (!(await canManageUnits())) return { data: null as never, error: UNIT_AUTHORIZATION_ERROR };
   const supabase = await createClient();
   const unitTypeResult = await getUnitTypeCodeById(supabase, input.unit_type_id);
   if (unitTypeResult.error) return { data: null as never, error: unitTypeResult.error };
@@ -463,7 +478,7 @@ export async function createUnit(
     .select(UNIT_SELECT)
     .single();
 
-  if (error) return { data: null as never, error: error.message };
+  if (error) return { data: null as never, error: userFacingUnitWriteError(error.message) };
   invalidateUnitDirectoryCache(payload.building_id);
   return { data, error: null };
 }

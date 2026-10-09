@@ -2,14 +2,14 @@ const components = [
   {
     title: "Fixed assessment",
     source: "The building's monthly operating budget and each unit's participation percentage.",
-    formula: "Monthly budget x unit participation percentage = fixed assessment",
+    formula: "Monthly budget x unit participation percentage = fixed assessment, rounded to the céntimo for each unit",
     month: "The obligation month. A plan for that year is required.",
     missing: "Without a valid budget plan or participation percentage, the fixed component is unavailable.",
   },
   {
     title: "Metered Water",
     source: "A completed Water meter record for each applicable condo unit, including valid nonnegative consumption, plus the Sedapal/Common Water bill.",
-    formula: "Unit consumption / total consumption x Sedapal bill = unit Water amount",
+    formula: "Sedapal bill / total m³ billed by Sedapal = rate per m³. Unit consumption x rate, rounded to the nearest céntimo = unit Water amount. The rate keeps its full precision; it is not rounded before multiplying. Building consumption not recorded on unit meters stays in Common Water.",
     month: "Readings from the source month feed the following obligation month.",
     missing: "Missing, incomplete, invalid, or negative readings block the Water component. A missing Sedapal bill also blocks Common Water.",
   },
@@ -163,6 +163,30 @@ export default function ObligationsHelpPage() {
           <div className="rounded-2xl border border-zinc-200 bg-white p-5"><p className="font-semibold text-zinc-950">Never short</p><p className="mt-2 text-sm leading-6 text-zinc-600">Rounding up means owners always cover the full Common Water amount. The extra is less than one céntimo per unit.</p></div>
         </div>
         <p className="text-sm leading-6 text-zinc-500">This is the current TB810 policy; it can be changed later. Each month&apos;s variance stays explainable after approval, so the variances can be totalled over time. Approved months keep the amounts they were approved with: September 2026 was approved under the earlier rounding (PEN 1.67 per unit, PEN 0.05 below its Common Water amount) and does not change.</p>
+      </section>
+
+      <section className="space-y-5" aria-labelledby="legacy-reconciliation">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">October 2026 legacy reconciliation</p>
+          <h2 id="legacy-reconciliation" className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950">Why TB810 can differ from legacy receipts</h2>
+        </div>
+        <p className="max-w-3xl text-lg leading-8 text-zinc-700">
+          October 2026 receipts were issued by the legacy system. Comparing them with TB810 leaves three small rounding differences. They come from different calculation conventions. They are not unpaid amounts and not additional Unit Charges.
+        </p>
+        <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white">
+          <div className="border-b border-zinc-200 bg-zinc-50 px-5 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">October 2026, building-wide</div>
+          {[
+            ["Metered Water rate: legacy rounds the rate to PEN 4.25/m³; TB810 uses the precise rate (about PEN 4.253467/m³)", "TB810 +PEN 2.21"],
+            ["Fixed assessment: legacy rounds once per receipt; TB810 rounds for each unit", "TB810 +PEN 0.05"],
+            ["Final receipt rounding: legacy rounds each receipt total to the nearest PEN 0.10; TB810 does not", "Legacy receipts +PEN 0.20 (net)"],
+          ].map(([label, value]) => <div key={label} className="grid grid-cols-[1fr_auto] gap-6 border-b border-zinc-100 px-5 py-4 text-sm last:border-0"><span className="text-zinc-700">{label}</span><span className="font-medium text-zinc-950">{value}</span></div>)}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5"><p className="font-semibold text-zinc-950">Current TB810 policy</p><p className="mt-2 text-sm leading-6 text-zinc-600">Precise Water rate, fixed assessment rounded to the céntimo for each unit, and no rounding of the final total.</p></div>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5"><p className="font-semibold text-zinc-950">Legacy conventions</p><p className="mt-2 text-sm leading-6 text-zinc-600">Rounded Water rate, fixed assessment rounded per receipt, and receipt totals rounded to PEN 0.10. These explain historical receipts only.</p></div>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5"><p className="font-semibold text-zinc-950">From November 2026</p><p className="mt-2 text-sm leading-6 text-zinc-600">Confirmed: TB810 keeps the full-precision Water rate. The legacy rounded rate is not adopted, so the Water rate difference from legacy receipts is expected.</p></div>
+        </div>
+        <p className="text-sm leading-6 text-zinc-500">Other October differences are intentional policy changes, not rounding: Bono empleados on Unit 904, the discontinued historical adjustments, and Gas. The October operations checklist records them.</p>
       </section>
 
       <section className="space-y-5" aria-labelledby="month-relationship">

@@ -4,7 +4,6 @@ import createJiti from "jiti";
 
 const jiti = createJiti(import.meta.url);
 const {
-  defaultStartMonthForNewCharge,
   isChargeEligibleForMonth,
   nextMonthKey,
 } = jiti("./month.ts");
@@ -46,7 +45,7 @@ test("open-ended recurring charge stays active until stopped", () => {
   assert.equal(isChargeEligibleForMonth({ ...charge, obligationMonth: "2027-01" }), true);
 });
 
-test("default start month advances one month past the reference month", () => {
-  assert.equal(defaultStartMonthForNewCharge("2026-08"), "2026-09");
+test("next month key advances one month", () => {
   assert.equal(nextMonthKey("2026-08"), "2026-09");
+  assert.equal(nextMonthKey("2026-12"), "2027-01");
 });

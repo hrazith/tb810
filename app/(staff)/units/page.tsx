@@ -3,6 +3,7 @@ import { LetterCircleP, Rows, SquaresFour } from "@phosphor-icons/react/dist/ssr
 
 import { Panel } from "@/components/ui/panel";
 import { listUnitTypes, listUnits } from "@/server/units";
+import { canManageUnits } from "@/server/units/authorization";
 
 import { UnitsControls } from "./_components/units-controls";
 import { UnitsTable } from "./_components/units-table";
@@ -26,12 +27,13 @@ function isParkingUnit(unitTypeName: string | null | undefined) {
 export default async function UnitsPage({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
   const view = params.view ?? "cards";
-  const [unitsResult, unitTypesResult] = await Promise.all([
+  const [unitsResult, unitTypesResult, canManage] = await Promise.all([
     listUnits({
       query: params.q,
       unitTypeId: params.unitTypeId,
     }),
     listUnitTypes(),
+    canManageUnits(),
   ]);
 
   return (
@@ -80,6 +82,7 @@ export default async function UnitsPage({ searchParams }: PageProps) {
             initialQuery={params.q ?? ""}
             initialUnitTypeId={params.unitTypeId ?? ""}
             unitTypes={unitTypesResult.data}
+            canManageUnits={canManage}
           />
         </div>
       </div>

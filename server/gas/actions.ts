@@ -13,6 +13,7 @@ import {
   deleteGasBill,
   deleteGasReading,
   importGasWorkbook,
+  setGasBillSelection,
   updateGasBill,
   updateGasReading,
 } from "./index";
@@ -82,7 +83,7 @@ function isGasWorkbookReadError(error: unknown) {
 
 export async function createGasBillAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {
   const values = {
-    supplier_name: "Not recorded",
+    supplier_name: String(formData.get("supplier_name") ?? ""),
     invoice_number: String(formData.get("invoice_number") ?? ""),
     invoice_date: String(formData.get("invoice_date") ?? ""),
     amount: toNumber(formData.get("amount")),
@@ -121,6 +122,18 @@ export async function deleteGasBillAction(formData: FormData): Promise<void> {
   const result = await deleteGasBill(String(formData.get("bill_id") ?? ""));
   if (result.error) throw new Error(userFacingGasBillError(result.error));
   revalidateGasBills();
+}
+
+// obligation_month empty = exclude the purchase from its pool; a month restores
+// (includes) it in that month's pool.
+export async function setGasBillSelectionAction(formData: FormData): Promise<GasFormState> {
+  const billId = String(formData.get("bill_id") ?? "");
+  const obligationMonth = String(formData.get("obligation_month") ?? "").trim();
+  const result = await setGasBillSelection(billId, obligationMonth || null);
+  if (result.error) return { error: userFacingGasBillError(result.error) };
+  revalidateGasBills();
+  revalidatePath("/", "layout");
+  return { success: obligationMonth ? "Purchase restored to the pool." : "Purchase excluded from the pool." };
 }
 
 export async function createGasReadingAction(_prev: GasFormState, formData: FormData): Promise<GasFormState> {

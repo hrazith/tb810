@@ -18,6 +18,8 @@ type Props = {
     formData: FormData,
   ) => Promise<UnitFormState>;
   submitLabel: string;
+  // Edit only: a meaningful change must explain why the Unit is changing.
+  showReasonForChange?: boolean;
 };
 
 const initialState: UnitFormState = {};
@@ -44,10 +46,11 @@ function meterAllowed(unitTypeId: string | undefined, unitTypes: UnitTypeRecord[
   return unitType?.code === "condo";
 }
 
-export function UnitForm({ defaults, action, submitLabel }: Props) {
+export function UnitForm({ defaults, action, submitLabel, showReasonForChange = false }: Props) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const values = { ...defaults.values, ...(state.values ?? {}) } as Partial<UnitInput> & {
     active?: boolean;
+    reason?: string;
   };
   const [selectedTypeId, setSelectedTypeId] = useState(
     values.unit_type_id ?? defaults.unitTypes[0]?.id ?? "",
@@ -254,7 +257,10 @@ export function UnitForm({ defaults, action, submitLabel }: Props) {
       </div>
 
       <label className="block space-y-2">
-        <span className="block text-lg font-medium text-zinc-900">Notes</span>
+        <span className="block text-lg font-medium text-zinc-900">Legacy notes (imported)</span>
+        <span className="block text-sm text-zinc-600">
+          Historical comments imported from the previous system.
+        </span>
         <textarea
           name="notes"
           rows={5}
@@ -262,6 +268,25 @@ export function UnitForm({ defaults, action, submitLabel }: Props) {
           className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
         />
       </label>
+
+      {showReasonForChange ? (
+        <label className="block space-y-2">
+          <span className="block text-lg font-medium text-zinc-900">Reason for change</span>
+          <span className="block text-sm text-zinc-600">
+            Explain why this Unit information is changing.
+          </span>
+          <textarea
+            name="reason"
+            rows={3}
+            defaultValue={values.reason ?? ""}
+            aria-invalid={Boolean(fieldError("reason", state)) || undefined}
+            className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+          />
+          {fieldError("reason", state) ? (
+            <p className="text-sm text-red-600">{fieldError("reason", state)}</p>
+          ) : null}
+        </label>
+      ) : null}
 
       {state.error ? (
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

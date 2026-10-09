@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { UnitForm } from "../../_components/unit-form";
 import { updateUnitAction } from "../../actions";
@@ -6,6 +6,7 @@ import {
   getUnitByNumberForCurrentBuilding,
   getUnitFormDefaults,
 } from "@/server/units";
+import { canManageUnits } from "@/server/units/authorization";
 
 type PageProps = {
   params: Promise<{
@@ -15,6 +16,10 @@ type PageProps = {
 
 export default async function EditUnitPage({ params }: PageProps) {
   const { unitNumber } = await params;
+  // Only units.manage may edit; others get the read-only Unit detail.
+  if (!(await canManageUnits())) {
+    redirect(`/units/${encodeURIComponent(unitNumber)}`);
+  }
   const lookup = await getUnitByNumberForCurrentBuilding(unitNumber);
 
   if (lookup.error) {
@@ -50,6 +55,7 @@ export default async function EditUnitPage({ params }: PageProps) {
         defaults={defaults.data}
         action={updateUnitAction.bind(null, lookup.data.id)}
         submitLabel="Save changes"
+        showReasonForChange
       />
     </section>
   );
