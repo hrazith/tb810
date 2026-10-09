@@ -1,3 +1,6 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessNow } from "@/server/business-date";
 import { getFixedBuildingIdentity } from "@/server/building";
@@ -9,8 +12,15 @@ const PROGRESSED_STATUSES = new Set(["ready_for_review", "approved", "invoices_g
 
 export type MonthlyObligationPulseStatus = "handed_off" | "not_ready" | "not_eligible" | "already_progressed" | "error";
 
+// FIN-008 operational/source clock: the system Pulse establishes the current
+// operational month's Billing Period container, independently of progression.
+export type OperationalMonthResult =
+  | { status: "ensured"; month: string; billingPeriodId: string; created: boolean }
+  | { status: "error"; reason: string };
+
 export type MonthlyObligationPulseResult = {
   status: MonthlyObligationPulseStatus;
+  operationalMonth?: OperationalMonthResult;
   buildingId: string;
   obligationMonth: string;
   billingPeriodId?: string;
@@ -61,6 +71,24 @@ export function mapSnapshotResult({
 
 export type PulseExecutionContext = "human" | "system";
 
+type RpcClient = {
+  rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+};
+
+// The month comes from the database clock. A failure is reported, never
+// worked around, and never gates obligation progression.
+export async function ensureOperationalMonth(client: unknown, buildingId: string): Promise<OperationalMonthResult> {
+  try {
+    const { data, error } = await (client as RpcClient).rpc("tb810_ensure_operational_billing_period_system", { p_building_id: buildingId });
+    if (error) return { status: "error", reason: error.message };
+    const payload = data as { billingPeriodId?: string; month?: string; created?: boolean } | null;
+    if (!payload?.billingPeriodId || !payload.month) return { status: "error", reason: "Operational month container unavailable." };
+    return { status: "ensured", month: payload.month, billingPeriodId: payload.billingPeriodId, created: payload.created === true };
+  } catch (error) {
+    return { status: "error", reason: error instanceof Error ? error.message : "Operational month container unavailable." };
+  }
+}
+
 export async function runMonthlyObligationPulse(executionContext: PulseExecutionContext = "human", persistence?: HandoffPersistence): Promise<MonthlyObligationPulseResult> {
   const building = getFixedBuildingIdentity();
   const businessNow = await getBusinessNow();
@@ -68,6 +96,27 @@ export async function runMonthlyObligationPulse(executionContext: PulseExecution
   const month = businessNow.getUTCMonth() + 1;
   const obligationMonth = `${year}-${String(month).padStart(2, "0")}`;
   const supabase = executionContext === "system" ? createSystemClient() : await createClient();
+  // Operational clock first; obligation progression is evaluated regardless.
+  const operationalMonth = executionContext === "system" ? await ensureOperationalMonth(supabase, building.id) : undefined;
+  const result = await evaluateObligationProgression({ executionContext, persistence, building, businessNow, obligationMonth, supabase });
+  return operationalMonth ? { ...result, operationalMonth } : result;
+}
+
+async function evaluateObligationProgression({
+  executionContext,
+  persistence,
+  building,
+  businessNow,
+  obligationMonth,
+  supabase,
+}: {
+  executionContext: PulseExecutionContext;
+  persistence?: HandoffPersistence;
+  building: { id: string; name: string };
+  businessNow: Date;
+  obligationMonth: string;
+  supabase: SupabaseClient<Database>;
+}): Promise<MonthlyObligationPulseResult> {
   const progressionResult = await loadGiulianaPackageProgression({ buildingId: building.id, startMonth: obligationMonth, client: supabase });
   if (progressionResult.error || !progressionResult.data) {
     return {

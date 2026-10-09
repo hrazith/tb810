@@ -141,6 +141,18 @@ async function CarlosDashboardPage({ firstName, error }: { firstName: string; er
     financialBlockers: projection.financialBlockers,
     reviewFingerprint: result.data.current.reviewFingerprint,
   };
+  const hasApprovalItem = projection.journeyState === "ready_for_approval" || projection.journeyState === "approval_overdue";
+  const chargeCount = (projection.components.other_charge.count ?? 0) + (projection.components.owner_direct_charge.count ?? 0);
+  const journeyStatus = projection.journeyState === "approved"
+    ? `✓ ${projection.journeyLabel} · ${amountText(projection.total)}`
+    : projection.journeyState === "building"
+      ? `${projection.journeyLabel}${chargeCount > 0 ? ` · ${chargeCount} charges` : ""}`
+      : projection.journeyState === "ready"
+        ? `${projection.journeyLabel} · ${amountText(projection.total)}`
+        : projection.journeyState === "blocked"
+          ? `${projection.journeyLabel} · ${projection.financialBlockers.length} ${projection.financialBlockers.length === 1 ? "issue" : "issues"}`
+          : projection.journeyLabel;
+  const noteworthy = result.data.current.worthNoting;
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col space-y-6 px-6 py-6 sm:py-8">
@@ -148,6 +160,27 @@ async function CarlosDashboardPage({ firstName, error }: { firstName: string; er
         <p className="text-md text-zinc-800">{formatDateLabel(result.data.businessDate)}</p>
         <DashboardGreeting firstName={firstName} />
       </div>
+
+      <div className="mt-8 flex flex-wrap items-start justify-between gap-6 border-t border-zinc-200 pt-8">
+        <div className="space-y-2">
+          <p className="text-2xl font-semibold tracking-tight text-zinc-950">{formatMonthLabel(projection.obligationMonth)} obligations</p>
+          <p className="text-xl font-semibold text-zinc-950">{journeyStatus}</p>
+          {hasApprovalItem ? <p className="max-w-2xl text-lg text-zinc-600">Open Obligations to review the {formatMonthLabel(projection.obligationMonth)} obligations before approving.</p> : null}
+        </div>
+        {projection.journeyState === "blocked" ? (
+          <ul className="max-w-2xl space-y-1 text-lg text-zinc-600">
+            {projection.financialBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+          </ul>
+        ) : null}
+      </div>
+
+      {noteworthy.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-700">
+          <FileText size={20} weight="regular" aria-hidden="true" />
+          <span className="font-medium text-zinc-950">Unit charges</span>
+          <span>{noteworthy.length} noteworthy {noteworthy.length === 1 ? "charge" : "charges"}</span>
+        </div>
+      ) : null}
 
       <CarlosApprovalWorkspace
         projection={projection}
@@ -215,7 +248,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const components = financialFacts.obligations.components;
   const handoffStatus = projection.handoff
     ? projection.handoff.status === "approved_ready_for_dispatch"
-      ? "Approved · Ready for dispatch"
+      ? "Approved"
       : "Complete · Awaiting Carlos approval"
     : projection.obligations.readiness === "awaiting_approval"
       ? "Complete · Awaiting Carlos approval"
@@ -228,7 +261,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const activeResponsibility = projection.activeResponsibility;
   const completedItems = projection.completed.map((item) => {
     if (item.key === "prior_obligations" && item.obligationMonth) {
-      return `${formatMonthLabel(item.obligationMonth)} obligations ${item.status === "approved_ready_for_dispatch" ? "approved · ready for dispatch" : "awaiting Carlos approval"}`;
+      return `${formatMonthLabel(item.obligationMonth)} obligations ${item.status === "approved_ready_for_dispatch" ? "approved" : "awaiting Carlos approval"}`;
     }
     if (item.key === "obligations") return `${financialMonthLabel} obligations calculated`;
     return item.key === "water" ? "Water" : "Gas";
@@ -324,7 +357,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
               <MeterProgress complete={gasComplete} expected={gasExpected} label="Gas meter readings" />
             </Link>
             <div className="hidden h-36 w-px bg-zinc-200 sm:block" />
-            <Link href="/gas" className="rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+            <Link href="/gas/bills" className="rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
               <span className="text-lg font-normal text-zinc-950">Supplier Bills</span>
               <p className="mt-2 text-lg font-semibold text-zinc-950">{financialFacts.gas.supplierBillCount} {financialFacts.gas.supplierBillCount === 1 ? "bill" : "bills"}</p>
               <p className="mt-1 text-sm text-zinc-600">{formatMoney(financialFacts.gas.supplierBillTotal)}</p>

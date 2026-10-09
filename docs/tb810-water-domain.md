@@ -119,8 +119,22 @@ For Sedapal:
 
 `Sedapal bill month M -> Obligation month M+1`
 
+Here "Sedapal bill month" is the source month: Sedapal's printed "Mes facturado",
+which is also the month of the Reading Date and of the Unit readings paired with
+the bill. Counted from the consumption (Service) month, the same chain is
+`Consumption month M -> source month M+1 -> Obligation month M+2`. Legacy
+`utilities.billed_month` and informal bill filenames use the consumption month,
+one month earlier than Sedapal's printed month.
+
 The underlying Sedapal service period is separate from both source-month
 labels and must not redefine Unit Water month identity.
+
+Water source intake follows the operational/source clock of the
+[Dual-Clock Monthly Operating Model](./architecture/monthly-operating-model.md)
+(FIN-008). When a Sedapal bill or a set of Unit readings arrives, Giuliana
+enters it and leaves the Water domain. The consuming obligation package looks
+backward for those facts later, and intake does not depend on obligation
+handoff.
 
 For the approved legacy cadence, water service can originate in one month while the assessment obligation belongs to a later month.
 

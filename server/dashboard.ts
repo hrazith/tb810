@@ -60,6 +60,17 @@ export type CarlosJourneyState = "building" | "ready" | "blocked" | "ready_for_a
 
 export const MONTHLY_OBLIGATION_APPROVAL_CUTOFF_DAY = 5;
 
+// Canonical display copy for Carlos's obligation journey. `ready` is complete
+// but not handed off: Pulse owns the handoff, so it is never actionable.
+export const CARLOS_JOURNEY_LABELS: Record<CarlosJourneyState, string> = {
+  building: "Building",
+  blocked: "Blocked",
+  ready: "Ready for handoff",
+  ready_for_approval: "Ready for your approval",
+  approval_overdue: "Approval overdue",
+  approved: "Approved",
+};
+
 export type GulianaDashboardFacts = {
   businessDate: string;
   operatingMonth: string;
@@ -181,6 +192,7 @@ export type CarlosDashboardProjection = {
   billingPeriodStatus: string | null;
   approvalState: CarlosApprovalState;
   journeyState: CarlosJourneyState;
+  journeyLabel: string;
   pendingReviews: Array<{
     billingPeriodId: string;
     obligationMonth: string;
@@ -356,14 +368,19 @@ export function projectCarlosDashboard(monthFacts: GulianaDashboardFacts): Carlo
     && (currentLifecycle.billingPeriodStatus === "ready_for_review" || isApprovedLifecycleStatus(currentLifecycle.billingPeriodStatus));
   const financialFacts = hasCurrentApprovalLifecycle ? monthFacts.current : monthFacts[financialFocus];
   const lifecycle = financialFacts.obligationLifecycle;
-  const currentMonth = monthFacts.businessDate.slice(0, 7) === financialFacts.obligations.obligationMonth;
+  // FIN-008: a package may lag behind the operational month, so lifecycle
+  // states apply once its obligation month has begun, not only during it. A
+  // future-month package (for example after a DEV date rewind) stays hidden.
+  const businessMonth = monthFacts.businessDate.slice(0, 7);
+  const obligationMonthReached = businessMonth >= financialFacts.obligations.obligationMonth;
+  const carriedIntoLaterMonth = businessMonth > financialFacts.obligations.obligationMonth;
   const financiallyReady = isReadyToApprove(financialFacts);
-  const readyForApproval = currentMonth
+  const readyForApproval = obligationMonthReached
     && lifecycle.billingPeriodStatus === "ready_for_review"
     && financiallyReady;
   const approvalState = readyForApproval
-    ? currentMonth && Number(monthFacts.businessDate.slice(8, 10)) > MONTHLY_OBLIGATION_APPROVAL_CUTOFF_DAY ? "overdue" : "ready"
-    : currentMonth && lifecycle.mode === "snapshotted" && isApprovedLifecycleStatus(lifecycle.billingPeriodStatus) ? "approved" : "not_ready";
+    ? carriedIntoLaterMonth || Number(monthFacts.businessDate.slice(8, 10)) > MONTHLY_OBLIGATION_APPROVAL_CUTOFF_DAY ? "overdue" : "ready"
+    : obligationMonthReached && lifecycle.mode === "snapshotted" && isApprovedLifecycleStatus(lifecycle.billingPeriodStatus) ? "approved" : "not_ready";
   const readinessDeadline = financialReadinessDeadline(financialFacts.obligations.obligationMonth);
   const journeyState = approvalState === "overdue"
     ? "approval_overdue"
@@ -390,6 +407,7 @@ export function projectCarlosDashboard(monthFacts: GulianaDashboardFacts): Carlo
     billingPeriodStatus: lifecycle.billingPeriodStatus,
     approvalState,
     journeyState,
+    journeyLabel: CARLOS_JOURNEY_LABELS[journeyState],
     pendingReviews: monthFacts.pendingReviews ?? [],
   };
 }

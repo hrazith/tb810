@@ -31,7 +31,23 @@ test("only the shared source-freeze extraction follows the Sedapal contract", ()
     "20261008120000_gas_production_contract.sql",
     "20261008130000_unit_change_events.sql",
     "20261008140000_production_dev_isolation.sql",
+    "20261009120000_api_surface_lockdown.sql",
+    "20261009130000_progression_unfinished_package_anchor.sql",
+    "20261009140000_pulse_operational_month_container.sql",
   ]);
+  // The operational-month container only inserts a Billing Period; it defines
+  // no Sedapal contract function.
+  assert.deepEqual(
+    [...fs.readFileSync(`supabase/migrations/${later[6]}`, "utf8").matchAll(/create (?:or replace )?function public\.(\w+)\(/g)].map((match) => match[1]),
+    ["tb810_ensure_operational_billing_period_system"],
+  );
+  // The API lockdown only revokes privileges and enables RLS; the progression
+  // anchor redefines only the progression read. Neither touches Sedapal.
+  assert.doesNotMatch(fs.readFileSync(`supabase/migrations/${later[4]}`, "utf8"), /create (?:or replace )?function/);
+  assert.deepEqual(
+    [...fs.readFileSync(`supabase/migrations/${later[5]}`, "utf8").matchAll(/create (?:or replace )?function public\.(\w+)\(/g)].map((match) => match[1]),
+    ["tb810_get_giuliana_package_progression"],
+  );
   // The Unit change-event migration touches no Sedapal contract function.
   const unitEvents = fs.readFileSync(`supabase/migrations/${later[2]}`, "utf8");
   assert.deepEqual([...unitEvents.matchAll(/create or replace function public\.(\w+)\(/g)].map((match) => match[1]).sort(), [

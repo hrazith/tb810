@@ -47,7 +47,7 @@ Documentation work and UI or data operations are tracked separately. An item is 
   - recurring charges with no end month accepted and eligible in every later month.
 - Full node suite: 442 tests, 0 failures (432 pass, 10 todo). `tsc --noEmit` and eslint are clean.
 
-**Caveat (canonical progression, unchanged).** Progression starts from the current business month. If the calendar reaches November while October is still un-handed-off, progression reports November as active. The Obligations workspace then moves to November, and October charges are no longer editable. This matches what Giuliana sees, so enter the October charges during October.
+**Caveat (superseded October 9, 2026 by FIN-008, the [Dual-Clock Monthly Operating Model](../architecture/monthly-operating-model.md)).** An unfinished package stays the active obligation package after the calendar moves on. The progression-anchor migration `20261009130000` implements this, but it is not yet applied live, so until then the caveat below still describes live behavior. Original caveat: Progression starts from the current business month. If the calendar reaches November while October is still un-handed-off, progression reports November as active. The Obligations workspace then moves to November, and October charges are no longer editable. This matches what Giuliana sees, so enter the October charges during October.
 
 No charges were created as part of this correction.
 

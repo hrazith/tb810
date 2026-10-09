@@ -6,11 +6,11 @@
 -- exact public production signature and an owner-only DEV implementation.
 
 -- Supabase's current public-schema defaults grant new functions to every API
--- role. Close that inheritance path for both owners that currently create
--- functions in this schema. Production RPCs are granted explicitly below.
+-- role. Close that inheritance path for postgres, the owner of every TB810
+-- function and the role migrations run as. Production RPCs are granted
+-- explicitly below. supabase_admin's defaults are out of reach (postgres is not
+-- a member of it) and it owns only extension functions in this schema.
 alter default privileges for role postgres in schema public
-  revoke execute on functions from public, anon, authenticated, service_role;
-alter default privileges for role supabase_admin in schema public
   revoke execute on functions from public, anon, authenticated, service_role;
 
 -- No API role may read, create, alter, or journal DEV sessions. Existing rows

@@ -101,6 +101,25 @@ context, `closed` does not imply native Carlos approval, `approved_by`,
 `approved_at`, a native obligation snapshot, or generated invoices. Native
 periods continue through the live TB810 handoff and approval lifecycle.
 
+### Current implementation: one row, two roles
+
+The implementation overloads a `tb810_billing_periods` row for month X. These
+are two concepts sharing one table, not one concept:
+
+1. **Obligation package X.** `status` (`ready_for_review`, `approved`,
+   `invoices_generated`, `closed`) records package X's handoff and approval
+   lifecycle, so `status` behaves as a workflow for obligation packages.
+2. **The operational-month container for month X.** Some source facts are keyed
+   to it. For example, the Sedapal bill emitted in month X is stored on Billing
+   Period X, and obligation package X+1 consumes it.
+
+Under the [Dual-Clock Monthly Operating Model](../architecture/monthly-operating-model.md)
+(FIN-008), the operational-month container must exist because time has passed,
+as this domain intends. Known mismatch: since the 2023-09 through 2026-08
+backfill, new rows are created only by obligation handoff or approval. When a
+handoff runs late, the container for an operational month that is already
+relevant does not exist, and source intake keyed to it (Sedapal) is blocked.
+
 ### `approved_by`
 
 User who approved the Billing Period.

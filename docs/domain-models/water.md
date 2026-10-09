@@ -147,10 +147,14 @@ System derives calculated values
 Record reviewed
 ↓
 
-Month closes
+Carlos approves the consuming obligation package
 ↓
 
 Record becomes immutable
+
+Intake follows the operational/source clock (FIN-008,
+[Monthly Operating Model](../architecture/monthly-operating-model.md)): the bill
+is entered when it arrives, whatever state earlier obligation packages are in.
 
 ## MVP1 Assumptions
 
@@ -158,7 +162,7 @@ Record becomes immutable
 - The monthly sequence is uninterrupted.
 - Previous Reading is inherited from the previous month's Current Reading.
 - Previous Reading is editable only for the very first ledger record.
-- Once a service month closes, the record becomes immutable.
+- The record becomes immutable when Carlos approves the obligation package that consumes it, not when a calendar month ends (see Record Lifecycle).
 - Historical records are never edited.
 - Corrections after lock are outside MVP1.
 - Missing service months are outside MVP1.
@@ -235,13 +239,15 @@ This means Service Month is the calendar month immediately preceding the Reading
 
 ### Charge Month
 
-TB810’s downstream owner-billing month.
-
-MVP1 rule:
-
 `Charge Month = Service Month + 1 calendar month`
 
-For the current workflow this normally matches the Reading Date month and Sedapal Billed Month, but those terms are not interchangeable.
+Despite its name, Charge Month is **not** the month in which owners are charged.
+It equals the source month: the Reading Date month, normally Sedapal's printed
+billed month, and the month of the Billing Period that stores the bill. Owners
+are charged in the Obligation Month, which is Service Month + 2 (see the
+Water-to-Obligation Timing Model above and the
+[Monthly Operating Model](../architecture/monthly-operating-model.md)). The
+Sedapal intake form still shows this derived "Charge Month" label.
 
 ### Canonical Example
 
@@ -249,7 +255,8 @@ For the current workflow this normally matches the Reading Date month and Sedapa
 - Reading Date: 06 Jul 2026
 - Billed Month: Jul 2026
 - Service Month: Jun 2026
-- Charge Month: Jul 2026
+- Charge Month (source month): Jul 2026
+- Obligation Month: Aug 2026
 
 ### MVP1 Constraint
 

@@ -46,6 +46,8 @@ The second timeline is the operational source work being collected for the next 
 
 These timelines must remain distinct rather than collapsing into one generic "current month" concept.
 
+They are the two clocks of the [Dual-Clock Monthly Operating Model](./monthly-operating-model.md) (FIN-008). Source work follows the calendar, and obligations follow the lifecycle. When the obligation package lags, for example October still unfinished on November 3, November source work stays valid and available. The lagging package stays the active obligation package until Pulse hands it off.
+
 The dashboard therefore has three related responsibilities:
 
 - the monthly status/handoff region communicates the obligation package currently crossing lifecycle boundaries;
@@ -260,11 +262,12 @@ month clock. Calendar/business date drives boundaries and pulse attempts;
 financial readiness drives handoff eligibility; Carlos approval creates the
 snapshot and freezes the canonical package; the earlier handoff advances Giuliana's
 operational focus to the immediate successor. Carlos approval changes the
-handed-off package's status but does not advance focus again. These transitions
-may occur before or after calendar month-turn.
+handed-off package's status but does not advance focus again. Readiness may
+occur before calendar month-turn; handoff occurs only once the obligation month
+has begun.
 
-For example, September source facts becoming ready on September 28 may produce
-an October handoff before October begins. Conversely, on October 1 unresolved
+For example, September source facts becoming ready on September 28 make October
+Ready for handoff, and the first October pulse hands it off. Conversely, on October 1 unresolved
 September facts leave October obligations Not Ready while October source work
 begins for November. After the final September fact arrives, a subsequent pulse
 may hand October to Carlos and show Complete · Awaiting Carlos approval.
@@ -599,8 +602,9 @@ The pulse uses the same lifecycle-driven progression package selection as the
 dashboard: a live package remains the candidate while Giuliana owns its
 preparation; `ready_for_review` hands the package to Carlos and advances the
 candidate to the immediate successor. Later approval does not advance it again.
-A package may be snapshotted early
-when its source facts are complete. The scheduler does not invoke dashboard
+A package may become ready early when its source facts are complete, but it is
+handed off only once its obligation month has begun, and no obligation rows are
+persisted until Carlos approves. The scheduler does not invoke dashboard
 loaders, scan historical months, poll from the client, or couple progression to
 source mutations.
 

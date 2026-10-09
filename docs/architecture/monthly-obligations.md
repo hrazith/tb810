@@ -152,10 +152,11 @@ This approved snapshot must preserve the financial facts Carlos reviewed so late
 The dashboard may preview the next obligation month before that approval boundary is reached.
 That preview remains live and unapproved until Pulse hands it to Carlos and he
 explicitly approves the resulting approved Billing Period and obligation rows. Handoff is
-readiness- and calendar-driven. Month close is an important guaranteed
-attempt/checkpoint, but it is not the earliest allowed handoff time: when all
-required financial facts for an upcoming package become ready before month
-turn, Pulse may hand that package off once it is calendar-eligible. The date
+readiness- and calendar-driven. Preparation and readiness may complete before
+the obligation month begins, but handoff may not: a package that becomes ready
+before month turn waits, and the first pulse in its obligation month hands it
+off. Month turn is therefore the earliest handoff time, not merely a guaranteed
+attempt. The date
 alone does not freeze an incomplete package; an incomplete package remains live
 and Not Ready until its final blocker resolves.
 
@@ -188,6 +189,10 @@ than one universal month clock.
 ### Frozen progression rules
 
 - The active obligation package consumes its canonical prior/source month.
+- The active obligation package is the oldest obligation month not yet handed
+  off. Progression anchors on it, bounded by the calendar month, and never
+  abandons an unfinished package because the calendar moved on (FIN-008,
+  [Monthly Operating Model](./monthly-operating-model.md)).
 - Source attention resolves independently as each source fact becomes complete.
 - A package is Ready for handoff when its required financial facts calculate
   successfully and no blocker remains.
@@ -237,6 +242,12 @@ server-only `SUPABASE_SECRET_KEY` execution path.
 
 ### Coordinated lifecycle clocks
 
+The [Dual-Clock Monthly Operating Model](./monthly-operating-model.md) (FIN-008)
+is canonical: source-domain progression follows the passage of time, obligation
+progression follows lifecycle completion and Pulse rules, and an obligation
+package may lag the operational month without blocking that month's source
+work.
+
 For obligation month M, the relevant preceding source periods are selected by
 the component rules. The lifecycle is:
 
@@ -259,8 +270,9 @@ financial focus advances at `ready_for_review`; Carlos approval then creates the
 immutable snapshot and changes the handed-off package's status. These concepts
 may point at different months by design.
 
-For example, September source facts becoming ready on September 28 may produce
-an October `ready_for_review` handoff before October begins. If September facts
+For example, September source facts becoming ready on September 28 make October
+Ready for handoff, but October is not calendar-eligible until October 1, so the
+first October pulse produces the `ready_for_review` handoff. If September facts
 remain incomplete on October 1, October is Not Ready while October source intake
 proceeds toward November. When the final September fact arrives on October 2, a
 later pulse may hand October to Carlos without requiring a user to manufacture
@@ -577,9 +589,11 @@ She handles the later operational dispatch workflow once the approved artifacts 
 This document does not define the final invoice-generation, PDF-bundle, dispatch-tracking, or Collections implementation.
 Those downstream details remain intentionally open until their dedicated workflows are designed.
 
-Carlos's first implementation slice is review and approval of an existing
-immutable snapshot. Approval is an authority action over that package, not a
-recalculation or a new snapshot operation.
+`ready_for_review` is a live review state: handoff persists no obligation rows
+or snapshot. Carlos reviews the live calculation, guarded by a review
+fingerprint that detects changes, and his approval persists the immutable
+obligation rows with their `calculation_snapshot`. Legacy packages whose rows
+were already persisted are approved without being recreated.
 
 ## 14. Workspace Responsibilities
 
@@ -640,11 +654,11 @@ This document does not:
 - Missing components must not be treated as zero.
 - Zero and missing must remain distinguishable.
 - Finalized Monthly Obligations are immutable historical snapshots.
-- Snapshot eligibility is readiness-driven; month-turn guarantees an attempt but is not the earliest allowed snapshot time.
+- Handoff is readiness-driven and calendar-gated: readiness may come early, but handoff never occurs before the obligation month begins.
 - Snapshot creation occurs atomically with Carlos approval for new packages.
 - A date change alone does not resolve or freeze an incomplete package.
 - Before finalization, live/progressive obligations may be presented as a preview.
-- After finalization, the package is Awaiting Carlos Approval.
+- After handoff (`ready_for_review`), the live package is Awaiting Carlos Approval; finalization happens at approval.
 - Carlos approves the live reviewed package; legacy immutable snapshots are approved without being recreated.
 - A future snapshot is not presentation-visible before its obligation month begins.
 - `ready_for_review` advances Giuliana's primary financial focus to the immediate successor live obligation preview; later Carlos approval does not advance it again.

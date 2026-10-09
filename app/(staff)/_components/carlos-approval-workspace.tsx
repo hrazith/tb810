@@ -60,6 +60,9 @@ function commonWaterRoundingText(component: { state: "available" | "blocked"; so
   return `Source pool ${amountText(component.sourcePool)} · ${label} ${signedAmountText(component.roundingVariance)}`;
 }
 
+const HANDED_OFF_STATUSES = new Set(["ready_for_review", "approved", "invoices_generated", "closed"]);
+const APPROVED_STATUSES = new Set(["approved", "invoices_generated", "closed"]);
+
 function componentText(component: { state: "available" | "blocked"; amount: string | null; count?: number | null }) {
   if (component.state === "blocked") return "Blocked";
   return `${amountText(component.amount)}${component.count == null ? "" : ` · ${component.count} ${component.count === 1 ? "charge" : "charges"}`}`;
@@ -113,6 +116,17 @@ export function CarlosApprovalWorkspace({ projection, initialDetail, attentionPa
     ? projection.pendingReviews.find((review) => review.obligationMonth !== selectedMonth && review.outstanding)
     : null;
 
+  // The pill follows the obligation journey: the oldest pending review once
+  // Pulse has handed a package off, otherwise the active package (read-only).
+  const journeyMonth = actionable?.obligationMonth ?? projection.obligationMonth;
+  const journeyLabel = actionable && !actionable.approvalEligible
+    ? "Ready for review"
+    : !actionable || actionable.obligationMonth === projection.obligationMonth
+      ? projection.journeyLabel
+      : "Ready for your approval";
+  const selectedHandedOff = selectedDetail ? HANDED_OFF_STATUSES.has(selectedDetail.billingPeriodStatus ?? "") : false;
+  const selectedApproved = selectedDetail ? APPROVED_STATUSES.has(selectedDetail.billingPeriodStatus ?? "") : false;
+
   return (
     <>
       {attentionPackages.length > 0 ? (
@@ -143,10 +157,20 @@ export function CarlosApprovalWorkspace({ projection, initialDetail, attentionPa
           className="fixed bottom-6 right-6 z-40 flex cursor-pointer items-center gap-4 rounded-full border border-zinc-950 bg-zinc-950 px-5 py-3 text-left text-white shadow-[0_8px_24px_rgba(0,0,0,0.2)] transition hover:bg-zinc-800 max-sm:bottom-4 max-sm:right-4"
         >
           <span className="text-sm font-semibold">Obligations</span>
-          <span className="text-sm text-zinc-300">{shortMonthLabel(actionable.obligationMonth)}</span>
-          <span className="text-xs font-semibold tracking-[0.12em] text-zinc-400">{actionable.approvalEligible ? "Ready for your approval" : "Ready for review"}</span>
+          <span className="text-sm text-zinc-300">{shortMonthLabel(journeyMonth)}</span>
+          <span className="text-xs font-semibold tracking-[0.12em] text-zinc-400">{journeyLabel}</span>
         </button>
-      ) : null}
+      ) : (
+        <button
+          type="button"
+          onClick={() => openMonth(journeyMonth)}
+          className="fixed bottom-6 right-6 z-40 flex cursor-pointer items-center gap-4 rounded-full border border-zinc-200 bg-white px-5 py-3 text-left shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition hover:border-zinc-950 max-sm:bottom-4 max-sm:right-4"
+        >
+          <span className="text-sm font-semibold text-zinc-950">Obligations</span>
+          <span className="text-sm text-zinc-600">{shortMonthLabel(journeyMonth)}</span>
+          <span className="text-xs font-semibold tracking-[0.12em] text-zinc-500">{journeyLabel}</span>
+        </button>
+      )}
 
       <Dialog
         open={selectedMonth !== null}
@@ -200,7 +224,15 @@ export function CarlosApprovalWorkspace({ projection, initialDetail, attentionPa
                 <button type="submit" disabled={approvalPending} className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-zinc-950 bg-zinc-950 px-6 py-3 text-base font-medium text-white transition hover:bg-zinc-800 disabled:cursor-wait disabled:opacity-60" aria-disabled={approvalPending}>{approvalPending ? `Approving ${formatMonthLabel(selectedDetail.obligationMonth)}…` : `Approve ${formatMonthLabel(selectedDetail.obligationMonth)} obligations`}</button>
               </form>
             ) : (
-              <p className="text-sm text-zinc-600">{blockingReview ? `This package is ready for review. ${formatMonthLabel(blockingReview.obligationMonth)} must be approved first.` : selectedDetail.financialBlockers.length > 0 ? selectedDetail.financialBlockers.join(" ") : "This package is visible for review."}</p>
+              <p className="text-sm text-zinc-600">{blockingReview
+                ? `This package is ready for review. ${formatMonthLabel(blockingReview.obligationMonth)} must be approved first.`
+                : selectedApproved
+                  ? "This package is approved."
+                  : !selectedHandedOff && selectedDetail.financialReadiness === "ready"
+                    ? "Source inputs are complete. This package is waiting for automatic handoff."
+                    : selectedDetail.financialBlockers.length > 0
+                      ? selectedDetail.financialBlockers.join(" ")
+                      : selectedHandedOff ? "This package is visible for review." : "Source inputs are still in progress."}</p>
             )}
           </div>
           )

@@ -49,13 +49,14 @@ test("all live DEV RPCs and internal helpers are denied to every API role", () =
   assert.match(migration, apiRoles);
 });
 
-test("PUBLIC and inherited default EXECUTE privileges are closed for both function owners", () => {
-  for (const owner of ["postgres", "supabase_admin"]) {
-    assert.match(
-      migration,
-      new RegExp(`alter default privileges for role ${owner} in schema public\\s+revoke execute on functions from public, anon, authenticated, service_role`),
-    );
-  }
+test("PUBLIC and inherited default EXECUTE privileges are closed for the TB810 function owner", () => {
+  assert.match(
+    migration,
+    /alter default privileges for role postgres in schema public\s+revoke execute on functions from public, anon, authenticated, service_role/,
+  );
+  // The migration role is not a member of supabase_admin, so altering its
+  // defaults fails and rolls back the whole migration.
+  assert.doesNotMatch(migration, /alter default privileges for role supabase_admin/);
 });
 
 test("normal Water, Gas, and Charge RPCs expose exact production-only signatures", () => {

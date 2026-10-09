@@ -1682,3 +1682,126 @@ test("two domain cards: Gas completes on readings, not on supplier-bill presence
   assert.match(page, /projection\.obligations\.statusLabel/);
   assert.match(page, /projection\.completed\.map/);
 });
+
+// Carlos obligation journey restoration (FIN-008 two-clock reading).
+function carlosJourney({ businessDate, obligationMonth = "2026-10", total = "26240.50", lifecycle, components }) {
+  const base = buildProjectionFacts().upcoming;
+  return projectCarlosDashboard(buildProjectionFacts({
+    businessDate,
+    operatingMonth: businessDate.slice(0, 7),
+    upcomingObligationMonth: "2026-11",
+    mostRecentHandoff: { obligationMonth: "2026-09", status: "approved" },
+    current: {
+      ...base,
+      obligations: { ...base.obligations, obligationMonth, total, ...(components ? { components: { ...base.obligations.components, ...components } } : {}) },
+      ...(lifecycle ? { obligationLifecycle: lifecycle } : {}),
+    },
+    upcoming: { ...base, obligations: { ...base.obligations, obligationMonth: "2026-11" } },
+  }));
+}
+
+const sedapalMissing = { common_water: { state: "blocked", amount: null, reason: "Sedapal water bill has not been entered yet." } };
+const handedOff = (status) => ({ mode: "snapshotted", billingPeriodId: "period-oct", billingPeriodStatus: status });
+
+test("Carlos journey: incomplete before the readiness deadline is quiet Building", () => {
+  const projection = carlosJourney({ businessDate: "2026-09-20", total: null, components: sedapalMissing });
+  assert.equal(projection.journeyState, "building");
+  assert.equal(projection.journeyLabel, "Building");
+  assert.equal(projection.approvalState, "not_ready");
+});
+
+test("Carlos journey: incomplete on or after the readiness deadline is Blocked with source blockers", () => {
+  for (const businessDate of ["2026-09-30", "2026-10-06", "2026-11-02"]) {
+    const projection = carlosJourney({ businessDate, total: null, components: sedapalMissing });
+    assert.equal(projection.journeyState, "blocked", businessDate);
+    assert.equal(projection.journeyLabel, "Blocked");
+    assert.deepEqual(projection.financialBlockers, ["Sedapal water bill has not been entered yet."]);
+    assert.equal(projection.approvalState, "not_ready");
+  }
+});
+
+test("Carlos journey: complete but not handed off is Ready for handoff and never actionable", () => {
+  for (const businessDate of ["2026-10-09", "2026-11-03"]) {
+    const projection = carlosJourney({ businessDate });
+    assert.equal(projection.journeyState, "ready", businessDate);
+    assert.equal(projection.journeyLabel, "Ready for handoff");
+    assert.equal(projection.approvalState, "not_ready");
+    assert.equal(projection.billingPeriodId, null);
+    assert.deepEqual(projection.pendingReviews, []);
+  }
+});
+
+test("Carlos journey: ready_for_review in its month is Ready for your approval", () => {
+  const projection = carlosJourney({ businessDate: "2026-10-03", lifecycle: handedOff("ready_for_review") });
+  assert.equal(projection.journeyState, "ready_for_approval");
+  assert.equal(projection.journeyLabel, "Ready for your approval");
+  assert.equal(projection.approvalState, "ready");
+});
+
+test("Carlos journey: the sixth-day overdue rule is preserved", () => {
+  const projection = carlosJourney({ businessDate: "2026-10-06", lifecycle: handedOff("ready_for_review") });
+  assert.equal(projection.journeyState, "approval_overdue");
+  assert.equal(projection.journeyLabel, "Approval overdue");
+});
+
+test("Carlos journey: a ready_for_review package carried into a later month stays actionable and overdue", () => {
+  for (const businessDate of ["2026-11-01", "2026-11-03", "2027-01-15"]) {
+    const projection = carlosJourney({ businessDate, lifecycle: handedOff("ready_for_review") });
+    assert.equal(projection.obligationMonth, "2026-10");
+    assert.equal(projection.approvalState, "overdue", businessDate);
+    assert.equal(projection.journeyState, "approval_overdue");
+    assert.notEqual(projection.journeyState, "ready", "a handed-off package never falls back to Ready for handoff");
+  }
+});
+
+test("Carlos journey: an approved package carried into a later month remains approved", () => {
+  const projection = carlosJourney({ businessDate: "2026-11-03", lifecycle: handedOff("approved") });
+  assert.equal(projection.approvalState, "approved");
+  assert.equal(projection.journeyState, "approved");
+  assert.equal(projection.journeyLabel, "Approved");
+});
+
+test("Carlos journey: a future-month package is not actionable because of the FIN-008 comparison", () => {
+  for (const status of ["ready_for_review", "approved"]) {
+    const projection = carlosJourney({ businessDate: "2026-09-28", lifecycle: handedOff(status) });
+    assert.equal(projection.approvalState, "not_ready", status);
+    assert.ok(!["ready_for_approval", "approval_overdue", "approved"].includes(projection.journeyState), status);
+  }
+});
+
+test("Carlos dashboard restores the journey region without the old inline approval card", () => {
+  const page = fs.readFileSync("app/(staff)/page.tsx", "utf8");
+  const carlos = page.slice(page.indexOf("async function CarlosDashboardPage"), page.indexOf("export default async function DashboardPage"));
+  assert.match(carlos, /\{formatMonthLabel\(projection\.obligationMonth\)\} obligations<\/p>/);
+  assert.match(carlos, /<p className="text-xl font-semibold text-zinc-950">\{journeyStatus\}<\/p>/);
+  assert.match(carlos, /projection\.journeyState === "blocked" \? \(\s*<ul[\s\S]*?projection\.financialBlockers\.map/);
+  assert.match(carlos, /noteworthy \{noteworthy\.length === 1 \? "charge" : "charges"\}/);
+  assert.match(carlos, /projection\.journeyLabel/);
+  assert.match(carlos, /<CarlosApprovalWorkspace/);
+  assert.match(carlos, /Financial watch/);
+  assert.doesNotMatch(carlos, /<form action=\{approveMonthlyObligationAction\}/, "no inline approval card");
+  assert.doesNotMatch(carlos, /dispatch/i);
+});
+
+test("Carlos floating Obligations control exists before handoff and opens the package read-only", () => {
+  const workspace = fs.readFileSync("app/(staff)/_components/carlos-approval-workspace.tsx", "utf8");
+  assert.match(workspace, /const journeyMonth = actionable\?\.obligationMonth \?\? projection\.obligationMonth;/);
+  assert.match(workspace, /\) : \(\s*<button[\s\S]*?onClick=\{\(\) => openMonth\(journeyMonth\)\}[\s\S]*?\{journeyLabel\}/);
+  assert.match(workspace, /projection\.journeyLabel/);
+  assert.match(workspace, /Source inputs are complete\. This package is waiting for automatic handoff\./);
+  assert.doesNotMatch(workspace, /hand ?off (it|this package) manually|manual handoff/i);
+});
+
+test("Carlos modal keeps the existing approval gate, so a package before handoff has no Approve action", () => {
+  const workspace = fs.readFileSync("app/(staff)/_components/carlos-approval-workspace.tsx", "utf8");
+  const gates = workspace.match(/<form action=\{approvalFormAction\}>/g) ?? [];
+  assert.equal(gates.length, 1);
+  assert.match(workspace, /\{selectedDetail\.billingPeriodStatus === "ready_for_review" && selectedDetail\.financialReadiness === "ready" && projection\.pendingReviews\.some\(\(review\) => review\.obligationMonth === selectedDetail\.obligationMonth && review\.approvalEligible\) \? \(\s*<form action=\{approvalFormAction\}>/);
+  assert.match(workspace, /name="reviewFingerprint" value=\{selectedDetail\.reviewFingerprint\}/);
+  assert.match(workspace, /commonWaterRoundingText\(component\)/);
+});
+
+test("Giuliana Supplier Bills card links to the Gas bills workspace", () => {
+  const page = fs.readFileSync("app/(staff)/page.tsx", "utf8");
+  assert.match(page, /<Link href="\/gas\/bills" className="rounded-2xl[^"]*">\s*<span className="text-lg font-normal text-zinc-950">Supplier Bills<\/span>/);
+});
