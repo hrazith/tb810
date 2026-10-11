@@ -113,7 +113,8 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
   const eligibleUnits = unitsResult?.data.filter((unit) => unit.unit_type_code === "condo") ?? [];
 
   const ownersMeasurementPromise = mode === "owners" ? measure(listOwners({ status: "active" })) : null;
-  const monthlySummaryMeasurementPromise = mode === "owners"
+  // The building summary is shown on both overviews (no unit selected in Units mode).
+  const monthlySummaryMeasurementPromise = mode === "owners" || !params.unitId
     ? measure(getMonthlyObligationSummary({ obligationMonth: monthKey }))
     : null;
 

@@ -5,6 +5,7 @@ import { createMonthlyObligationProviders } from "./providers";
 import { buildChargeMap, buildFixedAssessmentMap, buildGasCalculationInputFromFacts, buildWaterPreviewFromFacts, loadBuildingMonthFinancialFacts } from "./owner-facts";
 import { buildMonthlyObligationSummaryFromFacts, buildMonthlyObligationSummaryFromSnapshot } from "./summary-facts";
 import { calculateGasCharges } from "../gas/calculation";
+import { createPersistedObligationProviders, loadPersistedObligationRows } from "./persisted";
 import { isPerfLoggingEnabled } from "@/server/perf";
 
 export function selectBuildingOwnerDirectCharges(
@@ -130,29 +131,63 @@ export async function getUnitMonthlyObligationForBuilding({
   const buildingFacts = buildingFactsResult.data.current;
   const selectedUnitFacts = buildingFacts.unitRows.find((row) => row.id === unit.unitId) ?? null;
   const calculationStartedAt = Date.now();
-  const fixedAssessmentByUnitId = buildFixedAssessmentMap(buildingFacts.plan, buildingFacts.planYear, [
-    {
-      id: unit.unitId,
-      participation_percentage: unit.participationPercentage,
-    },
-  ]);
-  const waterByUnitId = new Map([
-    [
-      unit.unitId,
-      buildWaterPreviewFromFacts(
-        {
-          id: unit.unitId,
-          unit_type_id: selectedUnitFacts?.unit_type_id ?? "",
-          unit_type_code: selectedUnitFacts?.unit_type_code ?? "condo",
-          has_meter: selectedUnitFacts?.has_meter ?? false,
-        },
-        obligationMonth,
-        buildingFacts,
-      ),
-    ],
-  ]);
-  const gasCalculation = calculateGasCharges(buildGasCalculationInputFromFacts(buildingFacts, obligationMonth));
   const chargesByUnitId = buildChargeMap(buildingFacts.charges, obligationMonth, [unit.unitId]);
+  // Handed-off/approved packages read their persisted rows in one bounded query;
+  // live packages keep the existing calculation.
+  const persistedSnapshot = buildingFacts.obligationSnapshot;
+  const persistedRows = persistedSnapshot
+    ? await loadPersistedObligationRows({ billingPeriodId: persistedSnapshot.billingPeriodId, unitIds: [unit.unitId] })
+    : null;
+  if (persistedRows?.error) return { data: null as never, error: persistedRows.error };
+
+  function createLiveProviders() {
+    const fixedAssessmentByUnitId = buildFixedAssessmentMap(buildingFacts.plan, buildingFacts.planYear, [
+      {
+        id: unit.unitId,
+        participation_percentage: unit.participationPercentage,
+      },
+    ]);
+    const waterByUnitId = new Map([
+      [
+        unit.unitId,
+        buildWaterPreviewFromFacts(
+          {
+            id: unit.unitId,
+            unit_type_id: selectedUnitFacts?.unit_type_id ?? "",
+            unit_type_code: selectedUnitFacts?.unit_type_code ?? "condo",
+            has_meter: selectedUnitFacts?.has_meter ?? false,
+          },
+          obligationMonth,
+          buildingFacts,
+        ),
+      ],
+    ]);
+    const gasCalculation = calculateGasCharges(buildGasCalculationInputFromFacts(buildingFacts, obligationMonth));
+    return createMonthlyObligationProviders({
+      fixedAssessmentByUnitId,
+      waterByUnitId,
+      gasByUnitId: new Map([
+        [
+          unit.unitId,
+          gasCalculation.blockers.length > 0
+            ? { status: "unavailable", message: gasCalculation.blockers.join(" ") || "Gas lookup data is incomplete." }
+            : {
+                status: "available",
+                data: {
+                  ...gasCalculation,
+                  sourceReadingMonthLabel: buildingFacts.sourceReadingMonth,
+                  billingMonthLabel: obligationMonth,
+                },
+              },
+        ],
+      ]),
+      chargesByUnitId,
+    });
+  }
+
+  const providers = persistedRows
+    ? createPersistedObligationProviders(persistedRows.data, chargesByUnitId)
+    : createLiveProviders();
 
   const compositionStartedAt = Date.now();
   const composed = await composeMonthlyObligation(
@@ -172,26 +207,7 @@ export async function getUnitMonthlyObligationForBuilding({
         participationPercentage: unit.participationPercentage,
       },
     ],
-    createMonthlyObligationProviders({
-      fixedAssessmentByUnitId,
-      waterByUnitId,
-      gasByUnitId: new Map([
-        [
-          unit.unitId,
-          gasCalculation.blockers.length > 0
-            ? { status: "unavailable", message: gasCalculation.blockers.join(" ") || "Gas lookup data is incomplete." }
-            : {
-                status: "available",
-                data: {
-                  ...gasCalculation,
-                  sourceReadingMonthLabel: buildingFacts.sourceReadingMonth,
-                  billingMonthLabel: obligationMonth,
-                },
-              },
-        ],
-      ]),
-      chargesByUnitId,
-    }),
+    providers,
   );
 
   if (isPerfLoggingEnabled()) {

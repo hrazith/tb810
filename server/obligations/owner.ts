@@ -14,6 +14,7 @@ import {
   loadOwnerMonthResponsibility,
 } from "./owner-facts";
 import { calculateGasCharges } from "@/server/gas/calculation";
+import { createPersistedObligationProviders, loadPersistedObligationRows } from "./persisted";
 
 type QueryResult<T> = {
   data: T;
@@ -99,42 +100,40 @@ export async function getOwnerMonthlyObligationForBuilding({
   const responsibility = responsibilityResult.data;
   if (!responsibility) return { data: null, error: "Owner month responsibility not found." };
   const units = responsibility.responsibleUnits;
-  const fixedAssessmentByUnitId = buildFixedAssessmentMap(
-    buildingFacts.plan,
-    buildingFacts.planYear,
-    buildingFacts.unitRows,
-  );
-  const gasCalculation = calculateGasCharges(buildGasCalculationInputFromFacts(buildingFacts, obligationMonth));
-  const waterByUnitId = new Map(
-    units.map((unit) => [
-      unit.unitId,
-      buildWaterPreviewFromFacts(
-        {
-          id: unit.unitId,
-          unit_type_id: buildingFacts.unitRows.find((row) => row.id === unit.unitId)?.unit_type_id ?? "",
-          unit_type_code: unit.unitTypeCode,
-          has_meter: unit.hasMeter,
-        },
-        obligationMonth,
-        buildingFacts,
-      ),
-    ]),
-  );
-  const chargesByUnitId = buildChargeMap(buildingFacts.charges, obligationMonth, units.map((unit) => unit.unitId));
-  breakdown.unitCalculationMs = Date.now() - buildingFactsStarted - breakdown.buildingMonthFactsMs;
+  const unitIds = units.map((unit) => unit.unitId);
+  const chargesByUnitId = buildChargeMap(buildingFacts.charges, obligationMonth, unitIds);
+  // Handed-off/approved packages read their persisted rows in one bounded query;
+  // live packages keep the existing calculation.
+  const persistedSnapshot = buildingFacts.obligationSnapshot;
+  const persistedRows = persistedSnapshot
+    ? await loadPersistedObligationRows({ billingPeriodId: persistedSnapshot.billingPeriodId, unitIds })
+    : null;
+  if (persistedRows?.error) return { data: null, error: persistedRows.error };
+  if (persistedRows) dataRemoteRequests += 1;
 
-  const obligation = await composeMonthlyObligation(
-    { obligationMonth, buildingId, buildingName },
-    units.map((unit) => ({
-      unitId: unit.unitId,
-      unitNumber: unit.unitNumber,
-      unitAccountId: unit.unitId,
-      unitTypeCode: unit.unitTypeCode,
-      hasMeter: unit.hasMeter,
-      hasGasService: unit.hasGasService,
-      participationPercentage: unit.participationPercentage,
-    })),
-    createMonthlyObligationProviders({
+  function createLiveProviders() {
+    const fixedAssessmentByUnitId = buildFixedAssessmentMap(
+      buildingFacts.plan,
+      buildingFacts.planYear,
+      buildingFacts.unitRows,
+    );
+    const gasCalculation = calculateGasCharges(buildGasCalculationInputFromFacts(buildingFacts, obligationMonth));
+    const waterByUnitId = new Map(
+      units.map((unit) => [
+        unit.unitId,
+        buildWaterPreviewFromFacts(
+          {
+            id: unit.unitId,
+            unit_type_id: buildingFacts.unitRows.find((row) => row.id === unit.unitId)?.unit_type_id ?? "",
+            unit_type_code: unit.unitTypeCode,
+            has_meter: unit.hasMeter,
+          },
+          obligationMonth,
+          buildingFacts,
+        ),
+      ]),
+    );
+    return createMonthlyObligationProviders({
       fixedAssessmentByUnitId,
       waterByUnitId,
       gasByUnitId: new Map(
@@ -153,7 +152,26 @@ export async function getOwnerMonthlyObligationForBuilding({
         ]),
       ),
       chargesByUnitId,
-    }),
+    });
+  }
+
+  const providers = persistedRows
+    ? createPersistedObligationProviders(persistedRows.data, chargesByUnitId)
+    : createLiveProviders();
+  breakdown.unitCalculationMs = Date.now() - buildingFactsStarted - breakdown.buildingMonthFactsMs;
+
+  const obligation = await composeMonthlyObligation(
+    { obligationMonth, buildingId, buildingName },
+    units.map((unit) => ({
+      unitId: unit.unitId,
+      unitNumber: unit.unitNumber,
+      unitAccountId: unit.unitId,
+      unitTypeCode: unit.unitTypeCode,
+      hasMeter: unit.hasMeter,
+      hasGasService: unit.hasGasService,
+      participationPercentage: unit.participationPercentage,
+    })),
+    providers,
   );
   breakdown.ownerCompositionMs = Date.now() - buildingFactsStarted - breakdown.buildingMonthFactsMs - breakdown.unitCalculationMs;
 
