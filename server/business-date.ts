@@ -33,6 +33,27 @@ export async function getBusinessNow() {
   return resolveBusinessNowFromCookieValue(cookieStore.get(BUSINESS_DATE_COOKIE)?.value);
 }
 
+export const BUSINESS_TIME_ZONE = "America/Lima";
+
+/** YYYY-MM-DD of `now` as a calendar date in TB810's business time zone. */
+export function businessDateKeyAt(now: Date, timeZone = BUSINESS_TIME_ZONE) {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+/**
+ * Current calendar month in America/Lima. A DEV business-date override is
+ * already a business-local date, so it is used as-is rather than shifted.
+ */
+export async function getBusinessCalendarMonthKey() {
+  if (process.env.NODE_ENV === "development") {
+    const override = parseBusinessDateCookieValue((await cookies()).get(BUSINESS_DATE_COOKIE)?.value);
+    if (override) return override.slice(0, 7);
+  }
+  return businessDateKeyAt(new Date()).slice(0, 7);
+}
+
 export async function getBusinessMonthKey() {
   const now = await getBusinessNow();
   // The override only changes the business day; charge month logic still uses UTC month boundaries.

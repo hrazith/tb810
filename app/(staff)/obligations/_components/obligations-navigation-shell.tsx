@@ -30,7 +30,7 @@ type PendingSelection =
   | { kind: "owner"; id: string; label: string }
   | { kind: "unit"; id: string; label: string };
 
-function buildQuery(params: Record<string, string | undefined>) {
+function buildObligationsQuery(params: Record<string, string | undefined>) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value) search.set(key, value);
@@ -45,6 +45,8 @@ type Props = {
   selectedOwnerId: string | null;
   selectedUnitId: string | null;
   error?: string;
+  /** Explicitly requested month; carried through every navigation so the viewed month stays stable. */
+  month?: string | null;
   children: React.ReactNode;
 };
 
@@ -55,8 +57,11 @@ export function ObligationsNavigationShell({
   selectedOwnerId,
   selectedUnitId,
   error,
+  month,
   children,
 }: Props) {
+  const buildQuery = (params: Record<string, string | undefined>) =>
+    buildObligationsQuery({ ...params, month: month ?? undefined });
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);

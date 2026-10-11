@@ -22,6 +22,8 @@ import { isPerfLoggingEnabled } from "@/server/perf";
 import { getSelectedUnitTransactionsForUnit } from "@/server/transactions";
 import { listUnitDirectory } from "@/server/units";
 import { loadGiulianaPackageProgression, selectGiulianaWorkspaceMonth } from "@/server/obligations/progression";
+import { parseRequestedObligationMonth, selectObligationsViewMonth } from "@/server/obligations/view-month";
+import { getBusinessCalendarMonthKey } from "@/server/business-date";
 import { measure, type TimedResult } from "@/server/perf/timing";
 import { ObligationsNavigationShell } from "./_components/obligations-navigation-shell";
 import { AddChargeDialog } from "./_components/add-charge-dialog";
@@ -31,6 +33,7 @@ type PageProps = {
     mode?: "owners" | "units";
     ownerId?: string;
     unitId?: string;
+    month?: string;
     error?: string;
   }>;
 };
@@ -93,7 +96,15 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
   if (progressionResult.error || !progressionResult.data) {
     throw new Error(progressionResult.error ?? "Giuliana package progression unavailable.");
   }
-  const monthKey = selectGiulianaWorkspaceMonth(progressionResult.data);
+  // Charge defaults and edit limits follow the package lifecycle; the viewed
+  // month is the Lima calendar month unless one is explicitly requested.
+  const workspaceMonth = selectGiulianaWorkspaceMonth(progressionResult.data);
+  const requestedMonth = parseRequestedObligationMonth(params.month);
+  const monthKey = selectObligationsViewMonth({
+    requestedMonth: params.month,
+    calendarMonth: await getBusinessCalendarMonthKey(),
+  });
+  const monthParam = requestedMonth ? `&month=${requestedMonth}` : "";
   const mode = params.mode ?? "owners";
 
   const unitsMeasurement = await measure(listUnitDirectory());
@@ -241,7 +252,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
             }]),
         ).values(),
       );
-  const workingObligationMonth = monthKey;
+  const workingObligationMonth = workspaceMonth;
   const chargeUnits = eligibleUnits.map((unit) => ({ id: unit.id, unit_number: unit.unit_number }));
 
   const selectedUnitPanel =
@@ -293,6 +304,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
       selectedOwnerId={selectedOwner?.id ?? null}
       selectedUnitId={selectedUnit?.id ?? null}
       error={params.error}
+      month={requestedMonth}
     >
       <div className="space-y-8 p-6 md:p-8 ">
         {!selectedOwner && !selectedUnit ? (
@@ -301,7 +313,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
               <div className="text-3xl font-semibold tracking-tight text-zinc-950">{monthLabel(monthKey)}</div>
               <AddChargeDialog
                 action={createChargeAction}
-                returnTo={`/obligations?mode=${mode}`}
+                returnTo={`/obligations?mode=${mode}${monthParam}`}
                 workingMonth={workingObligationMonth}
                 defaultTarget={mode === "owners" ? "all_owners" : "all_units"}
                 defaultDescription={mode === "units" ? "Bono empleados" : ""}
@@ -379,7 +391,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                 </div>
                 <AddChargeDialog
                   action={createChargeAction}
-                  returnTo={`/obligations?mode=owners&ownerId=${selectedOwner.id}`}
+                  returnTo={`/obligations?mode=owners&ownerId=${selectedOwner.id}${monthParam}`}
                   workingMonth={workingObligationMonth}
                   defaultTarget={`owner:${selectedOwner.id}`}
                   units={chargeUnits}
@@ -492,7 +504,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                 </div>
                 <AddChargeDialog
                   action={createChargeAction}
-                  returnTo={`/obligations?mode=units&unitId=${selectedUnitPanel.unit.id}`}
+                  returnTo={`/obligations?mode=units&unitId=${selectedUnitPanel.unit.id}${monthParam}`}
                   workingMonth={workingObligationMonth}
                   defaultTarget={`unit:${selectedUnitPanel.unit.id}`}
                   units={chargeUnits}
@@ -582,7 +594,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                                 </summary>
                                 <div className="mt-3 w-[min(32rem,80vw)] rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
                                   <form action={editFutureChargeAction} className="space-y-3">
-                                    <input type="hidden" name="return_to" value={`/obligations?mode=units&unitId=${selectedUnitPanel.unit.id}`} />
+                                    <input type="hidden" name="return_to" value={`/obligations?mode=units&unitId=${selectedUnitPanel.unit.id}${monthParam}`} />
                                     <input type="hidden" name="charge_id" value={charge.id} />
                                     <label className="block space-y-2">
                                       <span className="text-sm font-medium text-zinc-700">Description</span>
@@ -608,7 +620,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                                       <Input
                                         name="starts_month"
                                         type="month"
-                                        min={nextMonthKey(monthKey) ?? monthKey}
+                                        min={nextMonthKey(workingObligationMonth) ?? workingObligationMonth}
                                         defaultValue={charge.effective_from_month.slice(0, 7)}
                                       />
                                     </label>
@@ -617,7 +629,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                                       <Input
                                         name="ends_month"
                                         type="month"
-                                        min={nextMonthKey(monthKey) ?? monthKey}
+                                        min={nextMonthKey(workingObligationMonth) ?? workingObligationMonth}
                                         defaultValue={charge.effective_to_month?.slice(0, 7) ?? ""}
                                       />
                                     </label>
@@ -636,7 +648,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                                     This will permanently delete this future charge series before it takes effect.
                                   </div>
                                   <form action={deleteFutureChargeAction} className="mt-3 space-y-3">
-                                    <input type="hidden" name="return_to" value={`/obligations?mode=units&unitId=${selectedUnitPanel.unit.id}`} />
+                                    <input type="hidden" name="return_to" value={`/obligations?mode=units&unitId=${selectedUnitPanel.unit.id}${monthParam}`} />
                                     <input type="hidden" name="charge_id" value={charge.id} />
                                     <Button type="submit" variant="destructive" className="w-full">
                                       Confirm Delete
