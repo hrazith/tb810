@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CurrencyDollar, DownloadSimple, Plus, X } from "@phosphor-icons/react";
+import { Plus, X } from "@phosphor-icons/react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -23,7 +23,6 @@ type Props = {
   defaultAmount?: string;
   units: Array<{ id: string; unit_number: string }>;
   owners: Array<{ id: string; full_name: string; owner_reference: string }>;
-  showDownload?: boolean;
 };
 
 function formatAmount(value: number) {
@@ -47,7 +46,6 @@ export function AddChargeDialog({
   defaultAmount = "",
   units,
   owners,
-  showDownload = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState(defaultTarget);
@@ -85,29 +83,14 @@ export function AddChargeDialog({
       <div className="flex items-center gap-2">
         <Button
           type="button"
-          variant="icon"
-          size="sm"
-          className="rounded-full"
-          aria-label="Add charge"
-          title="Add charge"
+          variant="neutral"
+          size="lg"
+          shape="pill"
           onClick={openDialog}
         >
-          <CurrencyDollar size={18} weight="bold" aria-hidden="true" />
-          <Plus className="-ml-1" size={11} weight="bold" aria-hidden="true" />
+          <Plus size={18} weight="bold" aria-hidden="true" />
+          Add charge
         </Button>
-        {showDownload ? (
-          <Button
-            type="button"
-            variant="icon"
-            size="sm"
-            className="rounded-full"
-            aria-label="Download invoices"
-            title="Download invoices"
-            disabled
-          >
-            <DownloadSimple size={18} aria-hidden="true" />
-          </Button>
-        ) : null}
       </div>
 
       <Dialog

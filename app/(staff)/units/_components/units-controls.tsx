@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FunnelSimple } from "@phosphor-icons/react/dist/ssr";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/select-menu";
 
 type UnitTypeOption = {
@@ -69,12 +69,12 @@ export function UnitsControls({
 
   return (
     <div className=" flex w-full flex-col gap-3 xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end xl:ml-auto">
-      <Input
-        type="search"
+      <SearchInput
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Search by unit number, floor, or type"
-        className="xl:w-[24rem]"
+        aria-label="Search units"
+        className="xl:w-96"
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();

@@ -57,7 +57,7 @@ export function CurrentUnitMeterReadingsWorkspace({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search"
-            className="h-12 w-full min-w-0  rounded-full border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 xl:w-lg"
+            className="min-w-0 xl:w-lg"
             aria-label="Search Unit Water readings"
           />
 

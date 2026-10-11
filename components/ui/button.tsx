@@ -15,9 +15,10 @@ type ButtonVariant =
   | "destructive"
   | "ghost"
   | "link"
-  | "icon";
+  | "icon"
+  | "neutral";
 
-type ButtonSize = "sm" | "md" | "lg";
+type ButtonSize = "sm" | "md" | "lg" | "icon";
 
 type ButtonShape = "default" | "pill";
 
@@ -59,12 +60,17 @@ const variantClasses: Record<ButtonVariant, string> = {
 
   icon:
     "border-zinc-300 bg-white text-zinc-700 shadow-sm hover:border-zinc-950 hover:text-zinc-950 focus-visible:outline-zinc-950 disabled:border-zinc-200 disabled:bg-zinc-50 disabled:text-zinc-400",
+
+  // Matches the SelectMenu trigger so toolbar icon actions read as one set.
+  neutral:
+    "border-transparent bg-zinc-200 text-zinc-700 shadow-sm hover:bg-zinc-300 hover:text-zinc-950 active:bg-zinc-400 focus-visible:outline-zinc-950 disabled:bg-zinc-100 disabled:text-zinc-400 disabled:shadow-none",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
   sm: "h-9 px-3 text-sm",
   md: "px-12 py-3 text-base",
   lg: "h-12 px-6 text-base",
+  icon: "size-12 shrink-0",
 };
 
 const shapeClasses: Record<ButtonShape, string> = {

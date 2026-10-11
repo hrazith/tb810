@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CaretDown, CaretRight, X } from "@phosphor-icons/react/dist/ssr";
+import { CaretDown, CaretRight, DownloadSimple, X } from "@phosphor-icons/react/dist/ssr";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -306,25 +306,18 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
       error={params.error}
       month={requestedMonth}
     >
-      <div className="space-y-8 p-6 md:p-8 ">
+      <div className="space-y-8 px-6 md:px-8 ">
         {!selectedOwner && !selectedUnit ? (
-          <div className="space-y-8">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-8 ">
+            <div className=" my-12 flex flex-wrap items-start justify-between gap-4">
               <div className="text-3xl font-semibold tracking-tight text-zinc-950">{monthLabel(monthKey)}</div>
-              <AddChargeDialog
-                action={createChargeAction}
-                returnTo={`/obligations?mode=${mode}${monthParam}`}
-                workingMonth={workingObligationMonth}
-                defaultTarget={mode === "owners" ? "all_owners" : "all_units"}
-                defaultDescription={mode === "units" ? "Bono empleados" : ""}
-                defaultAmount={mode === "units" ? "22" : ""}
-                units={chargeUnits}
-                owners={chargeOwners}
-                showDownload
-              />
+              {/* Placeholder until PDF export exists; intentionally disabled. */}
+              <Button variant="neutral" size="icon" shape="pill" aria-label="Download PDF" title="Download PDF" disabled>
+                <DownloadSimple size={22} aria-hidden="true" />
+              </Button>
             </div>
 
-            <div className="space-y-6 ">
+            <div className="space-y-6">
               <h3 className="mb-4 text-sm font-semibold uppercase text-zinc-500">Obligations</h3>
               <div className="space-y-3 text-sm text-zinc-600">
                     <div className="flex items-center justify-between gap-4">
@@ -360,19 +353,20 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                 </div>
               </div>
 
-              <div className="p-10">
-                  <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Invoices</div>
-                  <div className="text-sm text-zinc-600">Coming soon</div>
-                  <div className="mt-4">
-                    <Button type="button" variant="secondary" size="sm" disabled>
-                      Download all
-                    </Button>
-                  </div>
-              </div>
+              <AddChargeDialog
+                action={createChargeAction}
+                returnTo={`/obligations?mode=${mode}${monthParam}`}
+                workingMonth={workingObligationMonth}
+                defaultTarget={mode === "owners" ? "all_owners" : "all_units"}
+                defaultDescription={mode === "units" ? "Bono empleados" : ""}
+                defaultAmount={mode === "units" ? "22" : ""}
+                units={chargeUnits}
+                owners={chargeOwners}
+              />
 
             </div>
 
-            <div className="p-5 text-sm text-zinc-600">
+            <div className=" text-sm text-zinc-600">
                 Select an Owner or Unit to inspect its Monthly Obligation.
               </div>
             </div>
@@ -520,7 +514,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
 
               <div>
                 <div className="mb-8 text-4xl font-semibold tracking-tight text-zinc-950">{monthLabel(monthKey)}</div>
-                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Obligations</h3>
+                <h3 className=" mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Obligations</h3>
                 {selectedUnitPanel.obligation.components.map((component) => component.key === "other_charge" && component.lineItems?.length ? (
                   <details key={component.key} className="group">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-3 text-left text-base text-zinc-600">

@@ -8,8 +8,10 @@ function joinClasses(...classes: Array<string | undefined | false>) {
   return classes.filter(Boolean).join(" ");
 }
 
+// Canonical search field. Presentation only: consumers own state, filtering,
+// and submission. className should carry layout and width only.
 export const SearchInput = forwardRef(function SearchInput(
-  { className, type = "text", ...props }: SearchInputProps,
+  { className, type = "search", ...props }: SearchInputProps,
   ref: Ref<HTMLInputElement>,
 ) {
   return (
@@ -17,7 +19,7 @@ export const SearchInput = forwardRef(function SearchInput(
       ref={ref}
       type={type}
       className={joinClasses(
-        "block h-12 w-full rounded-full border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950",
+        "block h-12 w-full rounded-full border-0 bg-zinc-100 px-4 text-sm text-zinc-950 placeholder:text-zinc-500 transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}

@@ -117,7 +117,8 @@ export async function UnitMeterReadingsMonthPage({ month, query, deleted, histor
               name="q"
               defaultValue={query ?? ""}
               placeholder="Search"
-              className="h-11 w-full min-w-0 max-w-xs rounded-full border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 xl:w-[22rem]"
+              aria-label="Search Unit Water readings"
+              className="min-w-0 max-w-xs xl:w-88"
             />
           </form>
           {intakeOpen ? <DownloadTemplateLink /> : null}

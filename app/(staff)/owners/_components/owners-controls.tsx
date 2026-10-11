@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FunnelSimple } from "@phosphor-icons/react/dist/ssr";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/select-menu";
 
 type Props = {
@@ -55,11 +55,12 @@ export function OwnersControls({ initialQuery, initialStatus }: Props) {
 
   return (
     <div className="flex w-full flex-col gap-3 xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end xl:ml-auto">
-      <Input
+      <SearchInput
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Search owners"
-        className="xl:w-[22rem]"
+        aria-label="Search owners"
+        className="xl:w-88"
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();

@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FunnelSimple } from "@phosphor-icons/react/dist/ssr";
 
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/select-menu";
 
 type OwnerRow = {
@@ -125,19 +125,8 @@ export function ObligationsNavigationShell({
 
           <div className=" pr-1">
   {/* Obligation Title + Controls  */}
+            <h1 className="sr-only">Obligations</h1>
             <div className="py-12   flex items-center justify-between gap-4 bg-zinc-50 xl:sticky xl:top-0 xl:z-10">
-              <h1 className="whitespace-nowrap text-2xl text-center     font-semibold tracking-tight text-zinc-950">
-              Obligations
-              </h1>
-{/* Controls  */}
-            <div className="flex items-center gap-3">
-              <Input
-                type="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search"
-                className="w-64 rounded-xl border-0 bg-zinc-200 text-zinc-950"
-              />
 {/* Toggle  */}
             <div className="inline-flex gap-1  rounded-full bg-zinc-200 p-1">
               <Link
@@ -169,6 +158,15 @@ export function ObligationsNavigationShell({
                 Units
               </Link>
             </div>
+{/* Controls  */}
+            <div className="flex items-center gap-3">
+              <SearchInput
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search"
+                aria-label={mode === "owners" ? "Search owners" : "Search units"}
+                className="w-64"
+              />
             <SelectMenu
               ariaLabel={mode === "owners" ? "Filter owners by floor" : "Filter units by floor"}
               icon={<FunnelSimple />}
