@@ -145,7 +145,7 @@ export async function getOwnerMonthlyObligationForBuilding({
                 status: "available",
                 data: {
                   ...gasCalculation,
-                  sourceReadingMonthLabel: buildingFacts.sourceReadingMonth,
+                  sourceReadingMonthLabel: buildingFacts.gasSourceMonth,
                   billingMonthLabel: obligationMonth,
                 },
               },

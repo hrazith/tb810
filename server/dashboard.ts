@@ -3,6 +3,7 @@ import { cache } from "react";
 import { getBusinessNow } from "@/server/business-date";
 import { getFixedBuildingIdentity } from "@/server/building";
 import { isChargeEligibleForMonth, nextMonthKey, previousMonthKey } from "@/server/charges/month";
+import { gasSourceMonthForObligationMonth } from "@/server/gas/month-utils";
 import { buildMonthlyObligationSummaryFromFacts, buildMonthlyObligationSummaryFromSnapshot } from "@/server/obligations/summary-facts";
 import { loadBuildingMonthFinancialFacts, type BuildingMonthFinancialFacts } from "@/server/obligations/owner-facts";
 import { isApprovedPackage, isHandedOffPackage, selectFinancialFocus } from "@/server/obligations/package-selection";
@@ -473,10 +474,11 @@ function deriveAttentions(
     });
   }
 
-  if (sourceWorkLate && gasMissingCount > 0) {
+  const gasSourceMonth = gasSourceMonthForObligationMonth(facts.obligations.obligationMonth);
+  if (isSourceWorkLate(businessDate, gasSourceMonth) && gasMissingCount > 0) {
     attentions.push({
       source: "gas",
-      happened: `${gasMissingCount} ${sourceWorkMonthLabel} Gas readings are still missing for ${sourceWorkObligationMonthLabel} obligations.`,
+      happened: `${gasMissingCount} ${monthLabelFromMonthKey(gasSourceMonth)} Gas readings are still missing for ${sourceWorkObligationMonthLabel} obligations.`,
       impact: `${sourceWorkObligationMonthLabel} gas obligations cannot be completed.`,
     });
   }
@@ -663,7 +665,7 @@ export function projectGulianaDashboard(monthFacts: GulianaDashboardFacts): Guli
       packageState,
     ),
   };
-  const gasState = deriveGasState(sourceWork, financialFacts.obligations, financialFacts.sourceReadingMonth, sourceWorkActionable, monthFacts.businessDate);
+  const gasState = deriveGasState(sourceWork, financialFacts.obligations, gasSourceMonthForObligationMonth(financialFacts.obligations.obligationMonth), sourceWorkActionable, monthFacts.businessDate);
   const gas = {
     ...gasState,
     // Supplier-bill presence never completes Gas: an empty pool is valid, missing readings are not.

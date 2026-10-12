@@ -6,6 +6,7 @@ import type { UnitFixedMonthlyAssessmentState } from "@/server/budget-plans/type
 import { nextMonthKey, isChargeEligibleForMonth } from "@/server/charges/month";
 import type { ChargeRecord } from "@/server/charges/types";
 import { type GasCalculationInput } from "@/server/gas/calculation";
+import { gasSourceMonthForObligationMonth } from "@/server/gas/month-utils";
 import { calculateWaterChargePreviewsForUnit, persistedCommonWaterChargePreview, type WaterChargePreviewBundle } from "@/server/water";
 import { previousMonthKeyFromMonthKey } from "@/server/water/month-utils";
 import { classifyOwnershipRow } from "@/server/ownerships/classification";
@@ -22,6 +23,9 @@ type CommonWaterBill = NonNullable<Parameters<typeof calculateWaterChargePreview
 export type BuildingMonthFinancialFacts = {
   obligationMonth: string;
   sourceReadingMonth: string;
+  // Gas reading month consumed by this package: the start-of-month reading
+  // filed in the obligation month closes the previous month's usage.
+  gasSourceMonth: string;
   planYear: number;
   plan: { currency: string; monthly_operating_budget: string } | null;
   commonWaterType: { id: string; code: string; name: string } | null;
@@ -270,7 +274,7 @@ export function buildGasCalculationInputFromFacts(
   obligationMonth: string,
 ): GasCalculationInput {
   return {
-    sourceReadingMonth: financialFacts.sourceReadingMonth,
+    sourceReadingMonth: financialFacts.gasSourceMonth,
     obligationMonth,
     supplierBills: financialFacts.gasBills.map((bill) => ({
       billId: bill.id,
@@ -422,6 +426,7 @@ export async function loadBuildingMonthFinancialFacts({
   const current = {
     obligationMonth,
     sourceReadingMonth,
+    gasSourceMonth: gasSourceMonthForObligationMonth(obligationMonth),
     planYear: Number(obligationMonth.slice(0, 4)),
     plan: payload.currentPlan ? { currency: String(payload.currentPlan.currency), monthly_operating_budget: String(payload.currentPlan.monthly_operating_budget) } : null,
     ...sharedFacts,
@@ -435,6 +440,7 @@ export async function loadBuildingMonthFinancialFacts({
   const upcoming = {
     obligationMonth: upcomingMonth,
     sourceReadingMonth: obligationMonth,
+    gasSourceMonth: gasSourceMonthForObligationMonth(upcomingMonth),
     planYear: Number(upcomingMonth.slice(0, 4)),
     plan: payload.upcomingPlan ? { currency: String(payload.upcomingPlan.currency), monthly_operating_budget: String(payload.upcomingPlan.monthly_operating_budget) } : null,
     ...sharedFacts,

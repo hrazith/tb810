@@ -407,7 +407,9 @@ test("H partial gas work stays active and neutral before the deadline", () => {
   assert.deepEqual(projection.attentions, []);
 });
 
-test("late source work changes Water and Gas emphasis without financial blocking", () => {
+test("late source work changes Water emphasis; Gas waits for its own source month", () => {
+  // September obligations consume August Water but the Gas readings taken on
+  // September 1, so on August 7 only Water is late.
   const projection = projectGulianaDashboard(buildProjectionFacts({
     businessDate: "2026-08-07",
     sourceWork: {
@@ -417,17 +419,16 @@ test("late source work changes Water and Gas emphasis without financial blocking
   }));
 
   assert.equal(projection.water.emphasis, "attention");
-  assert.equal(projection.gas.emphasis, "attention");
+  assert.equal(projection.gas.emphasis, "normal");
   assert.deepEqual(projection.attentions.map((attention) => attention.happened), [
     "August Sedapal bill is still missing for September obligations.",
     "64 August Water readings are still missing for September obligations.",
-    "58 August Gas readings are still missing for September obligations.",
   ]);
 });
 
 test("late Gas readings create attention independently of supplier bills", () => {
   const projection = projectGulianaDashboard(buildProjectionFacts({
-    businessDate: "2026-08-07",
+    businessDate: "2026-09-07",
     sourceWork: {
       gas: { gasUnitCount: 58 },
     },
@@ -436,7 +437,7 @@ test("late Gas readings create attention independently of supplier bills", () =>
   assert.equal(projection.gas.emphasis, "attention");
   assert.deepEqual(projection.attentions.filter((attention) => attention.source === "gas"), [{
     source: "gas",
-    happened: "58 August Gas readings are still missing for September obligations.",
+    happened: "58 September Gas readings are still missing for September obligations.",
     impact: "September gas obligations cannot be completed.",
   }]);
 });
@@ -913,12 +914,9 @@ test("Sep 8 approved current obligations advance financial focus to upcoming", (
       happened: "64 September Water readings are still missing for October obligations.",
       impact: "October water obligations cannot be completed.",
     },
-    {
-      source: "gas",
-      happened: "58 September Gas readings are still missing for October obligations.",
-      impact: "October gas obligations cannot be completed.",
-    },
   ]);
+  // October Gas comes from the October 1 readings, which are not due yet.
+  assert.equal(projection.gas.readingsEmphasis, "normal");
 });
 
 test("approved current obligations keep a Giuliana handoff while October stays in financial focus", () => {
@@ -1538,7 +1536,7 @@ test("future Gas calculation blockers stay out of Attention during month open", 
 test("future Gas calculation blockers become attention after the source deadline", () => {
   const base = buildProjectionFacts().upcoming;
   const projection = projectGulianaDashboard(buildProjectionFacts({
-    businessDate: "2026-10-07",
+    businessDate: "2026-11-07",
     sourceWork: {
       gas: { gasUnitCount: 58, gasReadingCount: 0 },
     },
@@ -1558,7 +1556,7 @@ test("future Gas calculation blockers become attention after the source deadline
 
   assert.deepEqual(projection.attentions, [{
     source: "gas",
-    happened: "58 October Gas readings are still missing for November obligations.",
+    happened: "58 November Gas readings are still missing for November obligations.",
     impact: "November gas obligations cannot be completed.",
   }]);
   assert.equal(projection.gas.readingsEmphasis, "attention");
@@ -1620,14 +1618,14 @@ test("Oct 1: the unresolved October package owns the top region, Blocked, with S
   assert.deepEqual(projection.attentions.map((attention) => attention.happened), [GAS_MISSING], "the blocker surfaces as a notice");
 });
 
-test("Oct 8: October stays Blocked by late September Gas readings; Water complete and quiet", () => {
+test("Oct 8: October stays Blocked by late October Gas readings; Water complete and quiet", () => {
   const projection = projectGulianaDashboard(delayedOctoberFacts({ businessDate: "2026-10-08" }));
 
   assert.deepEqual(projection.activeResponsibility, { obligationMonth: "2026-10", state: "blocked" });
   assert.equal(projection.obligations.statusLabel, "Blocked");
   assert.deepEqual(projection.attentions, [{
     source: "gas",
-    happened: "58 September Gas readings are still missing for October obligations.",
+    happened: "58 October Gas readings are still missing for October obligations.",
     impact: "October gas obligations cannot be completed.",
   }], "Gas is the only notice: no Water attention");
 

@@ -12,8 +12,11 @@ const accounts = new Map([
   ["unit-1", { id: "account-1", unit_id: "unit-1", building_id: "building-1", status: "active" }],
 ]);
 
+// Package 2026-09: Water and Sedapal come from source month 2026-08; Gas comes
+// from the readings filed in 2026-09, which close August usage.
 const facts = {
   sourceReadingMonth: "2026-08",
+  gasSourceMonth: "2026-09",
   commonWaterBill: {
     id: "water-bill-1",
     billing_period_id: "source-period-1",
@@ -23,7 +26,7 @@ const facts = {
     total_consumption: 700,
   },
   gasBills: [{ id: "gas-bill-1", processed_at: null, amount: 460 }],
-  gasReadings: [{ id: "gas-reading-1", unit_id: "unit-1", reading_month: "2026-08-01", consumption: 12.5 }],
+  gasReadings: [{ id: "gas-reading-1", unit_id: "unit-1", reading_month: "2026-09-01", consumption: 12.5 }],
 };
 
 const completeComposition = {
@@ -206,7 +209,7 @@ test("Gas rows declare the readings, consumption and supplier pool used for calc
   assert.equal(result.error, null);
   const gas = result.data.rows.find((row) => row.obligation_type === "gas_consumption");
   assert.deepEqual(gas.calculation_snapshot.gasProvenance, {
-    sourceMonth: "2026-08",
+    sourceMonth: "2026-09",
     readingId: "gas-reading-1",
     unitConsumption: "12.5",
     billIds: ["gas-bill-a", "gas-bill-b"],

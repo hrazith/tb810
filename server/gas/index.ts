@@ -6,7 +6,9 @@ import { getActiveDevTestSessionId, getActiveDevTestSessionSummary, recordDevTes
 import { loadGiulianaPackageProgression } from "@/server/obligations/progression";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 import { getStaffContext } from "@/server/staff-context";
-import { canEditSourceMonth, getActiveReadingMonth } from "@/server/water/unit-meter-readings";
+import { getActiveReadingMonth } from "@/server/water/unit-meter-readings";
+import { isSourceMonthEditable } from "@/server/water/source-editability";
+import { gasObligationMonthForSourceMonth } from "./month-utils";
 import { parseGasWorkbook, type GasImportPreflight } from "./import";
 import { buildMissingGasReadingDrafts, gasReadingDateForSourceMonth } from "./dev-completion";
 import { isGasReadingDateInMonth } from "./date";
@@ -154,8 +156,38 @@ function gasReadingDateError(readingDate: string, readingMonth: string) {
     : "Reading date must belong to the selected operational month.";
 }
 
+// A Gas reading month is frozen by the package that consumes it, which is the
+// obligation package of the same month (gasObligationMonthForSourceMonth). The
+// database guard tb810_lock_gas_source_month_open enforces the same rule.
+export async function canEditGasSourceMonth(monthKey: string, referenceDate?: Date) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey)) return { allowed: false, error: null };
+  const building = await getCurrentBuilding();
+  if (building.error) return { allowed: false, error: building.error };
+  if (!building.data) return { allowed: false, error: null };
+
+  const obligationMonth = gasObligationMonthForSourceMonth(monthKey);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tb810_billing_periods")
+    .select("status")
+    .eq("building_id", building.data.id)
+    .eq("period_year", Number(obligationMonth.slice(0, 4)))
+    .eq("period_month", Number(obligationMonth.slice(5, 7)))
+    .maybeSingle();
+  if (error) return { allowed: false, error: error.message };
+
+  return {
+    allowed: isSourceMonthEditable({
+      sourceMonth: monthKey,
+      activeMonth: getActiveReadingMonth(referenceDate ?? await getBusinessNow()).key,
+      consumingPackage: data ? { status: data.status } : null,
+    }),
+    error: null,
+  };
+}
+
 async function gasReadingMonthEditError(monthKey: string, referenceDate?: Date) {
-  const correction = await canEditSourceMonth(monthKey, referenceDate);
+  const correction = await canEditGasSourceMonth(monthKey, referenceDate);
   if (correction.error) return correction.error;
   return correction.allowed ? null : "Only the current editable Gas reading month can be changed.";
 }

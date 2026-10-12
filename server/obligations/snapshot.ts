@@ -246,7 +246,7 @@ function buildSnapshotPayload(
       let gasProvenance: GasProvenance | null = null;
       if (component.key === "gas") {
         const reading = gasReadingByUnitId.get(unit.unitId);
-        gasProvenance = gasProvenanceForUnit(facts.sourceReadingMonth, reading, gasPoolProvenance);
+        gasProvenance = gasProvenanceForUnit(facts.gasSourceMonth, reading, gasPoolProvenance);
         if (!gasProvenance) {
           return { data: null, error: `Missing Gas provenance for ${unit.unitNumber}.`, failureKind: "not_ready" };
         }
@@ -352,7 +352,7 @@ export async function getSnapshotCalculation({
             status: "available" as const,
             data: {
               ...gasCalculation,
-              sourceReadingMonthLabel: facts.sourceReadingMonth,
+              sourceReadingMonthLabel: facts.gasSourceMonth,
               billingMonthLabel: obligationMonth,
             },
           },

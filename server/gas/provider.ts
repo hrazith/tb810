@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentBuilding, listUnits } from "@/server/units";
 
 import { calculateGasCharges, type GasCalculationResult } from "./calculation";
-import { isEligibleGasBill, previousMonthKeyFromMonthKey } from "./month-utils";
+import { gasSourceMonthForObligationMonth, isEligibleGasBill } from "./month-utils";
 
 export type GasChargePreviewState =
   | {
@@ -20,17 +20,6 @@ export type GasChargePreviewState =
 function monthLabelFromKey(monthKey: string) {
   const parsed = new Date(`${monthKey}-01T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return null;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(parsed);
-}
-
-function nextMonthLabel(monthKey: string) {
-  const parsed = new Date(`${monthKey}-01T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  parsed.setUTCMonth(parsed.getUTCMonth() + 1);
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
@@ -61,7 +50,7 @@ export async function getGasChargePreviewsForUnit(
   if (buildingResult.error) return { status: "unavailable", message: buildingResult.error };
   if (!buildingResult.data) return { status: "unavailable", message: "Current building not found." };
 
-  const sourceReadingMonth = previousMonthKeyFromMonthKey(obligationMonth);
+  const sourceReadingMonth = gasSourceMonthForObligationMonth(obligationMonth);
   if (!sourceReadingMonth) {
     return { status: "unavailable", message: "Gas lookup data is incomplete." };
   }
@@ -126,7 +115,7 @@ export async function getGasChargePreviewsForUnit(
   const gasUnits = unitsResult.data.filter((item) => item.unit_type_code === "condo" && item.has_gas_service);
   const chargesInput = {
     sourceReadingMonth,
-    obligationMonth: nextMonthLabel(sourceReadingMonth)?.slice(0, 7) ?? sourceReadingMonth,
+    obligationMonth,
     supplierBills: gasBillsForMonth.map((bill) => ({
       billId: bill.id,
       amount: String(bill.amount),
@@ -147,7 +136,7 @@ export async function getGasChargePreviewsForUnit(
 
   const calculation = calculateGasCharges(chargesInput);
   const sourceReadingMonthLabel = monthLabelFromKey(sourceReadingMonth);
-  const billingMonthLabel = nextMonthLabel(sourceReadingMonth);
+  const billingMonthLabel = monthLabelFromKey(obligationMonth);
   if (!sourceReadingMonthLabel || !billingMonthLabel) {
     return { status: "unavailable", message: "Gas lookup data is incomplete." };
   }
@@ -182,7 +171,7 @@ export async function getMonthlyGasObligationSummary({
   if (buildingResult.error) return { state: "blocked", amount: null, reason: buildingResult.error };
   if (!buildingResult.data) return { state: "blocked", amount: null, reason: "Current building not found." };
 
-  const sourceReadingMonth = previousMonthKeyFromMonthKey(obligationMonth);
+  const sourceReadingMonth = gasSourceMonthForObligationMonth(obligationMonth);
   if (!sourceReadingMonth) return { state: "blocked", amount: null, reason: "Gas lookup data is incomplete." };
 
   const supabase = await createClient();
@@ -214,7 +203,7 @@ export async function getMonthlyGasObligationSummary({
 
   const chargesInput = {
     sourceReadingMonth,
-    obligationMonth: nextMonthLabel(sourceReadingMonth)?.slice(0, 7) ?? sourceReadingMonth,
+    obligationMonth,
     supplierBills: gasBillsForMonth.map((bill) => ({
       billId: bill.id,
       amount: String(bill.amount),

@@ -11,11 +11,18 @@ const {
   shouldSubmitGasReading,
 } = jiti("./editability.ts");
 
-test("Gas mutation boundary delegates month editability to the canonical guard", () => {
+test("Gas mutation boundary delegates month editability to the Gas source-month guard", () => {
   const source = readFileSync("server/gas/index.ts", "utf8");
-  assert.match(source, /import \{ canEditSourceMonth/);
+  assert.doesNotMatch(source, /canEditSourceMonth/, "Gas must not use the Unit Water S -> S+1 guard");
+  assert.match(source, /import \{ isSourceMonthEditable \} from "@\/server\/water\/source-editability"/);
+  assert.match(source, /const obligationMonth = gasObligationMonthForSourceMonth\(monthKey\)/);
   assert.match(source, /async function gasReadingMonthEditError\(monthKey: string, referenceDate\?: Date\)/);
-  assert.match(source, /const correction = await canEditSourceMonth\(monthKey, referenceDate\)/);
+  assert.match(source, /const correction = await canEditGasSourceMonth\(monthKey, referenceDate\)/);
+  for (const page of ["app/(staff)/gas/unit-gas-readings/[month]/page.tsx", "app/(staff)/gas/readings/[readingId]/page.tsx"]) {
+    const pageSource = readFileSync(page, "utf8");
+    assert.match(pageSource, /await canEditGasSourceMonth\(/, page);
+    assert.doesNotMatch(pageSource, /canEditSourceMonth/, page);
+  }
   for (const functionName of ["createGasReading", "updateGasReading", "deleteGasReading"]) {
     const start = source.indexOf(`export async function ${functionName}`);
     const next = source.indexOf("export async function", start + 1);

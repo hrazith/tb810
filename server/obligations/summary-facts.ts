@@ -115,7 +115,7 @@ function buildWaterSummaryFromFacts(financialFacts: BuildingMonthFinancialFacts,
 
 function buildGasSummaryFromFacts(financialFacts: BuildingMonthFinancialFacts, obligationMonth: string) {
   const gasCalculation = calculateGasCharges({
-    sourceReadingMonth: financialFacts.sourceReadingMonth,
+    sourceReadingMonth: financialFacts.gasSourceMonth,
     obligationMonth,
     supplierBills: financialFacts.gasBills.map((bill) => ({
       billId: bill.id,

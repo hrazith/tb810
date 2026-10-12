@@ -34,7 +34,35 @@ test("only the shared source-freeze extraction follows the Sedapal contract", ()
     "20261009120000_api_surface_lockdown.sql",
     "20261009130000_progression_unfinished_package_anchor.sql",
     "20261009140000_pulse_operational_month_container.sql",
+    "20261011120000_restore_staff_read_rpc_grants.sql",
+    "20261012120000_restore_financial_table_grants.sql",
+    "20261012130000_gas_source_month_alignment.sql",
+    "20261012140000_gas_obligation_restatement.sql",
   ]);
+  // The grant restorations only grant privileges; they define no function.
+  for (const grantsOnly of later.slice(7, 9)) {
+    assert.doesNotMatch(fs.readFileSync(`supabase/migrations/${grantsOnly}`, "utf8"), /^\s*(?:create (?:or replace )?function|revoke)\b/m);
+  }
+  // The Gas source-month alignment redefines the building facts read, which
+  // also selects the Sedapal bill. Apart from its two Gas reading lines it must
+  // equal the previous definition, so every Sedapal selection is unchanged.
+  const factsDefinition = (file) => {
+    const source = fs.readFileSync(`supabase/migrations/${file}`, "utf8");
+    const start = source.indexOf("create or replace function public.tb810_get_building_month_financial_facts(");
+    assert.notEqual(start, -1, file);
+    return source.slice(start, source.indexOf("\n$$;", start))
+      .split("\n")
+      .filter((line) => !line.includes("from public.tb810_gas_readings gr"))
+      .join("\n");
+  };
+  assert.equal(factsDefinition(later[9]), factsDefinition("20261004120000_gas_bill_pool_reservation.sql"));
+  const alignment = fs.readFileSync(`supabase/migrations/${later[9]}`, "utf8");
+  const outsideFacts = alignment.slice(0, alignment.indexOf("create or replace function public.tb810_get_building_month_financial_facts("));
+  assert.doesNotMatch(outsideFacts, /tb810_assert_sedapal_provenance|tb810_utility_bills|tb810_lock_common_water_source_periods/);
+  // The Gas restatement replaces only gas_consumption rows and never reads Sedapal.
+  const restatement = fs.readFileSync(`supabase/migrations/${later[10]}`, "utf8");
+  assert.deepEqual([...restatement.matchAll(/create (?:or replace )?function public\.(\w+)\(/g)].map((match) => match[1]), ["tb810_restate_gas_obligations_system"]);
+  assert.doesNotMatch(restatement, /tb810_assert_sedapal_provenance|tb810_utility_bills/);
   // The operational-month container only inserts a Billing Period; it defines
   // no Sedapal contract function.
   assert.deepEqual(

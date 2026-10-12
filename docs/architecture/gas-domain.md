@@ -82,13 +82,17 @@ Status: Implemented in `20261008120000_gas_production_contract.sql`. Sections 1โ
 
 ### 7.1 Source month and consuming package
 
-A Gas reading with `reading_month = S` is the reading taken at the start of S and measures consumption for the month before it. Monthly Obligations package `S+1` consumes source month `S`. The rule is the same as for Unit Water and Sedapal.
+Revised October 12, 2026 (`20261012130000_gas_source_month_alignment.sql`).
+
+Gas usage of month M is billed in obligation month M+1. Gas meters are read at the start of each month, and a reading is filed under the month in which it is taken: the reading with `reading_month = S` closes the usage of S-1. Monthly Obligations package `S` therefore consumes Gas reading month `S`. For example, October obligations consume the readings taken on October 1, which measure September usage.
+
+This differs from Unit Water and Sedapal, whose package `S+1` consumes source month `S`. The original contract applied the Water rule to Gas, which billed the usage of M-2 (October billed August usage) and contradicted Legacy billing (January 2025 usage on the February 2025 bill) and the workbook parity fixtures. Packages approved under the original rule are corrected only through the audited restatement in ยง7.5.
 
 ### 7.2 Gas source freeze
 
-Source month S is editable while package S+1 is absent, `draft`, `collecting_readings`, or `ready_for_review`. It is frozen once S+1 is `approved`, `invoices_generated`, or `closed`.
+Gas reading month S is editable while package S is absent, `draft`, `collecting_readings`, or `ready_for_review`. It is frozen once package S is `approved`, `invoices_generated`, or `closed`.
 
-A row trigger on `tb810_gas_readings` calls the shared `tb810_lock_source_month_open` for the old and new months, in ascending order. This makes the freeze authoritative for every write path:
+A row trigger on `tb810_gas_readings` calls `tb810_lock_gas_source_month_open` (the shared source lock applied to package S) for the old and new months, in ascending order. This makes the freeze authoritative for every write path:
 
 - inline create, edit, and delete;
 - moving a reading between months;
@@ -159,7 +163,9 @@ A missing declaration is rejected as missing provenance. A mismatch is rejected 
 
 ### 7.5 Approved history and the correctable source ledger
 
-Approved obligations are immutable history. The source ledger (readings and purchases) can still be corrected while its consuming package is open. Once that package is finalized, correcting the ledger requires a future explicit, audited repair path. No such path exists yet, and approved obligations are never rewritten implicitly.
+Approved obligations are immutable history. The source ledger (readings and purchases) can still be corrected while its consuming package is open. Once that package is finalized, correcting the ledger requires an explicit, audited repair path, and approved obligations are never rewritten implicitly.
+
+The one repair path is `tb810_restate_gas_obligations_system` (`20261012140000_gas_obligation_restatement.sql`), run through `scripts/restate-gas-obligations.mjs`. It exists for packages approved under the original source-month rule. It runs only as the system, defaults to a dry run, accepts only an `approved` (undispatched) package whose Gas rows still declare a different source month, replaces only its `gas_consumption` rows using the pool reserved at approval, requires a reading for every enrolled Gas Unit, applies the provenance check above, and keeps the previous rows in `tb810_audit_logs` and in each new row's `calculation_snapshot.restatement`.
 
 ### 7.6 No fabricated readings
 

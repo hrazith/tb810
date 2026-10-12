@@ -4,10 +4,9 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { formatPeruvianDate } from "@/lib/water-dates";
-import { getGasReadingById, listGasReadings } from "@/server/gas";
+import { canEditGasSourceMonth, getGasReadingById, listGasReadings } from "@/server/gas";
 import { deleteGasReadingAction } from "@/server/gas/actions";
 import { listUnits } from "@/server/units";
-import { canEditSourceMonth } from "@/server/water/unit-meter-readings";
 
 import { GasReadingForm } from "../../_components/gas-reading-form";
 import { updateGasReadingAction } from "@/server/gas/actions";
@@ -26,7 +25,7 @@ export default async function GasReadingDetailPage({ params }: PageProps) {
   if (!result.data) notFound();
 
   const readingMonth = result.data.reading_month.slice(0, 7);
-  const correctionResult = await canEditSourceMonth(readingMonth);
+  const correctionResult = await canEditGasSourceMonth(readingMonth);
   if (correctionResult.error) throw new Error(correctionResult.error);
   const monthEditable = correctionResult.allowed;
 

@@ -5,6 +5,19 @@ export function previousMonthKeyFromMonthKey(monthKey: string) {
   return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+// Gas meters are read at the start of each month, so the reading filed in
+// month S closes the usage of S-1. Usage of month M is billed in obligation
+// month M+1, which therefore consumes the Gas reading month equal to itself.
+// Unit Water and Sedapal keep consuming the previous source month.
+export function gasSourceMonthForObligationMonth(obligationMonth: string) {
+  return obligationMonth;
+}
+
+// The obligation package that consumes (and freezes) a Gas reading month.
+export function gasObligationMonthForSourceMonth(readingMonth: string) {
+  return readingMonth;
+}
+
 export function firstDayOfMonth(monthKey: string) {
   const parsed = new Date(`${monthKey}-01T00:00:00Z`);
   return Number.isNaN(parsed.getTime()) ? null : `${monthKey}-01`;
