@@ -373,56 +373,59 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
             </div>
           ) : selectedOwner && selectedOwnerObligation?.data ? (
   /* Owner Obligation */
-            <div className="space-y-8  ">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <Button variant="icon" size="sm" className="ml-auto shrink-0" aria-label="Close owner obligations" data-obligations-close>
+            <div className="space-y-8">
+              <div className="flex justify-end">
+                <Button variant="icon" size="sm" className="shrink-0" aria-label="Close owner obligations" data-obligations-close>
                   <X aria-hidden size={16} />
                 </Button>
-                <div>
-                  <div className="text-2xl font-semibold tracking-tight text-zinc-950">{selectedOwner.full_name}</div>
-                  <div className="mt-2 text-sm text-zinc-600 ">
-                    {selectedOwner.owner_reference} · {selectedOwnerObligation.data.ownedUnitCount}  Units
+              </div>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="break-words text-3xl font-semibold tracking-tight text-zinc-950">{selectedOwner.full_name}</div>
+                  <div className="mt-2 text-sm text-zinc-600">
+                    {selectedOwner.owner_reference} · {selectedOwnerObligation.data.ownedUnitCount} Units
                   </div>
                 </div>
-                <AddChargeDialog
-                  action={createChargeAction}
-                  returnTo={`/obligations?mode=owners&ownerId=${selectedOwner.id}${monthParam}`}
-                  workingMonth={workingObligationMonth}
-                  defaultTarget={`owner:${selectedOwner.id}`}
-                  units={chargeUnits}
-                  owners={chargeOwners}
-                />
-                
+                <Button asChild variant="neutral" size="icon" shape="pill">
+                  <a
+                    href={`/obligations/owners/${selectedOwner.id}/aviso?month=${monthKey}`}
+                    download
+                    aria-label="Descargar aviso de pago (borrador)"
+                    title="Descargar aviso de pago (borrador)"
+                  >
+                    <DownloadSimple size={22} aria-hidden="true" />
+                  </a>
+                </Button>
               </div>
 
-              <div>
-            
-                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500"> Obligations {monthLabel(monthKey)} </h3>
+              <div className="space-y-6">
+                <h3 className="mb-4 text-sm font-semibold uppercase text-zinc-500">Obligations {monthLabel(monthKey)}</h3>
+                <div className="space-y-3 text-sm text-zinc-600">
                 {ownerComponentRows.map((component) => {
                   const value = component.state === "available" ? formatMoney(component.amount) : formatStatusLabel(component.state);
                   const showsUnitChargeLines = component.key === "other_charge" && ownerUnitChargeLines.length > 0;
                   if (component.key !== "fixed_assessment" && !showsUnitChargeLines) {
                     return (
-                      <div key={component.key} className="flex items-baseline justify-between gap-4 py-3 text-base text-zinc-600">
+                      <div key={component.key} className="flex items-center justify-between gap-4">
                         <span className="min-w-0 break-words">{componentLabel(component.key)}</span>
-                        <span className="min-w-0 wrap-anywhere text-right font-medium">{value}</span>
+                        <span className="min-w-0 wrap-anywhere text-right">{value}</span>
                       </div>
                     );
                   }
 
                   return (
                     <details key={component.key} className="group">
-                      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-3 text-left text-base text-zinc-600">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left">
                         <span className="min-w-0 break-words">{componentLabel(component.key)}</span>
-                        <span className="flex min-w-0 items-center gap-2 text-right font-medium">
+                        <span className="flex min-w-0 items-center gap-2 text-right">
                           <span className="wrap-anywhere">{value}</span>
                           <CaretRight className="shrink-0 group-open:hidden" size={16} aria-hidden="true" />
                           <CaretDown className="hidden shrink-0 group-open:block" size={16} aria-hidden="true" />
                         </span>
                       </summary>
-                      <div className="space-y-1 pl-6 pb-2">
+                      <div className="space-y-2 pl-6 pt-3">
                         {showsUnitChargeLines ? ownerUnitChargeLines.map((line) => (
-                          <div key={line.chargeId} className="flex items-baseline justify-between gap-4 py-2 text-sm text-zinc-600">
+                          <div key={line.chargeId} className="flex items-baseline justify-between gap-4">
                             <span className="min-w-0 break-words">
                               <Link href={`/units/${line.unitNumber}`} className="font-medium text-zinc-950 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950">
                                 {line.unitNumber}
@@ -437,7 +440,7 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                             ? formatMoney(unitFixedAssessment.amount)
                             : formatStatusLabel(unitFixedAssessment?.status ?? "not_applicable");
                           return (
-                            <div key={unit.unitId} className="flex items-baseline justify-between gap-4 py-2 text-sm text-zinc-600">
+                            <div key={unit.unitId} className="flex items-baseline justify-between gap-4">
                               <Link href={`/units/${unit.unitNumber}`} className="font-medium text-zinc-950 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950">
                                 {unit.unitNumber}
                               </Link>
@@ -451,17 +454,17 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                 })}
                 {selectedOwnerObligation.data.ownerDirectCharges.state === "available" && selectedOwnerObligation.data.ownerDirectCharges.lineItems.length > 0 ? (
                   <details className="group">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-3 text-left text-base text-zinc-600">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left">
                       <span className="min-w-0 break-words">Owner-direct charges</span>
-                      <span className="flex min-w-0 items-center gap-2 text-right font-medium">
+                      <span className="flex min-w-0 items-center gap-2 text-right">
                         <span className="wrap-anywhere">{formatMoney(selectedOwnerObligation.data.ownerDirectCharges.amount)}</span>
                         <CaretRight className="shrink-0 group-open:hidden" size={16} aria-hidden="true" />
                         <CaretDown className="hidden shrink-0 group-open:block" size={16} aria-hidden="true" />
                       </span>
                     </summary>
-                    <div className="space-y-1 pl-6 pb-2">
+                    <div className="space-y-2 pl-6 pt-3">
                       {selectedOwnerObligation.data.ownerDirectCharges.lineItems.map((item) => (
-                        <div key={item.chargeId} className="flex items-baseline justify-between gap-4 py-2 text-sm text-zinc-600">
+                        <div key={item.chargeId} className="flex items-baseline justify-between gap-4">
                           <span className="min-w-0 break-words">{item.description}</span>
                           <span className="min-w-0 wrap-anywhere text-right">{formatMoney(item.amount)}</span>
                         </div>
@@ -469,26 +472,35 @@ export default async function ObligationsPage({ searchParams }: PageProps) {
                     </div>
                   </details>
                 ) : (
-                  <div className="flex items-baseline justify-between gap-4 py-3 text-base text-zinc-600">
+                  <div className="flex items-center justify-between gap-4">
                     <span className="min-w-0 break-words">Owner-direct charges</span>
-                    <span className="min-w-0 wrap-anywhere text-right font-medium">
+                    <span className="min-w-0 wrap-anywhere text-right">
                       {selectedOwnerObligation.data.ownerDirectCharges.state === "available"
                         ? formatMoney(selectedOwnerObligation.data.ownerDirectCharges.amount)
                         : formatStatusLabel(selectedOwnerObligation.data.ownerDirectCharges.state)}
                     </span>
                   </div>
                 )}
-                <div className="mt-2 flex items-baseline justify-between gap-4 border-t border-zinc-200 pt-4 font-semibold text-zinc-950">
-                  <span>Total</span>
+                <div className="flex items-center justify-between gap-4 border-t border-zinc-200 pt-3 text-zinc-950">
+                  <span className="font-medium">Total</span>
                   <span className="min-w-0 wrap-anywhere text-right">
                     {selectedOwnerObligation.data.total.state === "available"
                       ? formatMoney(selectedOwnerObligation.data.total.amount)
                       : formatStatusLabel(selectedOwnerObligation.data.total.state)}
                   </span>
                 </div>
-                <div className="mt-2 text-sm text-zinc-500">{formatStatusLabel(selectedOwnerObligation.data.readiness)}</div>
-              </div>
+                <div className="text-zinc-500">{formatStatusLabel(selectedOwnerObligation.data.readiness)}</div>
+                </div>
 
+                <AddChargeDialog
+                  action={createChargeAction}
+                  returnTo={`/obligations?mode=owners&ownerId=${selectedOwner.id}${monthParam}`}
+                  workingMonth={workingObligationMonth}
+                  defaultTarget={`owner:${selectedOwner.id}`}
+                  units={chargeUnits}
+                  owners={chargeOwners}
+                />
+              </div>
             </div>
           ) : selectedUnit && selectedUnitPanel ? (
             <div className="space-y-8">
