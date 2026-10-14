@@ -18,12 +18,12 @@ type SummaryComponent = {
 
 function selectApplicableUnitCharges(
   charges: BuildingMonthFinancialFacts["charges"],
-  eligibleUnitIds: string[],
+  unitIds: string[],
   obligationMonth: string,
 ) {
   return charges.filter((row) => {
     if (row.owner_id != null || row.unit_id == null) return false;
-    if (!eligibleUnitIds.includes(row.unit_id)) return false;
+    if (!unitIds.includes(row.unit_id)) return false;
     const effectiveFromMonth = row.effective_from_month.slice(0, 7);
     const effectiveToMonth = row.effective_to_month ? row.effective_to_month.slice(0, 7) : null;
     return isChargeEligibleForMonth({
@@ -150,8 +150,10 @@ function buildChargeSummaryFromFacts(
   financialFacts: BuildingMonthFinancialFacts,
   obligationMonth: string,
 ) {
-  const eligibleUnitIds = financialFacts.unitRows.filter((unit) => unit.unit_type_code === "condo").map((unit) => unit.id);
-  const applicableCharges = selectApplicableUnitCharges(financialFacts.charges, eligibleUnitIds, obligationMonth);
+  // A Unit-attached charge belongs to its Unit whatever the Unit type, as in
+  // the Owner read model and the approval snapshot (buildChargeMap).
+  const buildingUnitIds = financialFacts.unitRows.map((unit) => unit.id);
+  const applicableCharges = selectApplicableUnitCharges(financialFacts.charges, buildingUnitIds, obligationMonth);
   const amount = applicableCharges.reduce((sum, row) => sum + Number(row.amount), 0);
   return {
     amount: formatAmount(amount),
